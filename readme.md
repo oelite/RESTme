@@ -9,6 +9,13 @@ RESTme (Restme) is a simple RESTful and HTTP client implemented in .NET Core
 * GET, POST,  PUT, DELETE supported
 * Parameters get automatically converted into query string or post form fields
 * Bearer Authentication and custom headers 
+* 
+
+### Nuget Package
+```csharp
+    Install-Package OElite.Restme
+```
+Package available and released to Nuget:  [https://www.nuget.org/packages/OElite.Restme/](https://www.nuget.org/packages/OElite.Restme/)
 
 ### Usage
 
