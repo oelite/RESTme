@@ -36,7 +36,7 @@ namespace OElite.Restme.UnitTests
             var result3 = await rest.GetAsync<GeoResult>("/json");
             Assert.True(result3?.Latitude != null);
 
-            rest = new Restme(new Uri("http://api-beta.webcider.com"));
+            rest = new Restme(new Uri("http://api-beta.oelite.com"));
             rest.Add("id", 8);
             var result4 = await rest.GetAsync<string>("/sites");
             Assert.True(result4.Length > 30);
