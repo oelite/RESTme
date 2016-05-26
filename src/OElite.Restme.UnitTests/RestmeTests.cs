@@ -22,6 +22,26 @@ namespace OElite.Restme.UnitTests
             var result3 = rest.Get<GeoResult>("/json");
             Assert.True(result3?.Latitude != null);
         }
+        [Fact]
+        public async Task GetAsyncTests()
+        {
+            var rest = new Restme(new Uri("http://freegeoip.net"));
+            var result1 = await rest.GetAsync<string>("/json/github.com");
+            Assert.True(result1.Length > 0 && result1.Contains("region_code"));
+
+            var result2 = await rest.GetAsync<GeoResult>("/json/github.com");
+            Assert.True(result2?.Latitude != 0);
+
+            rest.Add("q", "github.com");
+            var result3 = await rest.GetAsync<GeoResult>("/json");
+            Assert.True(result3?.Latitude != null);
+
+            rest = new Restme(new Uri("http://api-beta.webcider.com"));
+            rest.Add("id", 8);
+            var result4 = await rest.GetAsync<string>("/sites");
+            Assert.True(result4.Length > 30);
+
+        }
 
 
         private class GeoResult

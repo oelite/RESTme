@@ -167,6 +167,7 @@ namespace OElite.Restme
         }
         private string PrepareInjectParamsIntoQuery(string urlPath)
         {
+            urlPath = urlPath ?? string.Empty;
             var nvc = urlPath.IdentifyQueryParams();
             if (_params?.Count > 0)
             {
