@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OElite.Restme.Utils
+namespace OElite
 {
     public class OEliteFormUrlEncodedContent : ByteArrayContent
     {

@@ -1,15 +1,21 @@
 # REST Http Client
 
-RESTme (Restme) is a simple RESTful and HTTP client implemented in .NET Core
+RESTme (Restme) is a collectino of useful utility tools implemented in .NET Core aiming to increase productivity and keep code simplicity. Currently it includes: RESTful HTTP Client, Azure Storage Client, Redis Cache Client.
+
+All tools are wrapped into single class **Restme()** to keep everything simple, the class will automatically identify whether it's used as HTTP Client, Azure Storage Client or Redis Cache Client.
 
 ### Features
 * Implemented based on the latest .NET Core 1.0 (RC2)
 * Simple methods and flexible calls
 * Uses Newtonsoft JSON and allows custom serilization
-* GET, POST,  PUT, DELETE supported
-* Parameters get automatically converted into query string or post form fields
-* Bearer Authentication and custom headers 
-* 
+* HTTP Client:
+    * Parameters get automatically converted into query string or post form fields
+    * Supports GET, POST,  PUT, DELETE
+    * Bearer Authentication and custom headers 
+* Azure Storage Client:
+    * Simplified call stack
+* Redis Cache Client
+    * Simplified call stack
 
 ### Nuget Package
 ```csharp
@@ -18,6 +24,8 @@ RESTme (Restme) is a simple RESTful and HTTP client implemented in .NET Core
 Package available and released to Nuget:  [https://www.nuget.org/packages/OElite.Restme/](https://www.nuget.org/packages/OElite.Restme/)
 
 ### Usage
+
+#### Use as a RESTful HTTP client
 
 ```csharp
 //direct string JSON return
@@ -46,6 +54,12 @@ var myObject = new MyObject()
 var rest3 = new Restme(new Uri("http://example.com"));
 rest3.Add(myObject);
 
+
+```
+
+#### Use as a Azure Storage client
+```csharp
+//
 
 ```
 

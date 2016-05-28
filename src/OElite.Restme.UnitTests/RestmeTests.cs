@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace OElite.Restme.UnitTests
+namespace OElite.UnitTests
 {
     public class RestmeTests
     {

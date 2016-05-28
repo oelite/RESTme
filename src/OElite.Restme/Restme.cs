@@ -7,28 +7,29 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Text;
 using System.IO;
-using OElite.Restme.Utils;
 
-namespace OElite.Restme
+namespace OElite
 {
-    public class Restme : IRestme
+    public partial class Restme : IRestme
     {
-        private JsonSerializerSettings _jsonSettings = null;
+        internal Dictionary<string, string> _params;
+        internal Dictionary<string, List<string>> _headers;
+        internal JsonSerializerSettings _jsonSerializerSettings;
+        internal object _objAsParam;
+
         public Restme(Uri baseUri = null, string urlPath = null, JsonSerializerSettings jsonSerializerSettings = null)
         {
             this.BaseUri = baseUri;
             this.RequestUrlPath = urlPath;
             _params = new Dictionary<string, string>();
             _headers = new Dictionary<string, List<string>>();
-            _jsonSettings = jsonSerializerSettings ?? new JsonSerializerSettings() { ContractResolver = new OEliteJsonResolver() };
+            _jsonSerializerSettings = jsonSerializerSettings ?? new JsonSerializerSettings() { ContractResolver = new OEliteJsonResolver() };
+            this.PrepareRestMode();
         }
-        private Dictionary<string, string> _params;
-        private Dictionary<string, List<string>> _headers;
-        private object _objAsParam;
 
         public Uri BaseUri { get; set; }
         public string RequestUrlPath { get; set; }
-
+        public RestMode CurrentMode { get; set; }
 
 
         public void Add(object value)
@@ -86,44 +87,14 @@ namespace OElite.Restme
 
         public async Task<T> RequestAsync<T>(HttpMethod method, string relativePath = null)
         {
-            HttpClient httpClient = new HttpClient();
-            httpClient.BaseAddress = BaseUri;
-            PrepareHeaders(httpClient.DefaultRequestHeaders);
-            HttpResponseMessage response = null;
-
-            if (method == HttpMethod.Post)
+            switch (CurrentMode)
             {
-                response = await httpClient.PostAsync(new Uri(BaseUri, relativePath), new OEliteFormUrlEncodedContent(_params));
-            }
-            else if (method == HttpMethod.Put)
-            {
-                response = await httpClient.PutAsync(new Uri(BaseUri, relativePath), new OEliteFormUrlEncodedContent(_params));
-            }
-            else if (method == HttpMethod.Get)
-            {
-                response = await httpClient.GetAsync(new Uri(BaseUri, PrepareInjectParamsIntoQuery(relativePath)));
-            }
-            else if (method == HttpMethod.Delete)
-            {
-                response = await httpClient.DeleteAsync(new Uri(BaseUri, PrepareInjectParamsIntoQuery(relativePath)));
-            }
-
-            var content = await response.Content.ReadAsStringAsync();
-
-            try
-            {
-                if (typeof(T).IsConvertable())
-                {
-                    return (T)Convert.ChangeType(content, typeof(T));
-                }
-                else
-                {
-                    return JsonConvert.DeserializeObject<T>(content, _jsonSettings);
-                }
-            }
-            catch (Exception ex)
-            {
-                return default(T);
+                case RestMode.HTTPClient:
+                    return await this.HttpRequestAsync<T>(method, relativePath);
+                case RestMode.AzureStorageClient:
+                case RestMode.RedisCacheClient:
+                default:
+                    throw new NotSupportedException("Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
             }
         }
 
@@ -134,7 +105,18 @@ namespace OElite.Restme
 
         public async Task<T> GetAsync<T>(string relativeUrlPath = null)
         {
-            return await RequestAsync<T>(HttpMethod.Get, relativeUrlPath);
+            switch (CurrentMode)
+            {
+                case RestMode.HTTPClient:
+                    return await this.HttpGetAsync<T>(relativeUrlPath);
+                case RestMode.AzureStorageClient:
+                    return await this.StorageGetAsync<T>(relativeUrlPath);
+                case RestMode.RedisCacheClient:
+                    return await this.RedisGetAsync<T>(relativeUrlPath);
+                default:
+                    throw new NotSupportedException("Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
+            }
+
         }
 
         public T Post<T>(string relativeUrlPath = null)
@@ -147,8 +129,8 @@ namespace OElite.Restme
             return await RequestAsync<T>(HttpMethod.Post, relativeUrlPath);
         }
 
-        #region Private Methods
-        private void PrepareHeaders(HttpRequestHeaders headers)
+        #region Private Methods        
+        public void PrepareHeaders(HttpRequestHeaders headers)
         {
             if (_headers?.Count > 0)
             {
@@ -165,7 +147,7 @@ namespace OElite.Restme
                 }
             }
         }
-        private string PrepareInjectParamsIntoQuery(string urlPath)
+        public string PrepareInjectParamsIntoQuery(string urlPath)
         {
             urlPath = urlPath ?? string.Empty;
             var nvc = urlPath.IdentifyQueryParams();

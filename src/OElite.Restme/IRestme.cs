@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-namespace OElite.Restme
+namespace OElite
 {
     public interface IRestme
     {
