@@ -26,6 +26,35 @@ Package available and released to Nuget:  [https://www.nuget.org/packages/OElite
 
 ### Usage
 
+#### Every Simplified!
+With concept of simplifying understanding of how Azure Storage, Redis Cache or RESTful requests work, RESTme only cares about the following:
+##### Step 1. Initialize Restme()
+```csharp
+var rest = new Restme(yourConfigParameters); //the parameters are either HTTP url if it is HTTP Client, or the connection string for Azure Blob/Redis server
+```
+##### Step 2. Get/Save/Delete Data
+```csharp
+//HTTP Restful client (sudo code)
+// Get data
+rest.Get(requestUrl);
+// Save data
+rest.Add(paramKey, paramValue);
+rest.Post(requestUrl, data);
+// Delete data
+rest.Delete(requestUrl);
+
+//Azure Storage or Redis ache sudo-code
+// Get data
+rest.Get<Stream>("/container/filePath");
+rest.Get("/container/jsonData");
+rest.Get<myObject>("/container/filePath");
+
+// Save data
+rest.Post<myObject>("/container/filePath", myObject);
+// Delete data
+rest.Delete("/container/filePath");
+```
+
 #### Use as a RESTful HTTP client
 
 ```csharp
