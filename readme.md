@@ -16,7 +16,7 @@ All tools are wrapped into single class **Restme()** to keep everything simple, 
 * Azure Storage Client:
     * Simplified call stack
 * Redis Cache Client
-    * Simplified call stack
+    * Simplified call stack (Currently only support Azure Redis Cache, you can modify the source code to support other Redis Servers)
 
 ### Nuget Package
 ```csharp
