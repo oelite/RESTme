@@ -13,17 +13,26 @@ namespace OElite
         /// <param name="restme"></param>
         public static void PrepareRestMode(this Restme restme)
         {
-            var baseHost = restme.BaseUri?.Host?.ToLower();
-            if (baseHost.IsNotNullOrEmpty())
+            if (restme.BaseUri != null)
+                restme.CurrentMode = RestMode.HTTPClient;
+            else
             {
-                if (baseHost.Contains("blob.core.windows.net"))
-                    restme.CurrentMode = RestMode.AzureStorageClient;
-                else if (baseHost.Contains("redis.cache.windows.net"))
-                    restme.CurrentMode = RestMode.RedisCacheClient;
+                if (restme.ConnectionString.IsNotNullOrEmpty())
+                {
+                    var connectionString = restme.ConnectionString.ToLower();
+                    if ((connectionString.Contains("defaultendpointsprotocol") &&
+                        connectionString.Contains("accountname") &&
+                        connectionString.Contains("accountkey")) ||
+                        (connectionString.Contains("usedevelopmentstorage") &&
+                        connectionString.Contains("true")
+                        ))
+                        restme.CurrentMode = RestMode.AzureStorageClient;
+                    else if (restme.ConnectionString.ToLower().Contains("redis.cache.windows.net"))
+                        restme.CurrentMode = RestMode.RedisCacheClient;
+                }
                 else
-                    restme.CurrentMode = RestMode.HTTPClient;
+                    throw new NotSupportedException("Unable to identify RestmeMode.");
             }
-
         }
     }
 }

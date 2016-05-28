@@ -6,7 +6,7 @@ using Xunit;
 
 namespace OElite.UnitTests
 {
-    public class RestmeTests
+    public class RestmeHttpTests
     {
         [Fact]
         public void GetTests()

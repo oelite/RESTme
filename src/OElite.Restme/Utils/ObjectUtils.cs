@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +8,10 @@ namespace OElite
 {
     public static class ObjectUtils
     {
+        public static string JsonSerialize(this object objectValue)
+        {
+            return StringUtils.JsonSerialize(objectValue);
+        }
         public static T CreateObject<T>()
         {
             return Activator.CreateInstance<T>();
