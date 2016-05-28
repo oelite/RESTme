@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-namespace OElite.Restme
+namespace OElite
 {
     public interface IRestme
     {
@@ -19,14 +19,22 @@ namespace OElite.Restme
         void AddBearerToken(string token);
 
 
-        T Request<T>(HttpMethod method, string relativeUrlPath = null);
-        Task<T> RequestAsync<T>(HttpMethod method, string relativePath = null);
+        T Request<T>(HttpMethod method, string keyOrRelativePath = null);
+        Task<T> RequestAsync<T>(HttpMethod method, string keyOrRelativePath = null);
 
-        T Get<T>(string relativeUrlPath = null);
-        Task<T> GetAsync<T>(string relativeUrlPath = null);
+        T Get<T>(string keyOrRelativePath = null);
+        Task<T> GetAsync<T>(string keyOrRelativePath = null);
+        string Get(string keyOrRelativePath = null);
+        Task<string> GetAsync(string keyOrRelativePath = null);
 
-        T Post<T>(string relativeUrlPath = null);
-        Task<T> PostAsync<T>(string relativeUrlPath = null);
+        T Post<T>(string keyOrRelativePath = null, T dataObject = default(T));
+        Task<T> PostAsync<T>(string keyOrRelativePath = null, T dataObject = default(T));
+        string Post(string keyOrRelativePath = null, string dataValue = null);
+        Task<string> PostAsync(string keyOrRelativePath = null, string dataValue = null);
 
+        T Delete<T>(string keyOrRelativePath = null);
+        Task<T> DeleteAsync<T>(string keyOrRelativePath = null);
+        bool Delete(string keyOrRelativePath = null);
+        Task<bool> DeleteAsync(string keyOrRelativePAth = null);
     }
 }

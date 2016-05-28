@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace OElite.Restme.Utils
+namespace OElite
 {
     public static class PrimitiveTypes
     {
@@ -32,7 +32,7 @@ namespace OElite.Restme.Utils
                               typeof (TimeSpan)
                           };
 
-        public static bool IsConvertable(this Type type)
+        public static bool IsPrimitiveType(this Type type)
         {
             if (List.Any(x => x == type))
                 return true;

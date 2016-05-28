@@ -1,0 +1,4 @@
+﻿{
+  "azureStorageConnectionString": "",
+  "redisConnectionString": "oelite.redis.cache.windows.net:6380,password=M0RU13AtWR841t7oH4hvN62M+ygDwF7YVQmxYyZi3o8=,ssl=True,abortConnect=False"
+}

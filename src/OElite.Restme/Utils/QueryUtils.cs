@@ -5,7 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 
-namespace OElite.Restme.Utils
+namespace OElite
 {
     public static class QueryUtils
     {
