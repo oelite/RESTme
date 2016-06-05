@@ -1,13 +1,13 @@
 {
-  "version": "1.0.3-*",
+  "version": "1.0.4-*",
   "authors": [
     "Lida Weng"
   ],
   "owners": [
     "OElite Limited"
   ],
-  "description": "RESTme (Restme) is a simple RESTful and HTTP client, Azure Blob Storage Client, Redis Client implemented in .NET Core",
-  "summary": "RESTme (Restme) is a simple RESTful and HTTP client, Azure Blob Storage Client, Redis Client implemented in .NET Core",
+  "description": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core",
+  "summary": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core",
   "projectUrl": "https://github.com/oelite/RESTme",
   "tags": [
     "HTTP",

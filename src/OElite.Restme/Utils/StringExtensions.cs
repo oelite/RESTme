@@ -51,6 +51,10 @@
         {
             return !string.IsNullOrEmpty(segment);
         }
+        public static string MD5Encrypt(this string value)
+        {
+            return EncryptHelper.MD5Encrypt(value);
+        }
         /// <summary>
         /// Checks if a segement contains any parameters.
         /// </summary>
@@ -94,7 +98,7 @@
         {
             return StringUtils.JsonDeserialize<T>(value);
         }
-        
+
 
     }
 }

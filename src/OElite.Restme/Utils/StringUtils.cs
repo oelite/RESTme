@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
 
 namespace OElite
 {
