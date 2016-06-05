@@ -16,6 +16,14 @@ namespace OElite
         {
             return Activator.CreateInstance<T>();
         }
+        public static T ParseEnum<T>(this int enumValue)
+        {
+            return (T)Enum.Parse(typeof(T), enumValue.ToString());
+        }
+        public static T ParseEnum<T>(this string enumValue)
+        {
+            return (T)Enum.Parse(typeof(T), enumValue);
+        }
         public static bool IsSubclassOfRawGeneric(this Type toCheck, Type generic)
         {
             while (toCheck != null && toCheck != typeof(object))

@@ -64,12 +64,12 @@ var result1 = rest.Get("/json/github.com");
 
 //automatic Generic cast
 var result2 = rest.Get<MyObject>("/json/github.com");
-var resultAsync2 = await rest.GetAsync<<MyObjecT>("/json/github.com");
+var resultAsync2 = await rest.GetAsync<MyObjecT>("/json/github.com");
 
 //add parameters (Parameters get automatically converted into query string or post form fields)
 rest.add("q","github.com");
 var result3 = rest.Get<MyObject>("/json");  
-var resultAsync3 = await rest.GetAsync<MyObjecT>("/json");
+var resultAsync3 = await rest.GetAsync<MyObject>("/json");
 
 //supports POST, DELETE, PUT etc.
 var rest2 = new Restme(new Uri("http://example.com"));
