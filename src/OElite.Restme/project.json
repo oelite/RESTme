@@ -8,7 +8,7 @@
   ],
   "description": "RESTme (Restme) is a simple RESTful and HTTP client, Azure Blob Storage Client, Redis Client implemented in .NET Core",
   "summary": "RESTme (Restme) is a simple RESTful and HTTP client, Azure Blob Storage Client, Redis Client implemented in .NET Core",
-  "projectUrl": "http://www.oelite.com",
+  "projectUrl": "https://github.com/oelite/RESTme",
   "tags": [
     "HTTP",
     "REST",
