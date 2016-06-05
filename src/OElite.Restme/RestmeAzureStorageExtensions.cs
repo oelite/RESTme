@@ -40,7 +40,8 @@ namespace OElite
                 }
                 catch (Exception ex)
                 {
-                    throw new OEliteWebException("Unable to fetch requested blob:" + ex.Message, ex);
+                    Restme.LogDebug("Unable to fetch requested blob:" + ex.Message, ex);
+                    return default(T);
                 }
             }
         }
@@ -75,7 +76,8 @@ namespace OElite
                 }
                 catch (Exception ex)
                 {
-                    throw new OEliteWebException("Unable to upload requested data:\n" + ex.Message, ex);
+                    Restme.LogDebug("Unable to upload requested data:\n" + ex.Message, ex);
+                    return default(T);
                 }
             }
         }
@@ -95,7 +97,7 @@ namespace OElite
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException("Unable to delete requested data:\n" + ex.Message, ex);
+                Restme.LogDebug("Unable to delete requested data:\n" + ex.Message, ex);
             }
             return default(T);
         }
