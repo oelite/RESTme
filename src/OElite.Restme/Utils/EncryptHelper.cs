@@ -55,7 +55,7 @@ namespace OElite
                 des.Padding = PaddingMode.PKCS7;
                 byte[] inputByteArray = pToEncrypt;
                 des.Key = sKey;
-                des.IV = 
+                des.IV = sKey;
                 using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
                 {
                     using (CryptoStream cs = new CryptoStream(ms, des.CreateEncryptor(), CryptoStreamMode.Write))
