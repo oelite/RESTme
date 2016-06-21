@@ -1,41 +1,40 @@
 {
-  "version": "1.0.6-*",
   "authors": [
     "Lida Weng"
   ],
-  "owners": [
-    "OElite Limited"
-  ],
-  "description": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core",
-  "summary": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core",
-  "projectUrl": "https://github.com/oelite/RESTme",
-  "tags": [
-    "HTTP",
-    "REST",
-    "RESTful-Client",
-    "AzureBlob-Client",
-    "Redis",
-    "RedisClient",
-    "AzureStorage",
-    ".Net-Core"
-  ],
   "dependencies": {
-    "Microsoft.Extensions.Configuration": "1.0.0-rc2-final",
-    "Microsoft.Extensions.Logging.Abstractions": "1.0.0-rc2-final",
-    "NETStandard.Library": "1.5.0-rc2-24027",
+    "Microsoft.Extensions.Configuration": "1.0.0-*",
+    "Microsoft.Extensions.Logging.Abstractions": "1.0.0-*",
+    "NETStandard.Library": "1.6.0-*",
     "Newtonsoft.Json": "8.0.4-beta1",
     "NLog": "4.4.0-*",
-    "System.Collections.Specialized": "4.0.1-rc2-24027",
-    "System.Reflection.TypeExtensions": "4.1.0-rc2-24027",
+    "System.Collections.Specialized": "4.0.1-*",
+    "System.Reflection.TypeExtensions": "4.1.0-*",
     "WindowsAzure.Storage": "7.0.2-preview",
     "StackExchange.Redis": "1.1.604-alpha"
   },
+  "description": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core",
   "frameworks": {
-    "netstandard1.5": {
-      "imports": [
-        "dnxcore50",
-        "portable-net451+win8"
-      ]
+    "netstandard1.6": {
+      "imports": [ "netcore50", "portable-net45+win8" ]
     }
-  }
+  },
+  "packOptions": {
+    "owners": [
+      "OElite Limited"
+    ],
+    "tags": [
+      "HTTP",
+      "REST",
+      "RESTful-Client",
+      "AzureBlob-Client",
+      "Redis",
+      "RedisClient",
+      "AzureStorage",
+      ".Net-Core"
+    ],
+    "repository": { "url": "https://github.com/oelite/RESTme" },
+    "summary": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core"
+  },
+  "version": "1.0.6-*"
 }
