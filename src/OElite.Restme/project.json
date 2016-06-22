@@ -10,6 +10,7 @@
     "NLog": "4.4.0-*",
     "System.Collections.Specialized": "4.0.1-*",
     "System.Reflection.TypeExtensions": "4.1.0-*",
+    "System.Threading.Tasks.Extensions":"4.0.0-*",
     "WindowsAzure.Storage": "7.0.2-preview",
     "StackExchange.Redis": "1.1.604-alpha"
   },
