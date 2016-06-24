@@ -9,7 +9,7 @@ namespace OElite
     {
         public static DateTime CannotBeDefaultDateTime(object objectValue)
         {
-            DateTime result = GetDateTimeFromObjectValue(objectValue);
+            var result = GetDateTimeFromObjectValue(objectValue);
             if (result == null || result == DateTime.MinValue || result == DateTime.MaxValue)
                 throw new OEliteException("Null, minimum datetime value or maximum datetime value are not allowed.");
             else
@@ -18,21 +18,19 @@ namespace OElite
 
         public static DateTime GetDateTimeFromObjectValue(object objectValue)
         {
-            if (objectValue != null)
+            if (objectValue == null) return DateTime.MinValue;
+            try
             {
-                try
-                {
-                    DateTime dateTime = Convert.ToDateTime(objectValue);
-                    return dateTime;
-                }
-                catch (Exception ex)
-                {
-                    //OEliteHelper.Logger.Info("Failed to convert object with type of [ " + objectValue.GetType() + " ] into a DateTime value", ex);
-                }
+                var dateTime = Convert.ToDateTime(objectValue);
+                return dateTime;
+            }
+            catch (Exception ex)
+            {
+                //OEliteHelper.Logger.Info("Failed to convert object with type of [ " + objectValue.GetType() + " ] into a DateTime value", ex);
             }
             return DateTime.MinValue;
         }
-        public static DateTime GetUTCDateTimeFromObjectValue(object objectValue)
+        public static DateTime GetUtcDateTimeFromObjectValue(object objectValue)
         {
             return GetDateTimeFromObjectValue(objectValue).ToUniversalTime();
         }
@@ -43,11 +41,8 @@ namespace OElite
 
         public static bool IsValidSqlDateTimeValue(object objectValue)
         {
-            DateTime result = GetDateTimeFromObjectValue(objectValue);
-            if (result != null && result != DateTime.MaxValue && result != DateTime.MinValue && result.Year >= 1753 && result.Year < 9999)
-                return true;
-            else
-                return false;
+            var result = GetDateTimeFromObjectValue(objectValue);
+            return result != DateTime.MaxValue && result != DateTime.MinValue && result.Year >= 1753 && result.Year < 9999;
         }
         public static bool IsValidSqlDateTime(this DateTime dateTime)
         {
