@@ -10,7 +10,8 @@
     "NLog": "4.4.0-*",
     "System.Threading.Tasks.Extensions":"4.0.0",
     "WindowsAzure.Storage": "7.0.2-preview",
-    "StackExchange.Redis": "1.1.604-alpha"
+    "StackExchange.Redis": "1.1.604-alpha",
+    "OElite.Restme.Utils":"1.0.0-*"
   },
   "description": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core",
   "frameworks": {

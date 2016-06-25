@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace OElite
 {
-	public partial class Restme
+	public partial class Rest
 	{
 		internal ConnectionMultiplexer redisConnection;
 		internal IDatabase redisDatabase;

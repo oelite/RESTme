@@ -6,7 +6,7 @@ using NLog;
 
 namespace OElite
 {
-    public partial class Restme
+    public partial class Rest
     {
         public static void LogError(string errorMessage, Exception ex, string loggerName = "General")
         {

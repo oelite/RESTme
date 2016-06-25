@@ -6,7 +6,7 @@ using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 namespace OElite
 {
-    public partial class Restme
+    public partial class Rest
     {
         private CloudStorageAccount azureStorageAccount;
         private CloudBlobClient azureBlobClient;

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace OElite
 {
-    public partial class Restme
+    public partial class Rest
     {
         private void PrepareHttpRestme()
         {
