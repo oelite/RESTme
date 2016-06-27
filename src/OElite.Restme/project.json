@@ -1,22 +1,26 @@
-{
+﻿{
   "authors": [
     "Lida Weng"
   ],
   "dependencies": {
-    "Microsoft.Extensions.Configuration": "1.0.0-rtm-*",
-    "Microsoft.Extensions.Logging.Abstractions": "1.0.0-rtm-*",
-    "NETStandard.Library": "1.6.0-*",
+    "Microsoft.Extensions.Configuration": "1.1.0-alpha1-21444",
+    "Microsoft.Extensions.Logging.Abstractions": "1.1.0-alpha1-21444",
+    "NETStandard.Library": "1.6.0",
     "Newtonsoft.Json": "9.0.1",
-    "NLog": "4.4.0-*",
-    "System.Threading.Tasks.Extensions":"4.0.0",
-    "WindowsAzure.Storage": "7.0.2-preview",
+    "NLog": "4.4.0-beta11",
+    "OElite.Restme.Utils": "1.0.0-*",
     "StackExchange.Redis": "1.1.604-alpha",
-    "OElite.Restme.Utils":"1.0.0-*"
+    "System.Threading.Tasks.Extensions": "4.0.0",
+    "WindowsAzure.Storage": "7.0.2-preview"
   },
   "description": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core",
   "frameworks": {
     "netstandard1.6": {
-      "imports": [ "netcore50", "dnxcore50","portable-net45+win8" ]
+      "imports": [
+        "netcore50",
+        "dnxcore50",
+        "portable-net45+win8"
+      ]
     }
   },
   "packOptions": {
@@ -33,7 +37,9 @@
       "AzureStorage",
       ".Net-Core"
     ],
-    "repository": { "url": "https://github.com/oelite/RESTme" },
+    "repository": {
+      "url": "https://github.com/oelite/RESTme"
+    },
     "summary": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core"
   },
   "version": "1.0.6-*"
