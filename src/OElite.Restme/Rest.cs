@@ -255,7 +255,7 @@ namespace OElite
             {
                 foreach (var k in _params.Keys)
                 {
-                    nvc.Set(k, _params[k]);
+                    nvc.Add(k, _params[k]);
                 }
             }
             var indexOfQuestionMark = urlPath.IndexOf('?');

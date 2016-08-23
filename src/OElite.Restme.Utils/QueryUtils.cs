@@ -9,9 +9,9 @@ namespace OElite
 {
     public static class QueryUtils
     {
-        public static NameValueCollection IdentifyQueryParams(this string value)
+        public static Dictionary<string, string> IdentifyQueryParams(this string value)
         {
-            NameValueCollection result = new NameValueCollection();
+            Dictionary<string, string> result = new Dictionary<string, string>();
             var paramIndex = value?.IndexOf('?');
             if (paramIndex >= 0)
             {
@@ -19,23 +19,21 @@ namespace OElite
                 foreach (var pair in paramPairs)
                 {
                     var pairArray = pair.Split('=');
-                    if (pairArray?.Length == 2)
-                    {
-                        var kKey = pairArray[0].Trim();
-                        var kValue = WebUtility.UrlDecode(pairArray[1].Trim());
-                        result.Set(kKey, kValue);
-                    }
+                    if (pairArray?.Length != 2) continue;
+                    var kKey = pairArray[0].Trim();
+                    var kValue = WebUtility.UrlDecode(pairArray[1].Trim());
+                    result.Add(kKey, kValue);
                 }
             }
             return result;
         }
-        public static string ParseIntoQueryString(this NameValueCollection values, bool includeQuestionMark = true)
+        public static string ParseIntoQueryString(this Dictionary<string, string> values, bool includeQuestionMark = true)
         {
             string result = null;
             if (values?.Count > 0)
             {
                 int index = 0;
-                foreach (var k in values.Keys)
+                foreach (var k in values)
                 {
                     result = index == 0 ? $"{k}={WebUtility.UrlEncode(values[k.ToString()])}" : $"&{k}={WebUtility.UrlEncode(values[k.ToString()])}";
                 }

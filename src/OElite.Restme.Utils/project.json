@@ -5,13 +5,22 @@
   "dependencies": {
     "NETStandard.Library": "1.6.0",
     "Newtonsoft.Json": "9.0.1",
-    "NLog": "4.4.0-beta11"
+    "NLog": "4.4.0-betaV15"
   },
   "description": "Restme.Utils (RESTme) is the common library for Restme",
   "frameworks": {
     "netstandard1.6": {
       "imports": [
-        "dnxcore50"
+        "dnxcore50",
+        "netcore50",
+        "portable-net45+win8+wp8+wpa81"
+      ]
+    },
+    "netcoreapp1.0": {
+      "imports": [
+        "dnxcore50",
+        "netcore50",
+        "portable-net45+win8+wp8+wpa81"
       ]
     }
   },
@@ -27,5 +36,5 @@
     },
     "summary": "Restme.Utils (RESTme) is the common library for Restme"
   },
-  "version": "1.0.0-*"
+  "version": "1.0.1-*"
 }
