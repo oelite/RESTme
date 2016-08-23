@@ -7,7 +7,7 @@ using System.IO;
 
 namespace OElite
 {
-    public class EncryptHelper
+    public partial class EncryptHelper
     {
         public static string MD5Encrypt(string valueString)
         {

@@ -10,7 +10,7 @@ using System.IO;
 
 namespace OElite
 {
-    public partial class Restme : IRestme
+    public partial class Rest : IRestme
     {
         private RestMode currentRestMode;
         internal Encoding _currentEncoding;
@@ -28,13 +28,13 @@ namespace OElite
             this.PrepareRestMode();
 
         }
-        public Restme(Uri baseUri = null, string urlPath = null, JsonSerializerSettings jsonSerializerSettings = null, Encoding encoding = null)
+        public Rest(Uri baseUri = null, string urlPath = null, JsonSerializerSettings jsonSerializerSettings = null, Encoding encoding = null)
         {
             this.BaseUri = baseUri;
             this.RequestUrlPath = urlPath;
             Init(jsonSerializerSettings, encoding);
         }
-        public Restme(string endPointOrConnectionString, JsonSerializerSettings jsonSerializerSettings = null, Encoding encoding = null)
+        public Rest(string endPointOrConnectionString, JsonSerializerSettings jsonSerializerSettings = null, Encoding encoding = null)
         {
             if ((endPointOrConnectionString?.ToLower()).StartsWith("http"))
                 this.BaseUri = new Uri(endPointOrConnectionString);
@@ -255,7 +255,7 @@ namespace OElite
             {
                 foreach (var k in _params.Keys)
                 {
-                    nvc.Set(k, _params[k]);
+                    nvc.Add(k, _params[k]);
                 }
             }
             var indexOfQuestionMark = urlPath.IndexOf('?');

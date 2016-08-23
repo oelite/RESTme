@@ -24,7 +24,7 @@ namespace OElite.UnitTests
             if (storageConnectionString.IsNotNullOrEmpty())
             {
                 var filePath = "/private/storage/fileitems/0001d4ce-7670-425b-b609-46bfdf4afb07-data.json";
-                var rest = new Restme(storageConnectionString);
+                var rest = new Rest(storageConnectionString);
                 var stream = rest.Get<MemoryStream>(filePath);
                 Assert.True(stream?.Length > 0);
                 var jsonData = rest.Get<string>(filePath);
@@ -36,7 +36,7 @@ namespace OElite.UnitTests
         {
             if (storageConnectionString.IsNotNullOrEmpty())
             {
-                var rest = new Restme(storageConnectionString);
+				var rest = new Rest(storageConnectionString);
                 var testPath1 = "/private/test/test.json";
                 var testPath2 = "/private/test/testStream.stream";
 

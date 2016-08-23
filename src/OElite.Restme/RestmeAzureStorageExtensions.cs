@@ -9,7 +9,7 @@ namespace OElite
 {
     public static class RestmeAzureStorageExtensions
     {
-        public static async Task<T> StorageGetAsync<T>(this Restme restme, string storageRelativePath)
+        public static async Task<T> StorageGetAsync<T>(this Rest restme, string storageRelativePath)
         {
             MustBeStorageMode(restme);
             var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
@@ -40,12 +40,13 @@ namespace OElite
                 }
                 catch (Exception ex)
                 {
-                    throw new OEliteWebException("Unable to fetch requested blob:" + ex.Message, ex);
+                    Rest.LogDebug("Unable to fetch requested blob:" + ex.Message, ex);
+                    return default(T);
                 }
             }
         }
 
-        public static async Task<T> StoragePostAsync<T>(this Restme restme, string storageRelativePath, T dataObject)
+        public static async Task<T> StoragePostAsync<T>(this Rest restme, string storageRelativePath, T dataObject)
         {
             MustBeStorageMode(restme);
             if (dataObject == null)
@@ -75,11 +76,12 @@ namespace OElite
                 }
                 catch (Exception ex)
                 {
-                    throw new OEliteWebException("Unable to upload requested data:\n" + ex.Message, ex);
+                    Rest.LogDebug("Unable to upload requested data:\n" + ex.Message, ex);
+                    return default(T);
                 }
             }
         }
-        public static async Task<T> StorageDeleteAsync<T>(this Restme restme, string storageRelativePath)
+        public static async Task<T> StorageDeleteAsync<T>(this Rest restme, string storageRelativePath)
         {
             MustBeStorageMode(restme);
             var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
@@ -95,13 +97,13 @@ namespace OElite
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException("Unable to delete requested data:\n" + ex.Message, ex);
+                Rest.LogDebug("Unable to delete requested data:\n" + ex.Message, ex);
             }
             return default(T);
         }
 
         #region Private Methods
-        private static void MustBeStorageMode(Restme restme)
+        private static void MustBeStorageMode(Rest restme)
         {
             if (restme?.CurrentMode != RestMode.AzureStorageClient)
                 throw new InvalidOperationException($"current request is not valid operation, you are under RestMode: {restme.CurrentMode.ToString()}");

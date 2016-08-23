@@ -11,7 +11,7 @@ namespace OElite
         /// Use base uri to identify the use of current Restme client
         /// </summary>
         /// <param name="restme"></param>
-        public static void PrepareRestMode(this Restme restme)
+        public static void PrepareRestMode(this Rest restme)
         {
             if (restme.BaseUri != null)
                 restme.CurrentMode = RestMode.HTTPClient;

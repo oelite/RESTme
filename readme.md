@@ -26,6 +26,19 @@ Package available and released to Nuget:  [https://www.nuget.org/packages/OElite
 
 ### Usage
 
+if you get any compatibility issues and is using netcoreapp1.0,  try add the additional imports to your project.json file:
+```
+  "frameworks": {
+    "netcoreapp1.0": {
+      "imports": [
+        "dnxcore50",
+        "netcore50",
+        "portable-net451+win8"
+      ]
+    }
+  }
+```
+
 #### Every Simplified!
 With concept of simplifying understanding of how Azure Storage, Redis Cache or RESTful requests work, RESTme only cares about the following:
 ##### Step 1. Initialize Restme()
