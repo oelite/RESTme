@@ -49,5 +49,5 @@
     },
     "summary": "RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors & Extensions implemented in .NET Core"
   },
-  "version": "1.0.7-*"
+  "version": "1.0.8-*"
 }

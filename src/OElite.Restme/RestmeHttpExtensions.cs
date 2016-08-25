@@ -23,19 +23,29 @@ namespace OElite
 
             if (method == HttpMethod.Post)
             {
-                response = await httpClient.PostAsync(new Uri(restme.BaseUri, relativePath), new OEliteFormUrlEncodedContent(restme._params));
+                response =
+                    await
+                        httpClient.PostAsync(new Uri(restme.BaseUri, relativePath),
+                            new OEliteFormUrlEncodedContent(restme._params));
             }
             else if (method == HttpMethod.Put)
             {
-                response = await httpClient.PutAsync(new Uri(restme.BaseUri, relativePath), new OEliteFormUrlEncodedContent(restme._params));
+                response =
+                    await
+                        httpClient.PutAsync(new Uri(restme.BaseUri, relativePath),
+                            new OEliteFormUrlEncodedContent(restme._params));
             }
             else if (method == HttpMethod.Get)
             {
-                response = await httpClient.GetAsync(new Uri(restme.BaseUri, restme.PrepareInjectParamsIntoQuery(relativePath)));
+                response =
+                    await
+                        httpClient.GetAsync(new Uri(restme.BaseUri, restme.PrepareInjectParamsIntoQuery(relativePath)));
             }
             else if (method == HttpMethod.Delete)
             {
-                response = await httpClient.DeleteAsync(new Uri(restme.BaseUri, restme.PrepareInjectParamsIntoQuery(relativePath)));
+                response =
+                    await
+                        httpClient.DeleteAsync(new Uri(restme.BaseUri, restme.PrepareInjectParamsIntoQuery(relativePath)));
             }
 
             var content = await response.Content.ReadAsStringAsync();
@@ -44,7 +54,7 @@ namespace OElite
             {
                 if (typeof(T).IsPrimitiveType())
                 {
-                    return (T)Convert.ChangeType(content, typeof(T));
+                    return (T) Convert.ChangeType(content, typeof(T));
                 }
                 else
                 {
@@ -69,13 +79,12 @@ namespace OElite
 
         public static T HttpPost<T>(this Rest restme, string relativeUrlPath = null)
         {
-            return Task.Run(async () => await restme.HttpPostAsync<T>(relativeUrlPath)).Result;
+            return restme.HttpPostAsync<T>(relativeUrlPath).Result;
         }
 
-        public static async Task<T> HttpPostAsync<T>(this Rest restme, string relativeUrlPath = null)
+        public static Task<T> HttpPostAsync<T>(this Rest restme, string relativeUrlPath = null)
         {
-            return await restme.RequestAsync<T>(HttpMethod.Post, relativeUrlPath);
+            return restme.RequestAsync<T>(HttpMethod.Post, relativeUrlPath);
         }
-
     }
 }
