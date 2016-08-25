@@ -19,24 +19,22 @@ namespace OElite
             var blockBlob = container.GetBlockBlobReference(blobItemPath);
             using (MemoryStream stream = new MemoryStream())
             {
-
                 try
                 {
                     if (typeof(Stream).IsAssignableFrom(typeof(T)))
                     {
                         await blockBlob.DownloadToStreamAsync(stream);
-                        MemoryStream streamForOutput = new MemoryStream(stream.ToArray());
-                        return (T)Convert.ChangeType(streamForOutput, typeof(T));
+                        var streamForOutput = new MemoryStream(stream.ToArray());
+                        return (T) Convert.ChangeType(streamForOutput, typeof(T));
                     }
                     else
                     {
                         var jsonStringValue = await blockBlob.DownloadTextAsync();
                         if (typeof(T) == typeof(string))
-                            return (T)Convert.ChangeType(jsonStringValue, typeof(T));
+                            return (T) Convert.ChangeType(jsonStringValue, typeof(T));
                         else
                             return jsonStringValue.JsonDeserialize<T>();
                     }
-
                 }
                 catch (Exception ex)
                 {
@@ -50,7 +48,9 @@ namespace OElite
         {
             MustBeStorageMode(restme);
             if (dataObject == null)
-                throw new OEliteWebException("Uploading null blob is not supported, use delete method if you intended to delete.");
+                throw new OEliteWebException(
+                    "Uploading null blob is not supported, use delete method if you intended to delete.");
+
             var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
             var blobItemPath = restme.IdentifyBlobItemPath(storageRelativePath);
             if (blobItemPath.IsNullOrEmpty())
@@ -70,7 +70,10 @@ namespace OElite
                     else
                     {
                         var jsonValue = dataObject.JsonSerialize();
-                        await blockBlob.UploadTextAsync(jsonValue, restme._currentEncoding, restme.DefaultAzureBlobAccessCondition, restme.DefaultAzureBlobRequestOptions, restme.DefaultAzureBlobOperationContext);
+                        await
+                            blockBlob.UploadTextAsync(jsonValue, restme._currentEncoding,
+                                restme.DefaultAzureBlobAccessCondition, restme.DefaultAzureBlobRequestOptions,
+                                restme.DefaultAzureBlobOperationContext);
                     }
                     return dataObject;
                 }
@@ -81,6 +84,7 @@ namespace OElite
                 }
             }
         }
+
         public static async Task<T> StorageDeleteAsync<T>(this Rest restme, string storageRelativePath)
         {
             MustBeStorageMode(restme);
@@ -93,7 +97,7 @@ namespace OElite
             {
                 await blockBlob.DeleteIfExistsAsync();
                 if (typeof(T) == typeof(bool))
-                    return (T)Convert.ChangeType(true, typeof(T));
+                    return (T) Convert.ChangeType(true, typeof(T));
             }
             catch (Exception ex)
             {
@@ -103,11 +107,14 @@ namespace OElite
         }
 
         #region Private Methods
+
         private static void MustBeStorageMode(Rest restme)
         {
             if (restme?.CurrentMode != RestMode.AzureStorageClient)
-                throw new InvalidOperationException($"current request is not valid operation, you are under RestMode: {restme.CurrentMode.ToString()}");
+                throw new InvalidOperationException(
+                    $"current request is not valid operation, you are under RestMode: {restme.CurrentMode.ToString()}");
         }
+
         #endregion
     }
 }

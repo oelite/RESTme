@@ -14,7 +14,7 @@ namespace ConsoleApp
             Console.WriteLine("============== Http Client Test ==========");
             var rest = new Rest(new Uri("http://freegeoip.net"));
             var result1 = rest.Get<string>("/json/github.com");
-            Console.WriteLine($"return results:\n {rest}");
+            Console.WriteLine($"return results:\n {result1}");
 
             Console.WriteLine("============== Azure Storage Client Test ==========");
             var storageConnectionString = "";
