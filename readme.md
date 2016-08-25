@@ -41,9 +41,11 @@ if you get any compatibility issues and is using netcoreapp1.0,  try add the add
 
 #### Every Simplified!
 With concept of simplifying understanding of how Azure Storage, Redis Cache or RESTful requests work, RESTme only cares about the following:
-##### Step 1. Initialize Restme()
+##### Step 1. Initialize Rest()
 ```csharp
-var rest = new Restme(yourConfigParameters); //the parameters are either HTTP url if it is HTTP Client, or the connection string for Azure Blob/Redis server
+using OElite;
+...
+var rest = new Rest(yourConfigParameters); //the parameters are either HTTP url if it is HTTP Client, or the connection string for Azure Blob/Redis server
 ```
 ##### Step 2. Get/Save/Delete Data
 ```csharp
@@ -72,7 +74,7 @@ rest.Delete("/container/filePath");
 
 ```csharp
 //direct string JSON return
-var rest = new Restme(new Uri("http://freegeoip.net"));
+var rest = new Rest(new Uri("http://freegeoip.net"));
 var result1 = rest.Get("/json/github.com");
 
 //automatic Generic cast
@@ -85,7 +87,7 @@ var result3 = rest.Get<MyObject>("/json");
 var resultAsync3 = await rest.GetAsync<MyObject>("/json");
 
 //supports POST, DELETE, PUT etc.
-var rest2 = new Restme(new Uri("http://example.com"));
+var rest2 = new Rest(new Uri("http://example.com"));
 rest2.Add("Username","abc@def.com");
 rest2.Add("Birthday",DateTime.UtcNow);
 rest2.Post<MyObject>("/someurl");
@@ -99,7 +101,7 @@ var myObject = new MyObject()
     Username = "abc@def.com",
     Birthday = DateTime.UtcNow
 };
-var rest3 = new Restme(new Uri("http://example.com"));
+var rest3 = new Rest(new Uri("http://example.com"));
 rest3.Add(myObject);
 rest3.Post<ExpectedResultObject>("/directObjectPost");
 
@@ -110,7 +112,7 @@ rest3.Post<ExpectedResultObject>("/directObjectPost");
 ```csharp
 //get blob stream directly
 var blobStorageConnectionString = "{Your Storage Account Connection String}";
-var rest = new Restme(blobStorageConnetionString);
+var rest = new Rest(blobStorageConnetionString);
 
 rest.CreateAzureBlobContainerIfNotExists = true;  //do this only if you want to auto create the container
 
@@ -130,7 +132,7 @@ rest.GetAsync<ObjectType>("/myContainer/myfileObjectInJSONFileFormat");
 ### Use as a Redis client
 ```csharp
 var redisConnectionString = "{Your Redis Cache Connection String}";
-var rest = new Restme(redisConnectionString);
+var rest = new Rest(redisConnectionString);
 
 //get cache data (support Generic cast)
 var cacheResult = rest.Get("home:testKey");
