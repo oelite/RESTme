@@ -1,4 +1,4 @@
 ﻿{
-  "azureStorageConnectionString": "",
-  "redisConnectionString": ""
+  "azureStorageConnectionString": "DefaultEndpointsProtocol=https;AccountName=oelitecore;AccountKey=fqwDO4ViNGlzQbkwT/3g2ZFTYwxWevH9gVvKeK+vjv4S0891VdPllwuQkrLPNwEkEIULJGC9JgdfPX8mBx0tXA==",
+  "redisConnectionString": "oelite-core.redis.cache.windows.net:6380,password=N3gnc1XVEOWrh688KG5LynDX4SNjQeCDDOFLsgAhfVM=,ssl=True,abortConnect=False"
 }

@@ -23,12 +23,34 @@ namespace OElite.UnitTests
         {
             if (storageConnectionString.IsNotNullOrEmpty())
             {
-                var filePath = "/private/storage/fileitems/0001d4ce-7670-425b-b609-46bfdf4afb07-data.json";
+                var filePath = "/test/test.json";
                 var rest = new Rest(storageConnectionString);
-                var stream = rest.Get<MemoryStream>(filePath);
-                Assert.True(stream?.Length > 0);
-                var jsonData = rest.Get<string>(filePath);
-                Assert.True(jsonData?.ToLower()?.Contains("createdon"));
+                var stream = rest.Get<GeoResult>(filePath);
+                if (stream == null)
+                {
+                    var testData = new GeoResult() { City = "London", Country_Code = "GB", Country_Name = "United Kingdom" };
+                    rest.Post<GeoResult>(filePath, testData);
+                    stream = rest.Get<GeoResult>(filePath);
+                }
+                Assert.True(stream != null);
+                var retirmData = rest.Get<GeoResult>(filePath);
+                Assert.True(retirmData?.City?.IsNotNullOrEmpty());
+            }
+        }
+
+        [Fact]
+        public void AddAndPost()
+        {
+            if (storageConnectionString.IsNotNullOrEmpty())
+            {
+                var rest = new Rest(storageConnectionString);
+                var testPath1 = "/test/test_addAndPost.json";
+
+                var testData = new GeoResult() { City = "London", Country_Code = "GB", Country_Name = "United Kingdom" };
+                rest.Add(testData);
+                var result1 = rest.Post<GeoResult>(testPath1);
+                Assert.True(result1?.City == "London");
+                Assert.True(rest.Delete<bool>(testPath1));
             }
         }
         [Fact]
@@ -36,9 +58,9 @@ namespace OElite.UnitTests
         {
             if (storageConnectionString.IsNotNullOrEmpty())
             {
-				var rest = new Rest(storageConnectionString);
-                var testPath1 = "/private/test/test.json";
-                var testPath2 = "/private/test/testStream.stream";
+                var rest = new Rest(storageConnectionString);
+                var testPath1 = "/test/test.json";
+                var testPath2 = "/test/test.stream";
 
                 var testData = new GeoResult() { City = "London", Country_Code = "GB", Country_Name = "United Kingdom" };
                 var testDataInStream = StringUtils.GenerateStreamFromString(testData.JsonSerialize());
