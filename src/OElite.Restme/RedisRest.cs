@@ -34,27 +34,26 @@ namespace OElite
                         var addresses =
                             hostEntry?.AddressList?.Where(item => item.AddressFamily == AddressFamily.InterNetwork)?
                                 .ToArray();
-                        if (addresses?.Length > 0)
+                        if (!(addresses?.Length > 0)) return result;
+
+                        foreach (var address in addresses)
                         {
-                            foreach (var address in addresses)
+                            var ip4Address = address.MapToIPv4();
+                            try
                             {
-                                var ip4Address = address.MapToIPv4();
-                                try
-                                {
-                                    redisConfig = ConfigurationOptions.Parse(ip4Address?.ToString() +
-                                                                             this.ConnectionString.Substring(
-                                                                                 this.ConnectionString.IndexOf(':')));
-                                    result = ConnectionMultiplexer.Connect(redisConfig);
-                                }
-                                catch (Exception innerEx)
-                                {
-                                    LogError(innerEx.Message, innerEx);
-                                    continue;
-                                }
-                                if (result != null)
-                                {
-                                    break;
-                                }
+                                redisConfig = ConfigurationOptions.Parse(ip4Address +
+                                                                         ConnectionString.Substring(
+                                                                             ConnectionString.IndexOf(':')));
+                                result = ConnectionMultiplexer.Connect(redisConfig);
+                            }
+                            catch (Exception innerEx)
+                            {
+                                LogError(innerEx.Message, innerEx);
+                                continue;
+                            }
+                            if (result != null)
+                            {
+                                break;
                             }
                         }
                     }
