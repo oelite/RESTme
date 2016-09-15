@@ -16,8 +16,7 @@ namespace OElite
 
         public static async Task<T> HttpRequestAsync<T>(this Rest restme, HttpMethod method, string relativePath = null)
         {
-            HttpClient httpClient = new HttpClient();
-            httpClient.BaseAddress = restme.BaseUri;
+            var httpClient = new HttpClient {BaseAddress = restme.BaseUri};
             restme.PrepareHeaders(httpClient.DefaultRequestHeaders);
             HttpResponseMessage response = null;
 
@@ -58,7 +57,8 @@ namespace OElite
                 }
                 else
                 {
-                    return JsonConvert.DeserializeObject<T>(content, restme._jsonSerializerSettings);
+                    return content.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization,
+                        restme.Configuration.SerializerSettings);
                 }
             }
             catch (Exception ex)

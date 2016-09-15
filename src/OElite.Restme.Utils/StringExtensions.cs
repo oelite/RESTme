@@ -1,9 +1,12 @@
-﻿namespace OElite
+﻿using System.Collections;
+using System.Reflection;
+using Newtonsoft.Json;
+
+namespace OElite
 {
     using System;
     using System.Diagnostics;
     using System.Text.RegularExpressions;
-    using System.IO;
     using System.Text;
     using System.Linq;
 
@@ -17,8 +20,7 @@
         /// A regular expression used to manipulate parameterized route segments.
         /// </summary>
         /// <value>A <see cref="Regex"/> object.</value>
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        private static readonly Regex ParameterExpression =
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)] private static readonly Regex ParameterExpression =
             new Regex(@"\{(?<name>[A-Z0-9]*)\}", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>
@@ -39,22 +41,27 @@
 
             throw new FormatException("The specified segment does not contain any valid parameters.");
         }
+
         public static bool IsASCII(this string s)
         {
             return s.All(c => c < 127);
         }
+
         public static bool IsNullOrEmpty(this string segment)
         {
             return string.IsNullOrEmpty(segment);
         }
+
         public static bool IsNotNullOrEmpty(this string segment)
         {
             return !string.IsNullOrEmpty(segment);
         }
+
         public static string MD5Encrypt(this string value)
         {
             return EncryptHelper.MD5Encrypt(value);
         }
+
         /// <summary>
         /// Checks if a segement contains any parameters.
         /// </summary>
@@ -64,23 +71,27 @@
         /// <exception cref="ArgumentException">The provided value for the segment parameter was null or empty.</exception>
         public static bool IsParameterized(this string segment)
         {
-            Match parameterMatch =
+            var parameterMatch =
                 ParameterExpression.Match(segment);
 
             return parameterMatch.Success;
         }
-        public static string RemoveSpecialCharactersAndWhiteSpace(this string segment, bool removeDot = true, bool removeUnderScore = true, bool removeNumbers = false)
+
+        public static string RemoveSpecialCharactersAndWhiteSpace(this string segment, bool removeDot = true,
+            bool removeUnderScore = true, bool removeNumbers = false)
         {
-            StringBuilder sb = new StringBuilder();
-            foreach (char c in segment)
+            var sb = new StringBuilder();
+            foreach (var c in segment)
             {
-                if ((!removeNumbers && c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (!removeDot && c == '.') || (!removeUnderScore && c == '_'))
+                if ((!removeNumbers && c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                    (!removeDot && c == '.') || (!removeUnderScore && c == '_'))
                 {
                     sb.Append(c);
                 }
             }
             return sb.ToString();
         }
+
         public static string SplitCamelCase(this string str)
         {
             return Regex.Replace(
@@ -94,11 +105,14 @@
             );
         }
 
-        public static T JsonDeserialize<T>(this string value)
+        public static T JsonDeserialize<T>(this string value, bool attemptResponseMessageConvertIfListType = true,
+            JsonSerializerSettings serializerSettings = null)
         {
-            return StringUtils.JsonDeserialize<T>(value);
+            if (!(typeof(IEnumerable).IsAssignableFrom(typeof(T))) || !attemptResponseMessageConvertIfListType)
+                return StringUtils.JsonDeserialize<T>(value, serializerSettings);
+
+            var msg = StringUtils.JsonDeserialize<ResponseMessage>(value);
+            return msg != null ? msg.GetOriginalData<T>() : StringUtils.JsonDeserialize<T>(value, serializerSettings);
         }
-
-
     }
 }

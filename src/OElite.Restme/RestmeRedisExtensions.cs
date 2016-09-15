@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
+using NLog.LayoutRenderers;
 using StackExchange.Redis;
 
 namespace OElite
@@ -16,13 +18,14 @@ namespace OElite
             {
                 return (T) Convert.ChangeType(stringValue, typeof(T));
             }
-            return stringValue.JsonDeserialize<T>();
+            return stringValue.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization);
         }
 
         public static async Task<T> RedisPostAsync<T>(this Rest restme, string redisKey, T dataObject)
         {
             MustBeRedisMode(restme);
-            if (await restme.redisDatabase.StringSetAsync(redisKey, dataObject.JsonSerialize()))
+            if (await restme.redisDatabase.StringSetAsync(redisKey, dataObject.JsonSerialize(
+                restme.Configuration.UseRestConvertForCollectionSerialization)))
                 return dataObject;
             return default(T);
         }
