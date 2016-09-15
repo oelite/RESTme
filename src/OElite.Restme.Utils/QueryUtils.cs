@@ -33,9 +33,9 @@ namespace OElite
             if (values?.Count > 0)
             {
                 int index = 0;
-                foreach (var k in values)
+                foreach (var k in values.Keys)
                 {
-                    result = index == 0 ? $"{k}={WebUtility.UrlEncode(values[k.ToString()])}" : $"&{k}={WebUtility.UrlEncode(values[k.ToString()])}";
+                    result = index == 0 ? $"{k}={WebUtility.UrlEncode(values[k])}" : $"&{k}={WebUtility.UrlEncode(values[k])}";
                 }
             }
             if (includeQuestionMark)
