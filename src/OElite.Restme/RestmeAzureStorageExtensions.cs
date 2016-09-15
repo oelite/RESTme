@@ -69,9 +69,11 @@ namespace OElite
                     }
                     else
                     {
-                        var jsonValue = dataObject.JsonSerialize();
+                        var jsonValue =
+                            dataObject.JsonSerialize(restme.Configuration.UseRestConvertForCollectionSerialization,
+                                restme.Configuration.SerializerSettings);
                         await
-                            blockBlob.UploadTextAsync(jsonValue, restme._currentEncoding,
+                            blockBlob.UploadTextAsync(jsonValue, restme.Configuration.DefaultEncoding,
                                 restme.DefaultAzureBlobAccessCondition, restme.DefaultAzureBlobRequestOptions,
                                 restme.DefaultAzureBlobOperationContext);
                     }

@@ -23,7 +23,8 @@ namespace OElite
             if (string.IsNullOrEmpty(stringValue) || (trim && string.IsNullOrEmpty(stringValue.Trim())))
             {
                 logger.Error("The string value requested is null or empty which is not allowed for the current process");
-                throw new OEliteException("The string value requested is null or empty which is not allowed for the current process");
+                throw new OEliteException(
+                    "The string value requested is null or empty which is not allowed for the current process");
             }
             else return stringValue.Trim();
         }
@@ -58,6 +59,7 @@ namespace OElite
         {
             return GetFullClassNameFromType(objectValue.GetType());
         }
+
         public static string GetFullClassNameFromType(Type type)
         {
             return type.Name;
@@ -67,6 +69,7 @@ namespace OElite
         {
             return GetStringFromStream(stream, Encoding.UTF8);
         }
+
         public static string GetStringFromStream(System.IO.Stream stream, Encoding encoding)
         {
             if (encoding == null)
@@ -85,6 +88,7 @@ namespace OElite
                 return string.Empty;
             }
         }
+
         public static Stream GenerateStreamFromString(string s)
         {
             MemoryStream stream = new MemoryStream();
@@ -94,6 +98,7 @@ namespace OElite
             stream.Position = 0;
             return stream;
         }
+
         public static string GetStringValueOrEmpty(object objectValue, bool trim = true)
         {
             if (objectValue != null)
@@ -113,7 +118,8 @@ namespace OElite
             else return string.Empty;
         }
 
-        public static bool StringContains(string stringToValidate, string[] stringsToAttempt, string[] splitters, int minimumIncludes)
+        public static bool StringContains(string stringToValidate, string[] stringsToAttempt, string[] splitters,
+            int minimumIncludes)
         {
             if (!string.IsNullOrEmpty(stringToValidate))
             {
@@ -122,6 +128,7 @@ namespace OElite
             }
             else return true;
         }
+
         public static bool StringContains(string[] strings, string[] stringsToAttempt, int minimumIncludes)
         {
             int counter = 0;
@@ -136,7 +143,8 @@ namespace OElite
             return false;
         }
 
-        public static bool StringContains(string stringToValidate, int[] idsToAttempt, string[] splitters, int minimumIncludes)
+        public static bool StringContains(string stringToValidate, int[] idsToAttempt, string[] splitters,
+            int minimumIncludes)
         {
             if (!string.IsNullOrEmpty(stringToValidate))
             {
@@ -155,7 +163,7 @@ namespace OElite
             long i = 1;
             foreach (byte b in Guid.NewGuid().ToByteArray())
             {
-                i *= ((int)b + 1);
+                i *= ((int) b + 1);
             }
             return string.Format("{0:x}", i - DateTime.Now.Ticks);
         }
@@ -198,6 +206,7 @@ namespace OElite
         }
 
         #region Web Related
+
         public static string ToSeoFriendly(string title, int maxLength = -1)
         {
             var match = Regex.Match(title.ToLower(), "[\\w]+");
@@ -221,35 +230,45 @@ namespace OElite
             if (result[result.Length - 1] == '-') result.Remove(result.Length - 1, 1);
             return result.ToString();
         }
+
         #endregion
 
-        public static string JsonSerialize(object value)
+        public static string JsonSerialize(object value,
+            Newtonsoft.Json.JsonSerializerSettings serializerSettings = null)
         {
             if (value == null)
                 return string.Empty;
             try
             {
                 //return ServiceStack.Text.JsonSerializer.SerializeToString(value, value.GetType());
-                return Newtonsoft.Json.JsonConvert.SerializeObject(value, new Newtonsoft.Json.JsonSerializerSettings() { ContractResolver = new OEliteJsonResolver() });
+                return Newtonsoft.Json.JsonConvert.SerializeObject(value, serializerSettings
+                                                                          ??
+                                                                          new Newtonsoft.Json.JsonSerializerSettings()
+                                                                          {
+                                                                              ContractResolver =
+                                                                                  new OEliteJsonResolver()
+                                                                          });
             }
             catch (Exception ex)
             {
                 //OEliteHelper.Logger.Error("JSON serializing an object type of " + (value != null ? value.GetType().Name : "null :" + ex.Message), ex);
                 return string.Empty;
             }
-
-
         }
-        public static T JsonDeserialize<T>(string value, Newtonsoft.Json.JsonSerializerSettings jsonSerializerSettings = null)
+
+        public static T JsonDeserialize<T>(string value,
+            Newtonsoft.Json.JsonSerializerSettings jsonSerializerSettings = null)
         {
             try
             {
                 if (value.IsNotNullOrEmpty())
                 {
                     if (typeof(T).IsPrimitiveType())
-                        return (T)Convert.ChangeType(value, typeof(T));
+                        return (T) Convert.ChangeType(value, typeof(T));
                     else
-                        return Newtonsoft.Json.JsonConvert.DeserializeObject<T>(value, jsonSerializerSettings ?? new Newtonsoft.Json.JsonSerializerSettings() { ContractResolver = new OEliteJsonResolver() });
+                        return Newtonsoft.Json.JsonConvert.DeserializeObject<T>(value,
+                            jsonSerializerSettings ??
+                            new Newtonsoft.Json.JsonSerializerSettings() {ContractResolver = new OEliteJsonResolver()});
                 }
                 else
                     return default(T);
@@ -306,12 +325,14 @@ namespace OElite
                 return Link(linkText, Comparison.Contains);
             }
 
-            public static string Attribute(string attribute, string name, Comparison comparisonType = Comparison.Equality, string node = null)
+            public static string Attribute(string attribute, string name,
+                Comparison comparisonType = Comparison.Equality, string node = null)
             {
                 return XPath(comparisonType, attribute, name, node);
             }
 
-            public static string XPath(Comparison compareBy, string attribute, string attributeValue = "", string node = null)
+            public static string XPath(Comparison compareBy, string attribute, string attributeValue = "",
+                string node = null)
             {
                 switch (compareBy)
                 {

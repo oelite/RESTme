@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -16,14 +17,13 @@ namespace OElite
             try
             {
                 property = base.CreateProperty(member, memberSerialization);
-                if (typeof(System.IO.Stream).IsAssignableFrom(property.PropertyType))
+                if (typeof(Stream).IsAssignableFrom(property.PropertyType))
                 {
                     property.Ignored = true;
                 }
             }
             catch
             {
-
                 property = new JsonProperty();
             }
             return property;

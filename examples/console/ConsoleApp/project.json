@@ -9,7 +9,7 @@
       "type": "platform",
       "version": "1.0.0-rc3-004443-00"
     },
-    "OElite.Restme": "1.0.7-*"
+    "OElite.Restme": "1.0.*"
   },
   "frameworks": {
     "netcoreapp1.0": {

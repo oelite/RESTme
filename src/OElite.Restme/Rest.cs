@@ -8,57 +8,56 @@ using Newtonsoft.Json;
 using System.Text;
 using System.IO;
 using System.Reflection;
+using Microsoft.Extensions.Configuration;
 
 namespace OElite
 {
     public partial class Rest : IRestme
     {
-        private RestMode currentRestMode;
-        internal Encoding _currentEncoding;
         internal Dictionary<string, string> _params;
         internal Dictionary<string, List<string>> _headers;
-        internal JsonSerializerSettings _jsonSerializerSettings;
         internal object _objAsParam;
-
-        private void Init(JsonSerializerSettings jsonSerializerSettings = null, Encoding encoding = null)
-        {
-            _params = new Dictionary<string, string>();
-            _headers = new Dictionary<string, List<string>>();
-            _jsonSerializerSettings = jsonSerializerSettings ??
-                                      new JsonSerializerSettings() {ContractResolver = new OEliteJsonResolver()};
-            _currentEncoding = encoding ?? Encoding.UTF8;
-            this.PrepareRestMode();
-        }
-
-        public Rest(Uri baseUri = null, string urlPath = null, JsonSerializerSettings jsonSerializerSettings = null,
-            Encoding encoding = null)
-        {
-            this.BaseUri = baseUri;
-            this.RequestUrlPath = urlPath;
-            Init(jsonSerializerSettings, encoding);
-        }
-
-        public Rest(string endPointOrConnectionString, JsonSerializerSettings jsonSerializerSettings = null,
-            Encoding encoding = null)
-        {
-            if ((endPointOrConnectionString?.ToLower /**/()).StartsWith("http"))
-                this.BaseUri = new Uri(endPointOrConnectionString);
-            else
-                ConnectionString = endPointOrConnectionString;
-            Init(jsonSerializerSettings, encoding);
-        }
+        public RestConfig Configuration { get; set; }
 
         public Uri BaseUri { get; set; }
         public string ConnectionString { get; set; }
         public string RequestUrlPath { get; set; }
 
+
+        private void Init(RestConfig config = null)
+        {
+            _params = new Dictionary<string, string>();
+            _headers = new Dictionary<string, List<string>>();
+
+            this.Configuration = config ?? new RestConfig();
+            this.PrepareRestMode();
+        }
+
+        public Rest(Uri baseUri = null, string urlPath = null, RestConfig config = null)
+        {
+            this.BaseUri = baseUri;
+            this.RequestUrlPath = urlPath;
+            Init(config);
+        }
+
+        public Rest(string endPointOrConnectionString, RestConfig configuration = null)
+        {
+            var lowerConn = endPointOrConnectionString?.ToLower();
+            if (lowerConn != null && lowerConn.StartsWith("http"))
+                this.BaseUri = new Uri(endPointOrConnectionString);
+            else
+                ConnectionString = endPointOrConnectionString;
+            Init(configuration);
+        }
+
+
         public RestMode CurrentMode
         {
-            get { return currentRestMode; }
+            get { return Configuration.OperationMode; }
             set
             {
-                currentRestMode = value;
-                switch (currentRestMode)
+                Configuration.OperationMode = value;
+                switch (value)
                 {
                     case RestMode.AzureStorageClient:
                         PrepareStorageRestme();
@@ -99,9 +98,12 @@ namespace OElite
             _params = _params ?? new Dictionary<string, string>();
 
             if (_params.ContainsKey(key))
-                _params[key] = JsonConvert.SerializeObject(value);
+                _params[key] = value.JsonSerialize(Configuration.UseRestConvertForCollectionSerialization,
+                    Configuration.SerializerSettings);
             else
-                _params.Add(key, JsonConvert.SerializeObject(value));
+                _params.Add(key,
+                    value.JsonSerialize(Configuration.UseRestConvertForCollectionSerialization,
+                        Configuration.SerializerSettings));
         }
 
         public void AddHeader(string header, string value, bool allowMultipleValues = false)
@@ -195,7 +197,7 @@ namespace OElite
                         if (_objAsParam == null)
                             throw new NotSupportedException(
                                 "dataObject should not be null - use DeleteAsync() method if you intended to delete. Alternatively add an object parameter before the call.");
-                        else if (_objAsParam.GetType().IsAssignableFrom(typeof(T)))
+                        else if (_objAsParam.GetType() is T)
                         {
                             dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
                         }
@@ -212,7 +214,7 @@ namespace OElite
                         if (_objAsParam == null)
                             throw new NotSupportedException(
                                 "dataObject should not be null - use DeleteAsync() method if you intended to delete. Alternatively add an object parameter before the call.");
-                        else if (_objAsParam.GetType().IsAssignableFrom(typeof(T)))
+                        else if (_objAsParam is T)
                         {
                             dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
                         }
