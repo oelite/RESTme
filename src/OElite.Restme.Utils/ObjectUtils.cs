@@ -215,7 +215,7 @@ namespace OElite
             /// </summary>
             /// <param name="task">Task<T> method to execute</param>
             public static void RunSync(Func<Task> task)
-            {
+            {                
                 var oldContext = SynchronizationContext.Current;
                 var synch = new ExclusiveSynchronizationContext();
                 SynchronizationContext.SetSynchronizationContext(synch);

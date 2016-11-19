@@ -19,7 +19,7 @@ namespace OElite
         /// <returns>return the original string if it passes</returns>
         /// <exception cref="WebCider.OEliteException" > throws when the string is invalid </exception>
         public static string CanNotBeNullOrEmpty(string stringValue, bool trim = true)
-        {
+        {            
             if (string.IsNullOrEmpty(stringValue) || (trim && string.IsNullOrEmpty(stringValue.Trim())))
             {
                 logger.Error("The string value requested is null or empty which is not allowed for the current process");
