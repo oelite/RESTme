@@ -22,7 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../OElite.Restme.Utils/OElite.Restme.Utils.csproj">
-      <Project>{F9299D83-6A42-4865-AD62-2467DE1F6E61}</Project>
+      <Project>{E16A4495-94A2-42E8-9F08-35BB6D25E2E4}</Project>
       <Name>OElite.Restme.Utils</Name>
     </ProjectReference>
   </ItemGroup>
@@ -66,6 +66,12 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>bin</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin</OutputPath>
   </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

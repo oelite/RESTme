@@ -16,12 +16,12 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../src/OElite.Restme/OElite.Restme.csproj">
-      <Project>{BC0ABC06-1DEA-497B-BA00-A28025FC020C}</Project>
+      <Project>{0B56BD4C-D981-41DB-8FD2-2AA3DC563E11}</Project>
       <Name>OElite.Restme</Name>
     </ProjectReference>
     <ProjectReference Include="../../../src/OElite.Restme.Utils/OElite.Restme.Utils.csproj">
       <FromP2P>true</FromP2P>
-      <Project>{F9299D83-6A42-4865-AD62-2467DE1F6E61}</Project>
+      <Project>{A18D2CFB-CDEB-445D-98E3-7FB870740380}</Project>
       <Name>OElite.Restme.Utils</Name>
     </ProjectReference>
   </ItemGroup>

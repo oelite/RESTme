@@ -21,12 +21,12 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../OElite.Restme/OElite.Restme.csproj">
-      <Project>{104B1BE6-2533-4A63-BDB8-DA2B13BA14B3}</Project>
+      <Project>{0B56BD4C-D981-41DB-8FD2-2AA3DC563E11}</Project>
       <Name>OElite.Restme</Name>
     </ProjectReference>
     <ProjectReference Include="../OElite.Restme.Utils/OElite.Restme.Utils.csproj">
       <FromP2P>true</FromP2P>
-      <Project>{09524DAC-5C65-43F5-950E-0AFA98533473}</Project>
+      <Project>{A18D2CFB-CDEB-445D-98E3-7FB870740380}</Project>
       <Name>OElite.Restme.Utils</Name>
     </ProjectReference>
   </ItemGroup>
