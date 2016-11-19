@@ -21,12 +21,12 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../OElite.Restme/OElite.Restme.csproj">
-      <Project>{BC0ABC06-1DEA-497B-BA00-A28025FC020C}</Project>
+      <Project>{104B1BE6-2533-4A63-BDB8-DA2B13BA14B3}</Project>
       <Name>OElite.Restme</Name>
     </ProjectReference>
     <ProjectReference Include="../OElite.Restme.Utils/OElite.Restme.Utils.csproj">
       <FromP2P>true</FromP2P>
-      <Project>{E3CFBDA2-73D6-47C5-A3D2-C0DD9644D170}</Project>
+      <Project>{09524DAC-5C65-43F5-950E-0AFA98533473}</Project>
       <Name>OElite.Restme.Utils</Name>
     </ProjectReference>
   </ItemGroup>
@@ -58,6 +58,7 @@
   </ItemGroup>
   <PropertyGroup Label="Configuration">
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
+    <OutputPath>bin\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
