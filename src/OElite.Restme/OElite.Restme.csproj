@@ -5,15 +5,13 @@
     <Description>RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors &amp; Extensions implemented in .NET Core</Description>
     <VersionPrefix>1.0.9-dev</VersionPrefix>
     <TargetFramework>netstandard1.6</TargetFramework>
+	<PackageTargetFallback>$(PackageTargetFallback);dnxcore50;netcore50;portable-net451+win8</PackageTargetFallback>
     <AssemblyName>OElite.Restme</AssemblyName>
     <PackageTags>HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
     <RepositoryUrl>https://github.com/oelite/RESTme</RepositoryUrl>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
     <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard1.6'">
-    <PackageTargetFallback>dnxcore50;netcore50;portable-net451+win8</PackageTargetFallback>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="**\*.cs" />
