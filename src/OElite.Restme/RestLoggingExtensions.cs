@@ -1,28 +1,27 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using NLog;
+using Microsoft.Extensions.Logging;
 
 namespace OElite
 {
-    public partial class Rest
-    {
-        public static void LogError(string errorMessage, Exception ex, string loggerName = "General")
-        {
-            LogManager.GetLogger(loggerName).Error(ex, errorMessage);
-        }
-        public static void LogInfo(string info, Exception ex, string loggerName = "General")
-        {
-            LogManager.GetLogger(loggerName).Info(ex, info);
-        }
-        public static void LogDebug(string debugInfo, Exception ex, string loggerName = "General")
-        {
-            LogManager.GetLogger(loggerName).Debug(ex, debugInfo);
-        }
-        public static void LogFatal(string fatalInfo, Exception ex, string loggerName = "General")
-        {
-            LogManager.GetLogger(loggerName).Fatal(ex, fatalInfo);
-        }
-    }
+	public partial class Rest
+	{
+		private ILogger Logger { get; set; }
+
+		public void LogError(string errorMessage, Exception ex = null, int eventId = 0)
+		{
+			Logger?.LogError(eventId, ex, errorMessage);
+		}
+		public void LogInfo(string info, Exception ex = null, int eventId = 0)
+		{
+			Logger?.LogInformation(eventId, ex, info);
+		}
+		public void LogDebug(string debugInfo, Exception ex = null, int eventId = 0)
+		{
+			Logger?.LogDebug(eventId, debugInfo, ex);
+		}
+		public void LogFatal(string fatalInfo, Exception ex = null, int eventId = 0)
+		{
+			Logger?.LogCritical(eventId, fatalInfo, ex);
+		}
+	}
 }

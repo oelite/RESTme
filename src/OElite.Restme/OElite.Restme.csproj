@@ -1,75 +1,31 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage Client, Redis Client as well as many Convertors &amp; Extensions implemented in .NET Core</Description>
-    <VersionPrefix>1.0.9-dev</VersionPrefix>
-    <TargetFramework>netstandard1.6</TargetFramework>
-	<PackageTargetFallback>$(PackageTargetFallback);dnxcore50;netcore50;portable-net451+win8</PackageTargetFallback>
+    <Description>RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage
+            Client, Redis Client as well as many Convertors &amp; Extensions implemented in .NET Core
+        </Description>
+    <VersionPrefix>2.0.0-dev</VersionPrefix>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>OElite.Restme</AssemblyName>
     <PackageTags>HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
     <RepositoryUrl>https://github.com/oelite/RESTme</RepositoryUrl>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
     <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+    <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
+    <Authors>OElite Limited</Authors>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-    <EmbeddedResource Include="compiler\resources\**\*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.0.0" />
+    <PackageReference Include="NETStandard.Library" Version="2.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
+    <PackageReference Include="StackExchange.Redis" Version="1.2.6" />
+    <PackageReference Include="System.Runtime.Serialization.Formatters" Version="4.3.0">
+    </PackageReference>
+    <PackageReference Include="WindowsAzure.Storage" Version="8.2.1" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../OElite.Restme.Utils/OElite.Restme.Utils.csproj">
-      <Project>{E16A4495-94A2-42E8-9F08-35BB6D25E2E4}</Project>
-      <Name>OElite.Restme.Utils</Name>
-    </ProjectReference>
+    <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Sdk">
-      <Version>1.0.0-alpha-20161104-2</Version>
-      <PrivateAssets>All</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration">
-      <Version>1.1.0</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions">
-      <Version>1.1.0</Version>
-    </PackageReference>
-    <PackageReference Include="NETStandard.Library">
-      <Version>1.6.1</Version>
-    </PackageReference>
-    <PackageReference Include="Newtonsoft.Json">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="NLog">
-      <Version>4.4.0-betaV15</Version>
-    </PackageReference>
-    <PackageReference Include="StackExchange.Redis">
-      <Version>1.1.608</Version>
-    </PackageReference>
-    <PackageReference Include="System.Threading.Tasks.Extensions">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="WindowsAzure.Storage">
-      <Version>7.2.1</Version>
-    </PackageReference>
-  </ItemGroup>
-  <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp1.0'">
-    <PackageReference Include="Microsoft.NETCore.App">
-      <Version>1.1.0</Version>
-    </PackageReference>
-  </ItemGroup>
-  <PropertyGroup Label="Configuration">
-    <OutputPath>bin\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <OutputPath>bin</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <OutputPath>bin</OutputPath>
-  </PropertyGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -1,18 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using System.Text;
-using System.IO;
-using System.Reflection;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OElite
 {
-    public partial class Rest : IRestme
+    public partial class Rest : IRestme, IDisposable
     {
         internal Dictionary<string, string> _params;
         internal Dictionary<string, List<string>> _headers;
@@ -22,6 +17,7 @@ namespace OElite
         public Uri BaseUri { get; set; }
         public string ConnectionString { get; set; }
         public string RequestUrlPath { get; set; }
+        public bool Initialized { get; set; }
 
 
         private void Init(RestConfig config = null)
@@ -29,31 +25,33 @@ namespace OElite
             _params = new Dictionary<string, string>();
             _headers = new Dictionary<string, List<string>>();
 
-            this.Configuration = config ?? new RestConfig();
+            Configuration = config ?? new RestConfig();
             this.PrepareRestMode();
         }
 
-        public Rest(Uri baseUri = null, string urlPath = null, RestConfig config = null)
+        public Rest(Uri baseUri = null, string urlPath = null, RestConfig config = null, ILogger logger = null)
         {
-            this.BaseUri = baseUri;
-            this.RequestUrlPath = urlPath;
+            BaseUri = baseUri;
+            RequestUrlPath = urlPath;
+            Logger = logger;
             Init(config);
         }
 
-        public Rest(string endPointOrConnectionString, RestConfig configuration = null)
+        public Rest(string endPointOrConnectionString, RestConfig configuration = null, ILogger logger = null)
         {
             var lowerConn = endPointOrConnectionString?.ToLower();
             if (lowerConn != null && lowerConn.StartsWith("http"))
-                this.BaseUri = new Uri(endPointOrConnectionString);
+                BaseUri = new Uri(endPointOrConnectionString);
             else
                 ConnectionString = endPointOrConnectionString;
+            Logger = logger;
             Init(configuration);
         }
 
 
         public RestMode CurrentMode
         {
-            get { return Configuration.OperationMode; }
+            get => Configuration.OperationMode;
             set
             {
                 Configuration.OperationMode = value;
@@ -66,6 +64,7 @@ namespace OElite
                         PrepareRedisRestme();
                         break;
                     case RestMode.HTTPClient:
+                    case RestMode.HTTPRestClient:
                     default:
                         PrepareHttpRestme();
                         break;
@@ -79,8 +78,7 @@ namespace OElite
             if (_params?.Count > 0)
                 throw new InvalidOperationException(
                     "Additional parameters have been added, try use Add(string key, object value) instead of Add(object value).");
-            else
-                _objAsParam = value;
+            _objAsParam = value;
         }
 
         public void Add(string key, string value)
@@ -115,10 +113,10 @@ namespace OElite
                 if (allowMultipleValues)
                     _headers[header].Add(value);
                 else
-                    _headers[header] = new List<string>() {value};
+                    _headers[header] = new List<string> {value};
             }
             else
-                _headers.Add(header, new List<string>() {value});
+                _headers.Add(header, new List<string> {value});
         }
 
         public void AddBearerToken(string token)
@@ -128,15 +126,17 @@ namespace OElite
 
         public T Request<T>(HttpMethod method, string relativeUrlPath = null)
         {
-            return Task.Run(async () => await RequestAsync<T>(method, relativeUrlPath)).Result;
+            return RequestAsync<T>(method, relativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public async Task<T> RequestAsync<T>(HttpMethod method, string relativePath = null)
+        public Task<T> RequestAsync<T>(HttpMethod method, string relativePath = null)
         {
             switch (CurrentMode)
             {
                 case RestMode.HTTPClient:
-                    return await this.HttpRequestAsync<T>(method, relativePath);
+                case RestMode.HTTPRestClient:
+                    return Task.Run(() =>
+                        this.HttpRequestAsync<T>(method, relativePath).WaitAndGetResult(Configuration.DefaultTimeout));
                 case RestMode.AzureStorageClient:
                 case RestMode.RedisCacheClient:
                 default:
@@ -147,56 +147,68 @@ namespace OElite
 
         public T Get<T>(string keyOrRelativeUrlPath = null)
         {
-            return Task.Run(async () => await GetAsync<T>(keyOrRelativeUrlPath)).Result;
+            return GetAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public async Task<T> GetAsync<T>(string keyOrRelativeUrlPath = null)
+        public Task<T> GetAsync<T>(string keyOrRelativeUrlPath = null)
         {
-            switch (CurrentMode)
+            var task = Task.Run(() =>
             {
-                case RestMode.HTTPClient:
-                    return await this.HttpGetAsync<T>(keyOrRelativeUrlPath);
-                case RestMode.AzureStorageClient:
-                    return await this.StorageGetAsync<T>(keyOrRelativeUrlPath);
-                case RestMode.RedisCacheClient:
-                    return await this.RedisGetAsync<T>(keyOrRelativeUrlPath);
-                default:
-                    throw new NotSupportedException(
-                        "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
-            }
+                switch (CurrentMode)
+                {
+                    case RestMode.HTTPClient:
+                    case RestMode.HTTPRestClient:
+                        return this.HttpGetAsync<T>(keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.AzureStorageClient:
+                        return this.StorageGetAsync<T>(keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.RedisCacheClient:
+                        return this.RedisGetAsync<T>(keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    default:
+                        throw new NotSupportedException(
+                            "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
+                }
+            });
+            return task;
         }
 
         public string Get(string keyOrRelativePath = null)
         {
-            return Task.Run(async () => await GetAsync(keyOrRelativePath)).Result;
+            return GetAsync(keyOrRelativePath).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public async Task<string> GetAsync(string keyOrRelativePath = null)
+        public Task<string> GetAsync(string keyOrRelativePath = null)
         {
-            return await GetAsync<string>(keyOrRelativePath);
+            return GetAsync<string>(keyOrRelativePath);
         }
 
 
         public T Post<T>(string keyOrRelativeUrlPath = null, T dataObject = default(T))
         {
-            return PostAsync<T>(keyOrRelativeUrlPath, dataObject).Result;
+            return PostAsync(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
         public Task<T> PostAsync<T>(string keyOrRelativeUrlPath = null, T dataObject = default(T))
         {
-            switch (CurrentMode)
+            var task = Task.Run<T>(() =>
             {
-                case RestMode.HTTPClient:
-                    if (dataObject != null)
-                        throw new NotSupportedException(
-                            "dataObject is not expected when using Http Client, please check your RestMode");
-                    return RequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath);
-                case RestMode.AzureStorageClient:
-                    if (dataObject == null)
-                    {
+                switch (CurrentMode)
+                {
+                    case RestMode.HTTPClient:
+                    case RestMode.HTTPRestClient:
+                        return RequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.AzureStorageClient:
+                        if (dataObject != null)
+                            return this.StoragePostAsync(keyOrRelativeUrlPath, dataObject)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
                         if (_objAsParam == null)
-                            throw new NotSupportedException(
-                                "dataObject should not be null - use DeleteAsync() method if you intended to delete. Alternatively add an object parameter before the call.");
+                        {
+                            DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
+                            return default(T);
+                        }
                         else if (_objAsParam.GetType() is T)
                         {
                             dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
@@ -206,14 +218,17 @@ namespace OElite
                             throw new NotSupportedException(
                                 "A object parameter is detected, however it is not same generic type as the return type for the current call.");
                         }
-                    }
-                    return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject);
-                case RestMode.RedisCacheClient:
-                    if (dataObject == null)
-                    {
+                        return this.StoragePostAsync(keyOrRelativeUrlPath, dataObject)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.RedisCacheClient:
+                        if (dataObject != null)
+                            return this.RedisPostAsync(keyOrRelativeUrlPath, dataObject)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
                         if (_objAsParam == null)
-                            throw new NotSupportedException(
-                                "dataObject should not be null - use DeleteAsync() method if you intended to delete. Alternatively add an object parameter before the call.");
+                        {
+                            DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
+                            return default(T);
+                        }
                         else if (_objAsParam is T)
                         {
                             dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
@@ -223,11 +238,14 @@ namespace OElite
                             throw new NotSupportedException(
                                 "A object parameter is detected, however it is not same generic type as the return type for the current call.");
                         }
-                    }
-                    return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject);
-                default:
-                    throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
-            }
+                        return this.RedisPostAsync(keyOrRelativeUrlPath, dataObject)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    default:
+                        throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
+                }
+            });
+
+            return task;
         }
 
         public Task<string> PostAsync(string keyOrRelativeUrlPath = null, string dataObject = null)
@@ -237,27 +255,34 @@ namespace OElite
 
         public string Post(string keyOrRelativeUrlPath = null, string dataObject = null)
         {
-            return PostAsync(keyOrRelativeUrlPath, dataObject).Result;
+            return PostAsync(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
         public T Delete<T>(string keyOrRelativeUrlPath = null)
         {
-            return Task.Run(async () => await DeleteAsync<T>(keyOrRelativeUrlPath)).Result;
+            return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
         public Task<T> DeleteAsync<T>(string keyOrRelativeUrlPath = null)
         {
-            switch (CurrentMode)
+            var task = Task.Run(() =>
             {
-                case RestMode.HTTPClient:
-                    return RequestAsync<T>(HttpMethod.Delete, keyOrRelativeUrlPath);
-                case RestMode.AzureStorageClient:
-                    return this.StorageDeleteAsync<T>(keyOrRelativeUrlPath);
-                case RestMode.RedisCacheClient:
-                    return this.RedisDeleteAsync<T>(keyOrRelativeUrlPath);
-                default:
-                    throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
-            }
+                switch (CurrentMode)
+                {
+                    case RestMode.HTTPClient:
+                    case RestMode.HTTPRestClient:
+                        return Request<T>(HttpMethod.Delete, keyOrRelativeUrlPath);
+                    case RestMode.AzureStorageClient:
+                        return this.StorageDeleteAsync<T>(keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.RedisCacheClient:
+                        return this.RedisDeleteAsync<T>(keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    default:
+                        throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
+                }
+            });
+            return task;
         }
 
         public Task<bool> DeleteAsync(string keyOrRelativeUrlPath = null)
@@ -267,10 +292,10 @@ namespace OElite
 
         public bool Delete(string keyOrRelativeUrlPath = null)
         {
-            return DeleteAsync(keyOrRelativeUrlPath).Result;
+            return DeleteAsync(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        #region Private Methods        
+        #region Private Methods
 
         public void PrepareHeaders(HttpRequestHeaders headers)
         {
@@ -303,10 +328,17 @@ namespace OElite
             var indexOfQuestionMark = urlPath.IndexOf('?');
             if (indexOfQuestionMark > 0)
                 return urlPath.Substring(0, indexOfQuestionMark) + nvc.ParseIntoQueryString();
-            else
-                return urlPath + nvc.ParseIntoQueryString();
+            return urlPath + nvc.ParseIntoQueryString();
         }
 
         #endregion
+
+
+        public void Dispose()
+        {
+            var disposeTasks = new List<Task> {AttemptDisposeRedis()};
+
+            Task.WaitAll(disposeTasks.ToArray());
+        }
     }
 }

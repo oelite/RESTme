@@ -5,12 +5,12 @@ using System.Text;
 
 namespace OElite
 {
-    public class OEliteFormUrlEncodedContent : ByteArrayContent
+    public class OEliteRestfulHttpContent : ByteArrayContent
     {
-        public OEliteFormUrlEncodedContent(IEnumerable<KeyValuePair<string, string>> nameValueCollection)
+        public OEliteRestfulHttpContent(IEnumerable<KeyValuePair<string, string>> nameValueCollection)
             : base(GetContentByteArray(nameValueCollection))
         {
-            base.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/x-www-form-urlencoded");
+            base.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
         }
         private static byte[] GetContentByteArray(IEnumerable<KeyValuePair<string, string>> nameValueCollection, Encoding encoding = null)
         {

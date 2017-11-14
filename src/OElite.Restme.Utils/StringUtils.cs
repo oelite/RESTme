@@ -1,16 +1,19 @@
 ﻿using System;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.IO;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
 //using Microsoft.Extensions.Logging;
-using System.Security.Cryptography;
 
 namespace OElite
 {
     public class StringUtils
     {
-        private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+        //private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
         /// Validate an input whether it is null or empty string
@@ -19,14 +22,14 @@ namespace OElite
         /// <returns>return the original string if it passes</returns>
         /// <exception cref="WebCider.OEliteException" > throws when the string is invalid </exception>
         public static string CanNotBeNullOrEmpty(string stringValue, bool trim = true)
-        {            
+        {
             if (string.IsNullOrEmpty(stringValue) || (trim && string.IsNullOrEmpty(stringValue.Trim())))
             {
-                logger.Error("The string value requested is null or empty which is not allowed for the current process");
+                //logger.Error("The string value requested is null or empty which is not allowed for the current process");
                 throw new OEliteException(
                     "The string value requested is null or empty which is not allowed for the current process");
             }
-            else return stringValue.Trim();
+            return stringValue.Trim();
         }
 
         public static string CanNotBeNullOrEmpty(object stringObj, bool trim = true)
@@ -65,19 +68,19 @@ namespace OElite
             return type.Name;
         }
 
-        public static string GetStringFromStream(System.IO.Stream stream)
+        public static string GetStringFromStream(Stream stream)
         {
             return GetStringFromStream(stream, Encoding.UTF8);
         }
 
-        public static string GetStringFromStream(System.IO.Stream stream, Encoding encoding)
+        public static string GetStringFromStream(Stream stream, Encoding encoding)
         {
             if (encoding == null)
                 encoding = Encoding.UTF8;
             try
             {
                 stream.Position = 0;
-                using (System.IO.StreamReader reader = new System.IO.StreamReader(stream, encoding))
+                using (StreamReader reader = new StreamReader(stream, encoding))
                 {
                     return reader.ReadToEnd();
                 }
@@ -107,7 +110,7 @@ namespace OElite
                 {
                     string result = Convert.ToString(objectValue);
                     if (result == objectValue.GetType().ToString()) return string.Empty;
-                    else return trim ? result.Trim() : result;
+                    return trim ? result.Trim() : result;
                 }
                 catch (Exception ex)
                 {
@@ -115,7 +118,7 @@ namespace OElite
                     return string.Empty;
                 }
             }
-            else return string.Empty;
+            return string.Empty;
         }
 
         public static bool StringContains(string stringToValidate, string[] stringsToAttempt, string[] splitters,
@@ -126,7 +129,7 @@ namespace OElite
                 string[] values = stringToValidate.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
                 return StringContains(values, stringsToAttempt, minimumIncludes);
             }
-            else return true;
+            return true;
         }
 
         public static bool StringContains(string[] strings, string[] stringsToAttempt, int minimumIncludes)
@@ -163,7 +166,7 @@ namespace OElite
             long i = 1;
             foreach (byte b in Guid.NewGuid().ToByteArray())
             {
-                i *= ((int) b + 1);
+                i *= (b + 1);
             }
             return string.Format("{0:x}", i - DateTime.Now.Ticks);
         }
@@ -234,20 +237,21 @@ namespace OElite
         #endregion
 
         public static string JsonSerialize(object value,
-            Newtonsoft.Json.JsonSerializerSettings serializerSettings = null)
+            JsonSerializerSettings serializerSettings = null)
         {
             if (value == null)
                 return string.Empty;
             try
             {
                 //return ServiceStack.Text.JsonSerializer.SerializeToString(value, value.GetType());
-                return Newtonsoft.Json.JsonConvert.SerializeObject(value, serializerSettings
-                                                                          ??
-                                                                          new Newtonsoft.Json.JsonSerializerSettings()
-                                                                          {
-                                                                              ContractResolver =
-                                                                                  new OEliteJsonResolver()
-                                                                          });
+                return JsonConvert.SerializeObject(value, serializerSettings
+                                                          ??
+                                                          new JsonSerializerSettings
+                                                          {
+                                                              ContractResolver =
+                                                                  new OEliteJsonResolver(),
+                                                              NullValueHandling = NullValueHandling.Ignore
+                                                          });
             }
             catch (Exception ex)
             {
@@ -257,24 +261,35 @@ namespace OElite
         }
 
         public static T JsonDeserialize<T>(string value,
-            Newtonsoft.Json.JsonSerializerSettings jsonSerializerSettings = null)
+            JsonSerializerSettings jsonSerializerSettings = null)
         {
             try
             {
-                if (value.IsNotNullOrEmpty())
-                {
-                    if (typeof(T).IsPrimitiveType())
-                        return (T) Convert.ChangeType(value, typeof(T));
-                    else
-                        return Newtonsoft.Json.JsonConvert.DeserializeObject<T>(value,
-                            jsonSerializerSettings ??
-                            new Newtonsoft.Json.JsonSerializerSettings() {ContractResolver = new OEliteJsonResolver()});
-                }
-                else
-                    return default(T);
+                if (!value.IsNotNullOrEmpty()) return default(T);
+                if (typeof(T).IsPrimitiveType())
+                    return (T) Convert.ChangeType(value, typeof(T));
+
+                return JsonConvert.DeserializeObject<T>(value,
+                    jsonSerializerSettings ??
+                    new JsonSerializerSettings
+                    {
+                        ContractResolver = new OEliteJsonResolver(),
+                        NullValueHandling = NullValueHandling.Ignore
+                    });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                try
+                {
+                    //in case it is JSON encoded as a JSON string
+                    var token = JToken.Parse(value);
+                    return JObject.Parse((string) token)
+                        .ToObject<T>(new JsonSerializer() {ContractResolver = new OEliteJsonResolver()});
+                }
+                catch (Exception ex2)
+                {
+                    // ignored
+                }
                 //OEliteHelper.Logger.Warn($"Deserializing an object to type {typeof(T).FullName} has failed. The original value was: \n {value}", ex);
             }
             return default(T);
@@ -292,7 +307,7 @@ namespace OElite
                 Equality,
                 Contains,
                 StartsWith,
-                EndsWith,
+                EndsWith
             }
 
             public static string XPath(string xpath)
@@ -365,7 +380,7 @@ namespace OElite
 
         public static string ByteSizeInString(long byteSize)
         {
-            var culture = System.Globalization.CultureInfo.CurrentUICulture;
+            var culture = CultureInfo.CurrentUICulture;
             const string format = "#,0.0";
 
             if (byteSize < 1024)
