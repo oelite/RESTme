@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -17,28 +15,39 @@ namespace OElite
             if (blobItemPath.IsNullOrEmpty())
                 throw new OEliteWebException("Invalid blob item name.");
             var blockBlob = container.GetBlockBlobReference(blobItemPath);
-            using (MemoryStream stream = new MemoryStream())
+            using (var stream = new MemoryStream())
             {
                 try
                 {
+                    if (!await blockBlob.ExistsAsync()) return default(T);
+
                     if (typeof(Stream).IsAssignableFrom(typeof(T)))
-                    {
+                    {                        
                         await blockBlob.DownloadToStreamAsync(stream);
-                        var streamForOutput = new MemoryStream(stream.ToArray());
-                        return (T) Convert.ChangeType(streamForOutput, typeof(T));
-                    }
-                    else
-                    {
-                        var jsonStringValue = await blockBlob.DownloadTextAsync();
-                        if (typeof(T) == typeof(string))
-                            return (T) Convert.ChangeType(jsonStringValue, typeof(T));
+                        var bytes = FileUtils.ReadStreamToEnd(stream);
+                        T result;
+                        if (typeof(T).GetTypeInfo().IsAbstract)
+                        {
+                            result = (T) Activator.CreateInstance(typeof(MemoryStream), bytes);
+                        }
                         else
-                            return jsonStringValue.JsonDeserialize<T>();
+                            result = (T) Activator.CreateInstance(typeof(T), bytes);
+                        return result;
                     }
+
+
+                    var jsonStringValue = await blockBlob.DownloadTextAsync();
+                    if (!jsonStringValue.IsNotNullOrEmpty()) return default(T);
+
+                    if (typeof(T) == typeof(string))
+                        return (T) Convert.ChangeType(jsonStringValue, typeof(T));
+
+                    return jsonStringValue.JsonDeserialize<T>();
                 }
                 catch (Exception ex)
                 {
-                    Rest.LogDebug("Unable to fetch requested blob:" + ex.Message, ex);
+                    restme.LogDebug(
+                        $"Unable to fetch requested blob: {storageRelativePath}\n {ex.Message} \n {ex.StackTrace}", ex);
                     return default(T);
                 }
             }
@@ -61,6 +70,9 @@ namespace OElite
             {
                 try
                 {
+                    var extension = FileUtils.GetFileExtensionName(storageRelativePath);
+                    if (extension.IsNotNullOrEmpty())
+                        blockBlob.Properties.ContentType = FileUtils.GetMimeType(extension);
                     if (typeof(Stream).IsAssignableFrom(typeof(T)))
                     {
                         stream = dataObject as Stream;
@@ -81,7 +93,7 @@ namespace OElite
                 }
                 catch (Exception ex)
                 {
-                    Rest.LogDebug("Unable to upload requested data:\n" + ex.Message, ex);
+                    restme.LogDebug("Unable to upload requested data:\n" + ex.Message, ex);
                     return default(T);
                 }
             }
@@ -103,7 +115,7 @@ namespace OElite
             }
             catch (Exception ex)
             {
-                Rest.LogDebug("Unable to delete requested data:\n" + ex.Message, ex);
+                restme.LogDebug("Unable to delete requested data:\n" + ex.Message, ex);
             }
             return default(T);
         }

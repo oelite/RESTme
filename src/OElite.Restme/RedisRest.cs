@@ -1,9 +1,9 @@
 ﻿using StackExchange.Redis;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
+using System.Net;
 
 namespace OElite
 {
@@ -28,22 +28,19 @@ namespace OElite
                     catch (Exception ex)
                     {
                         LogError(ex.Message, ex);
-                        var host = this.ConnectionString.Split(new char[] {',', ':'})[0];
-                        var hostEntry = Task.Run(async () => await System.Net.Dns.GetHostEntryAsync(host)).
-                            Result;
-                        var addresses =
-                            hostEntry?.AddressList?.Where(item => item.AddressFamily == AddressFamily.InterNetwork)?
-                                .ToArray();
-                        if (!(addresses?.Length > 0)) return result;
-
-                        foreach (var address in addresses)
+                        var endPoints = redisConfig.EndPoints;
+                        foreach (DnsEndPoint endpoint in endPoints)
                         {
-                            var ip4Address = address.MapToIPv4();
                             try
                             {
-                                redisConfig = ConfigurationOptions.Parse(ip4Address +
-                                                                         ConnectionString.Substring(
-                                                                             ConnectionString.IndexOf(':')));
+                                var port = endpoint.Port;
+                                if (!IsIpAddress(endpoint.Host))
+                                {
+                                    IPHostEntry ip = Dns.GetHostEntryAsync(endpoint.Host).WaitAndGetResult(Configuration.DefaultTimeout);
+                                    redisConfig.EndPoints.Remove(endpoint);
+                                    redisConfig.EndPoints.Add(ip.AddressList.First(), port);
+                                }
+
                                 result = ConnectionMultiplexer.Connect(redisConfig);
                             }
                             catch (Exception innerEx)
@@ -52,20 +49,43 @@ namespace OElite
                                 continue;
                             }
                             if (result != null)
-                            {
                                 break;
-                            }
                         }
                     }
                     return result;
                 }).Value;
-                redisDatabase = redisConnection.GetDatabase();
+                redisDatabase = redisConnection?.GetDatabase();
             }
             catch (Exception ex)
             {
                 LogError(ex.Message, ex);
                 throw new OEliteDbException("failed to initialize Redis connection:\n" + ex.Message, ex);
             }
+            if (redisConnection?.IsConnected == true && redisDatabase?.Database > 0)
+                Initialized = true;
+        }
+
+        bool IsIpAddress(string host)
+        {
+            string ipPattern = @"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b";
+            return Regex.IsMatch(host, ipPattern);
+        }
+
+        private Task AttemptDisposeRedis()
+        {
+            return Task.Run(() =>
+            {
+                if (redisConnection != null)
+                {
+                    try
+                    {
+                        redisConnection.Dispose();
+                    }
+                    catch
+                    {
+                    }
+                }
+            });
         }
     }
 }

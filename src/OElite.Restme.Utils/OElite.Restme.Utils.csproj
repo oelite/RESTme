@@ -1,44 +1,19 @@
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Description>Restme.Utils (RESTme) is the common library for Restme</Description>
-    <VersionPrefix>1.0.3</VersionPrefix>
-    <TargetFramework>netstandard1.6</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>OElite.Restme.Utils</AssemblyName>
     <PackageTags>RESTme</PackageTags>
     <RepositoryUrl>https://github.com/oelite/RESTme</RepositoryUrl>
-	<PackageTargetFallback>$(PackageTargetFallback);dnxcore50;netcore50;portable-net451+win8</PackageTargetFallback>
+    <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
+    <VersionPrefix>2.0.0-dev</VersionPrefix>
+    <Authors>OElite Limited</Authors>
+    <Owners>OElite Limited</Owners>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-    <EmbeddedResource Include="compiler\resources\**\*" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Sdk">
-      <Version>1.0.0-alpha-20161104-2</Version>
-      <PrivateAssets>All</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="NETStandard.Library">
-      <Version>1.6.1</Version>
-    </PackageReference>
-    <PackageReference Include="Newtonsoft.Json">
-      <Version>9.0.1</Version>
-    </PackageReference>
-    <PackageReference Include="NLog">
-      <Version>4.4.0-betaV15</Version>
+    <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
+    <PackageReference Include="System.Reflection.TypeExtensions" Version="4.4.0" />
+    <PackageReference Include="System.Security.Cryptography.Algorithms" Version="4.3.0">
     </PackageReference>
   </ItemGroup>
-  <PropertyGroup Label="Configuration">
-    <OutputPath>bin</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugType>
-    </DebugType>
-    <OutputPath>bin</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <OutputPath>bin</OutputPath>
-  </PropertyGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

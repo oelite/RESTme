@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
-using NLog.LayoutRenderers;
-using StackExchange.Redis;
+using OElite.Utils;
 
 namespace OElite
 {
@@ -14,11 +10,17 @@ namespace OElite
         {
             MustBeRedisMode(restme);
             string stringValue = await restme.redisDatabase.StringGetAsync(redisKey);
-            if (typeof(T).IsPrimitiveType())
+
+            if (stringValue.IsNotNullOrEmpty())
             {
-                return (T) Convert.ChangeType(stringValue, typeof(T));
+                if (typeof(T).IsPrimitiveType())
+                {
+                    return (T) Convert.ChangeType(stringValue, typeof(T));
+                }
+                return stringValue.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization);
             }
-            return stringValue.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization);
+            else
+                return default(T);
         }
 
         public static async Task<T> RedisPostAsync<T>(this Rest restme, string redisKey, T dataObject)

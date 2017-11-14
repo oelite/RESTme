@@ -1,67 +1,30 @@
-﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
-  <PropertyGroup>
-    <TargetFramework>netcoreapp1.0</TargetFramework>
-    <AssemblyName>OElite.Restme.UnitTests</AssemblyName>
-    <PackageTargetFallback Condition=" '$(TargetFramework)' == 'netcoreapp1.0' ">$(PackageTargetFallback);dnxcore50;netcore50;portable-net45+win8</PackageTargetFallback>
-    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
-    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
-    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
-  </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-    <EmbeddedResource Include="compiler\resources\**\*" />
-    <Content Include="testsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="testSettings.json">
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="../OElite.Restme/OElite.Restme.csproj">
-      <Project>{69AAE654-E3D5-4986-B9AE-8B3A13720AEF}</Project>
-      <Name>OElite.Restme</Name>
-    </ProjectReference>
-    <ProjectReference Include="../OElite.Restme.Utils/OElite.Restme.Utils.csproj">
-      <FromP2P>true</FromP2P>
-      <Project>{6FEF86BA-ED3C-4DBB-B507-6958AF405494}</Project>
-      <Name>OElite.Restme.Utils</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Sdk">
-      <Version>1.0.0-alpha-20161104-2</Version>
-      <PrivateAssets>All</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk">
-      <Version>15.0.0-preview-20161024-02</Version>
-    </PackageReference>
-    <PackageReference Include="xunit.runner.visualstudio">
-      <Version>2.2.0-beta4-build1194</Version>
-    </PackageReference>
-    <PackageReference Include="xunit">
-      <Version>2.2.0-beta4-build3444</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration">
-      <Version>1.1.0</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json">
-      <Version>1.1.0</Version>
-    </PackageReference>
-  </ItemGroup>
-  <ItemGroup Condition=" '$(TargetFramework)' == 'netcoreapp1.0' ">
-    <PackageReference Include="Microsoft.NETCore.App">
-      <Version>1.1.0</Version>
-    </PackageReference>
-  </ItemGroup>
-  <PropertyGroup Label="Configuration">
-    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
-    <OutputPath>bin\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
-  </PropertyGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>netcoreapp2.0</TargetFramework>
+        <AssemblyName>OElite.Restme.UnitTests</AssemblyName>
+        <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+        <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+        <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+        <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../OElite.Restme/OElite.Restme.csproj">
+            <Project>{F7AF2F2D-654A-4B60-8AF7-B59A4D67CA73}</Project>
+            <Name>OElite.Restme</Name>
+        </ProjectReference>
+        <ProjectReference Include="../OElite.Restme.Utils/OElite.Restme.Utils.csproj">
+            <FromP2P>true</FromP2P>
+            <Project>{162906C9-078A-4FF6-BB93-F8AB2ABD1A10}</Project>
+            <Name>OElite.Restme.Utils</Name>
+        </ProjectReference>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.0" />
+        <PackageReference Include="xunit.runner.visualstudio">
+            <Version>2.2.0-beta4-build1194</Version>
+        </PackageReference>
+        <PackageReference Include="xunit">
+            <Version>2.2.0-beta4-build3444</Version>
+        </PackageReference>
+    </ItemGroup>
 </Project>

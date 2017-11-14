@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+
 namespace OElite
 {
     public partial class Rest
@@ -17,6 +15,7 @@ namespace OElite
 
 
         public bool CreateAzureBlobContainerIfNotExists { get; set; }
+        public BlobContainerPublicAccessType BlobContainerPublicAccessType { get; set; }
 
         private void PrepareStorageRestme()
         {
@@ -25,15 +24,23 @@ namespace OElite
 
             azureStorageAccount = CloudStorageAccount.Parse(ConnectionString);
             azureBlobClient = azureStorageAccount.CreateCloudBlobClient();
+            Initialized = true;
         }
+
         internal async Task<CloudBlobContainer> GetAzureBlobContainerAsync(string relativePath)
         {
             var containerName = IdentifyBlobContainerName(relativePath);
             var container = azureBlobClient.GetContainerReference(containerName);
             if (CreateAzureBlobContainerIfNotExists)
-                await container.CreateIfNotExistsAsync();
+            {
+                var result = await container.CreateIfNotExistsAsync();
+                if (result)
+                    await container.SetPermissionsAsync(
+                        new BlobContainerPermissions {PublicAccess = BlobContainerPublicAccessType});
+            }
             return container;
         }
+
         internal string IdentifyBlobContainerName(string relativePath)
         {
             relativePath = relativePath?.Replace('\\', '/')?.Replace("//", "/").Trim('/');
@@ -43,12 +50,17 @@ namespace OElite
             else
                 throw new OEliteWebException("Unable to identify azure blob container name.");
         }
+
         internal string IdentifyBlobItemPath(string relativePath)
         {
-            return relativePath?.Replace('\\', '/')?
-                .Replace("//", "/")?
-                .Trim('/')?
-                .Replace(IdentifyBlobContainerName(relativePath), string.Empty)?
+            return relativePath?.Replace('\\', '/')
+                ?
+                .Replace("//", "/")
+                ?
+                .Trim('/')
+                ?
+                .Replace(IdentifyBlobContainerName(relativePath), string.Empty)
+                ?
                 .Trim('/');
         }
     }

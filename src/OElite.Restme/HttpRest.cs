@@ -4,6 +4,7 @@
     {
         private void PrepareHttpRestme()
         {
+            Initialized = true;
         }
     }
 }

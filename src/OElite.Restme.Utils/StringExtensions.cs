@@ -1,5 +1,4 @@
 ﻿using System.Collections;
-using System.Reflection;
 using Newtonsoft.Json;
 
 namespace OElite
@@ -20,7 +19,8 @@ namespace OElite
         /// A regular expression used to manipulate parameterized route segments.
         /// </summary>
         /// <value>A <see cref="Regex"/> object.</value>
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)] private static readonly Regex ParameterExpression =
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        private static readonly Regex ParameterExpression =
             new Regex(@"\{(?<name>[A-Z0-9]*)\}", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>
@@ -111,8 +111,13 @@ namespace OElite
             if (!(typeof(IEnumerable).IsAssignableFrom(typeof(T))) || !attemptResponseMessageConvertIfListType)
                 return StringUtils.JsonDeserialize<T>(value, serializerSettings);
 
-            var msg = StringUtils.JsonDeserialize<ResponseMessage>(value);
-            return msg != null ? msg.GetOriginalData<T>() : StringUtils.JsonDeserialize<T>(value, serializerSettings);
+            if (value?.ToLower()?.Contains("AssociatedTotalCountPropertyName".ToLower()) == true)
+            {
+                var msg = StringUtils.JsonDeserialize<ResponseMessage>(value);
+                return msg != null ? msg.GetOriginalData<T>() : StringUtils.JsonDeserialize<T>(value, serializerSettings);
+            }
+            else
+                return StringUtils.JsonDeserialize<T>(value, serializerSettings);
         }
     }
 }
