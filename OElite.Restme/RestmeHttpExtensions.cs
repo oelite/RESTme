@@ -34,12 +34,15 @@ namespace OElite
                 {
                     if (restme._params?.Count > 0)
                         submitContent = new OEliteRestfulHttpContent(restme._params);
-                    else if (restme?._objAsParam != null)
+                    else if (restme._objAsParam != null)
                     {
                         submitContent = new StringContent(restme._objAsParam.JsonSerialize());
-                        submitContent.Headers.ContentType =
-                            new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
                     }
+                    else
+                        submitContent = new StringContent(string.Empty);
+
+                    submitContent.Headers.ContentType =
+                        new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
                 }
 
                 if (method == HttpMethod.Post)

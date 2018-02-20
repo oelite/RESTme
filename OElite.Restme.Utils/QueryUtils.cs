@@ -18,8 +18,11 @@ namespace OElite
                 if (pairArray?.Length != 2) continue;
                 var kKey = pairArray[0].Trim();
                 var kValue = WebUtility.UrlDecode(pairArray[1].Trim());
+
+                //note: BUG Identified: when multiple parameters with same name appears this will throw an exception
                 result.Add(kKey, kValue);
             }
+
             return result;
         }
 
@@ -34,11 +37,11 @@ namespace OElite
                 {
                     result = index == 0
                         ? $"{k}={WebUtility.UrlEncode(values[k])}"
-                        : $"&{k}={WebUtility.UrlEncode(values[k])}";
+                        : result + $"&{k}={WebUtility.UrlEncode(values[k])}";
                     index++;
                 }
             }
-            if (includeQuestionMark)
+            if (includeQuestionMark && result.IsNotNullOrEmpty())
                 result = $"?{result}";
 
             return result;

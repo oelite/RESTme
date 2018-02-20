@@ -17,18 +17,19 @@ namespace OElite
                 {
                     return (T) Convert.ChangeType(stringValue, typeof(T));
                 }
+
                 return stringValue.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization);
             }
             else
                 return default(T);
         }
 
-        public static async Task<T> RedisPostAsync<T>(this Rest restme, string redisKey, T dataObject)
+        public static async Task<T> RedisPostAsync<T>(this Rest restme, string redisKey, object dataObject)
         {
             MustBeRedisMode(restme);
             if (await restme.redisDatabase.StringSetAsync(redisKey, dataObject.JsonSerialize(
                 restme.Configuration.UseRestConvertForCollectionSerialization)))
-                return dataObject;
+                return (T) dataObject;
             return default(T);
         }
 
@@ -38,8 +39,7 @@ namespace OElite
             var result = await restme.redisDatabase.KeyDeleteAsync(redisKey);
             if (typeof(T) == typeof(bool))
                 return (T) Convert.ChangeType(result, typeof(T));
-            else
-                return default(T);
+            return default(T);
         }
 
         #region Private Methods
