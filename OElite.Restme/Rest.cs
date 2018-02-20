@@ -198,6 +198,8 @@ namespace OElite
                 {
                     case RestMode.HTTPClient:
                     case RestMode.HTTPRestClient:
+                        if (dataObject != null)
+                            _objAsParam = dataObject;
                         return RequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.AzureStorageClient:
