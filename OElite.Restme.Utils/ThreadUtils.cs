@@ -18,7 +18,9 @@ namespace OElite
         {
             if (task == null) return default(T);
             if (timeoutMiliseconds > 0)
+            {
                 task.Wait(timeoutMiliseconds);
+            }
             else
                 task.Wait();
 

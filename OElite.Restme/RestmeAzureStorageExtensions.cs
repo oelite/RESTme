@@ -22,7 +22,7 @@ namespace OElite
                     if (!await blockBlob.ExistsAsync()) return default(T);
 
                     if (typeof(Stream).IsAssignableFrom(typeof(T)))
-                    {                        
+                    {
                         await blockBlob.DownloadToStreamAsync(stream);
                         var bytes = FileUtils.ReadStreamToEnd(stream);
                         T result;
@@ -32,6 +32,7 @@ namespace OElite
                         }
                         else
                             result = (T) Activator.CreateInstance(typeof(T), bytes);
+
                         return result;
                     }
 
@@ -53,7 +54,7 @@ namespace OElite
             }
         }
 
-        public static async Task<T> StoragePostAsync<T>(this Rest restme, string storageRelativePath, T dataObject)
+        public static async Task<T> StoragePostAsync<T>(this Rest restme, string storageRelativePath, object dataObject)
         {
             MustBeStorageMode(restme);
             if (dataObject == null)
@@ -89,7 +90,8 @@ namespace OElite
                                 restme.DefaultAzureBlobAccessCondition, restme.DefaultAzureBlobRequestOptions,
                                 restme.DefaultAzureBlobOperationContext);
                     }
-                    return dataObject;
+
+                    return (T) dataObject;
                 }
                 catch (Exception ex)
                 {
@@ -117,6 +119,7 @@ namespace OElite
             {
                 restme.LogDebug("Unable to delete requested data:\n" + ex.Message, ex);
             }
+
             return default(T);
         }
 

@@ -25,8 +25,8 @@ namespace OElite
         string Get(string keyOrRelativePath = null);
         Task<string> GetAsync(string keyOrRelativePath = null);
 
-        T Post<T>(string keyOrRelativePath = null, T dataObject = default(T));
-        Task<T> PostAsync<T>(string keyOrRelativePath = null, T dataObject = default(T));
+        T Post<T>(string keyOrRelativePath = null, object dataObject = null);
+        Task<T> PostAsync<T>(string keyOrRelativePath = null, object dataObject = null);
         string Post(string keyOrRelativePath = null, string dataValue = null);
         Task<string> PostAsync(string keyOrRelativePath = null, string dataValue = null);
 

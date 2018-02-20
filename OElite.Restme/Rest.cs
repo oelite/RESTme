@@ -39,7 +39,7 @@ namespace OElite
 
         public Rest(string endPointOrConnectionString, RestConfig configuration = null, ILogger logger = null)
         {
-            var lowerConn = endPointOrConnectionString?.ToLower();
+            var lowerConn = endPointOrConnectionString;
             if (lowerConn != null && lowerConn.StartsWith("http"))
                 BaseUri = new Uri(endPointOrConnectionString);
             else
@@ -185,12 +185,12 @@ namespace OElite
         }
 
 
-        public T Post<T>(string keyOrRelativeUrlPath = null, T dataObject = default(T))
+        public T Post<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
         {
-            return PostAsync(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+            return PostAsync<T>(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public Task<T> PostAsync<T>(string keyOrRelativeUrlPath = null, T dataObject = default(T))
+        public Task<T> PostAsync<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
         {
             var task = Task.Run<T>(() =>
             {
@@ -202,7 +202,7 @@ namespace OElite
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.AzureStorageClient:
                         if (dataObject != null)
-                            return this.StoragePostAsync(keyOrRelativeUrlPath, dataObject)
+                            return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         if (_objAsParam == null)
                         {
@@ -218,11 +218,12 @@ namespace OElite
                             throw new NotSupportedException(
                                 "A object parameter is detected, however it is not same generic type as the return type for the current call.");
                         }
-                        return this.StoragePostAsync(keyOrRelativeUrlPath, dataObject)
+
+                        return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.RedisCacheClient:
                         if (dataObject != null)
-                            return this.RedisPostAsync(keyOrRelativeUrlPath, dataObject)
+                            return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         if (_objAsParam == null)
                         {
@@ -238,7 +239,8 @@ namespace OElite
                             throw new NotSupportedException(
                                 "A object parameter is detected, however it is not same generic type as the return type for the current call.");
                         }
-                        return this.RedisPostAsync(keyOrRelativeUrlPath, dataObject)
+
+                        return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     default:
                         throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
@@ -325,6 +327,7 @@ namespace OElite
                     nvc.Add(k, _params[k]);
                 }
             }
+
             var indexOfQuestionMark = urlPath.IndexOf('?');
             if (indexOfQuestionMark > 0)
                 return urlPath.Substring(0, indexOfQuestionMark) + nvc.ParseIntoQueryString();
