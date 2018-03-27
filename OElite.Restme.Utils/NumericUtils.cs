@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using OElite.Restme.Utils;
 
 namespace OElite
 {
@@ -12,18 +13,20 @@ namespace OElite
             {
                 try
                 {
-                    string valueString = StringUtils.GetStringValueOrEmpty(objectValue);
+                    var valueString = StringUtils.GetStringValueOrEmpty(objectValue);
                     if (valueString.IsNullOrEmpty())
                         return 0;
-                    int dotIndex = valueString.IndexOf('.');
+                    var dotIndex = valueString.IndexOf('.');
                     if (dotIndex > 0)
                         valueString = valueString.Substring(0, dotIndex);
-                    int value = Int32.Parse(valueString);
+                    var value = int.Parse(valueString);
                     return value;
                 }
                 catch (Exception ex)
                 {
-                    //OEliteHelper.Logger.Info(String.Format("Failed converting object [{0}] into integer value, 0 will be returned. ", objectValue.GetType()), ex);
+                    RestmeLogger.LogDebug(
+                        String.Format("Failed converting object [{0}] into integer value, 0 will be returned. ",
+                            objectValue.GetType()), ex);
                     return 0;
                 }
             }
@@ -40,7 +43,9 @@ namespace OElite
                 }
                 catch (Exception ex)
                 {
-                    //OEliteHelper.Logger.Info(String.Format("Failed converting object [{0}] into integer value, 0 will be returned. ", objectValue.GetType()), ex);
+                    RestmeLogger.LogDebug(
+                        string.Format("Failed converting object [{0}] into integer value, 0 will be returned. ",
+                            objectValue.GetType()), ex);
                     return 0;
                 }
             }
@@ -57,7 +62,9 @@ namespace OElite
                 }
                 catch (Exception ex)
                 {
-                    //OEliteHelper.Logger.Info(String.Format("Failed converting object [{0}] into decimal value, 0 will be returned. ", objectValue.GetType()), ex);
+                    RestmeLogger.LogDebug(
+                        string.Format("Failed converting object [{0}] into decimal value, 0 will be returned. ",
+                            objectValue.GetType()), ex);
                     return 0;
                 }
             }
@@ -74,69 +81,53 @@ namespace OElite
                 {
                     return GetIntegerValueFromObject(val);
                 }
-                else if (result is long)
+
+                if (result is long)
                     return GetLongIntegerValueFromObject(val);
-                else if (result is decimal)
-                    return GetDecimalValueFromObject(val);
-                else
-                    return val;
+                return result is decimal ? (T) GetDecimalValueFromObject(val) : (T) val;
             }
             catch (Exception ex)
             {
-                System.Threading.Tasks.Task.Run(() =>
-                {
-                    //OEliteHelper.Logger.Error("value cannot be converted into numeric values.", ex);
-                });
+                RestmeLogger.LogDebug(ex.Message, ex);
                 throw ex;
             }
         }
 
         public static int[] GetIntegerArrayFromString(string stringToConvert, string[] splitters)
         {
-            List<int> result = new List<int>();
-            if (!string.IsNullOrEmpty(stringToConvert) && splitters != null)
-            {
-                string[] values = stringToConvert.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
-                if (values != null && values.Length > 0)
-                {
-                    foreach (string value in values)
-                    {
-                        result.Add(NumericUtils.GetIntegerValueFromObject(value));
-                    }
-                }
-            }
+            var result = new List<int>();
+            if (string.IsNullOrEmpty(stringToConvert) || splitters == null) return result.ToArray();
+            var values = stringToConvert.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
+            if (values == null || values.Length <= 0) return result.ToArray();
+            result.AddRange(values.Select(GetIntegerValueFromObject));
+
             return result.ToArray();
         }
+
         public static long[] GetLongIntArrayFromString(string stringToConvert, string[] splitters)
         {
-            List<long> result = new List<long>();
-            if (!string.IsNullOrEmpty(stringToConvert) && splitters != null)
-            {
-                string[] values = stringToConvert.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
-                if (values != null && values.Length > 0)
-                {
-                    foreach (string value in values)
-                    {
-                        result.Add(NumericUtils.GetLongIntegerValueFromObject(value));
-                    }
-                }
-            }
+            var result = new List<long>();
+            if (string.IsNullOrEmpty(stringToConvert) || splitters == null) return result.ToArray();
+            var values = stringToConvert.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
+            if (values == null || values.Length <= 0) return result.ToArray();
+            result.AddRange(values.Select(GetLongIntegerValueFromObject));
+
             return result.ToArray();
         }
 
-        public static bool ArrayContainsAny(int[] valuesToValidate, int[] valuesToContain, int minimumCounts)
+        public static bool ArrayContainsAny(int[] valuesToValidate, IEnumerable<int> valuesToContain, int minimumCounts)
         {
-            int counter = 0;
+            var counter = 0;
             if (valuesToValidate == null || valuesToValidate.Length < minimumCounts) return false;
 
-            foreach (int value in valuesToContain)
+            foreach (var value in valuesToContain)
             {
                 if (valuesToValidate.Contains(value))
                     counter++;
                 if (counter >= minimumCounts) return true;
             }
+
             return false;
         }
-
     }
 }

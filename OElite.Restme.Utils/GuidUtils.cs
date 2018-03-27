@@ -1,4 +1,5 @@
 ﻿using System;
+using OElite.Restme.Utils;
 
 namespace OElite
 {
@@ -6,34 +7,32 @@ namespace OElite
     {
         public static Guid GetGuidOrEmpty(object value)
         {
-            if (value != null)
+            if (value == null) return Guid.Empty;
+            try
             {
-                try
-                {
-                    if (value.GetType() == typeof(string))
-                        return new Guid(StringUtils.GetStringValueOrEmpty(value));
-                    else
-                        return (Guid)value;
-                }
-                catch (Exception ex)
-                {
-                    return Guid.Empty;
-                }
+                if (value is string)
+                    return new Guid(StringUtils.GetStringValueOrEmpty(value));
+                return (Guid) value;
             }
-            else
+            catch (Exception ex)
+            {
+                RestmeLogger.LogDebug(ex.Message, ex);
                 return Guid.Empty;
+            }
+
+            return Guid.Empty;
         }
+
         public static bool IsNullOrEmpty(this Guid value)
         {
-            if (value == Guid.Empty)
-                return true;
-            else
-                return false;
+            return value == Guid.Empty;
         }
+
         public static bool IsNotNullOrEmpty(this Guid value)
         {
             return !IsNullOrEmpty(value);
         }
+
         public static bool IsNotNullOrEmpty(this Guid? value)
         {
             return !IsNullOrEmpty(value);
@@ -41,10 +40,7 @@ namespace OElite
 
         public static bool IsNullOrEmpty(this Guid? value)
         {
-            if (value == null || value == Guid.Empty)
-                return true;
-            else
-                return false;
+            return value == null || value == Guid.Empty;
         }
     }
 }

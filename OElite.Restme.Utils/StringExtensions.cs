@@ -89,6 +89,7 @@ namespace OElite
                     sb.Append(c);
                 }
             }
+
             return sb.ToString();
         }
 
@@ -111,13 +112,12 @@ namespace OElite
             if (!(typeof(IEnumerable).IsAssignableFrom(typeof(T))) || !attemptResponseMessageConvertIfListType)
                 return StringUtils.JsonDeserialize<T>(value, serializerSettings);
 
-            if (value?.ToLower()?.Contains("AssociatedTotalCountPropertyName".ToLower()) == true)
-            {
-                var msg = StringUtils.JsonDeserialize<ResponseMessage>(value);
-                return msg != null ? msg.GetOriginalData<T>() : StringUtils.JsonDeserialize<T>(value, serializerSettings);
-            }
-            else
+            if (value?.ToLower()?.Contains("AssociatedTotalCountPropertyName".ToLower()) != true)
                 return StringUtils.JsonDeserialize<T>(value, serializerSettings);
+            var msg = StringUtils.JsonDeserialize<ResponseMessage>(value);
+            return msg != null
+                ? msg.GetOriginalData<T>()
+                : StringUtils.JsonDeserialize<T>(value, serializerSettings);
         }
     }
 }
