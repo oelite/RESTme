@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -6,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using OElite.Restme.Utils;
 
 //using Microsoft.Extensions.Logging;
 
@@ -20,15 +22,15 @@ namespace OElite
         /// </summary>
         /// <param name="stringValue">string value to validate</param>
         /// <returns>return the original string if it passes</returns>
-        /// <exception cref="WebCider.OEliteException" > throws when the string is invalid </exception>
+        /// <exception cref="OEliteException" > throws when the string is invalid </exception>
         public static string CanNotBeNullOrEmpty(string stringValue, bool trim = true)
         {
             if (string.IsNullOrEmpty(stringValue) || (trim && string.IsNullOrEmpty(stringValue.Trim())))
             {
-                //logger.Error("The string value requested is null or empty which is not allowed for the current process");
                 throw new OEliteException(
                     "The string value requested is null or empty which is not allowed for the current process");
             }
+
             return stringValue.Trim();
         }
 
@@ -46,7 +48,7 @@ namespace OElite
         /// <returns></returns>
         public static string SubString(string original, int length, string appendix)
         {
-            string newString = "";
+            var newString = "";
             if (original.Length <= length)
             {
                 newString = original;
@@ -55,6 +57,7 @@ namespace OElite
             {
                 newString = original.Substring(0, length) + appendix;
             }
+
             return newString;
         }
 
@@ -80,14 +83,14 @@ namespace OElite
             try
             {
                 stream.Position = 0;
-                using (StreamReader reader = new StreamReader(stream, encoding))
+                using (var reader = new StreamReader(stream, encoding))
                 {
                     return reader.ReadToEnd();
                 }
             }
             catch (Exception ex)
             {
-                //OEliteHelper.Logger.Info("Failed Converting Stream value into String value: " + ex.Message, ex);
+                RestmeLogger.LogDebug("Failed Converting Stream value into String value: " + ex.Message, ex);
                 return string.Empty;
             }
         }
@@ -104,57 +107,50 @@ namespace OElite
 
         public static string GetStringValueOrEmpty(object objectValue, bool trim = true)
         {
-            if (objectValue != null)
+            if (objectValue == null) return string.Empty;
+            try
             {
-                try
-                {
-                    string result = Convert.ToString(objectValue);
-                    if (result == objectValue.GetType().ToString()) return string.Empty;
-                    return trim ? result.Trim() : result;
-                }
-                catch (Exception ex)
-                {
-                    //OEliteHelper.Logger.Info(String.Format("Failed Converting object value [typeof: {0} ] into String value: {1}", objectValue.GetType(), ex.Message), ex);
-                    return string.Empty;
-                }
+                var result = Convert.ToString(objectValue);
+                if (result == objectValue.GetType().ToString()) return string.Empty;
+                return trim ? result.Trim() : result;
             }
-            return string.Empty;
+            catch (Exception ex)
+            {
+                RestmeLogger.LogDebug(
+                    string.Format("Failed Converting object value [typeof: {0} ] into String value: {1}",
+                        objectValue.GetType(), ex.Message), ex);
+                return string.Empty;
+            }
         }
 
-        public static bool StringContains(string stringToValidate, string[] stringsToAttempt, string[] splitters,
+        public static bool StringContains(string stringToValidate, IEnumerable<string> stringsToAttempt,
+            string[] splitters,
             int minimumIncludes)
         {
-            if (!string.IsNullOrEmpty(stringToValidate))
-            {
-                string[] values = stringToValidate.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
-                return StringContains(values, stringsToAttempt, minimumIncludes);
-            }
-            return true;
+            if (string.IsNullOrEmpty(stringToValidate)) return true;
+            var values = stringToValidate.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
+            return StringContains(values, stringsToAttempt, minimumIncludes);
         }
 
-        public static bool StringContains(string[] strings, string[] stringsToAttempt, int minimumIncludes)
+        public static bool StringContains(string[] strings, IEnumerable<string> stringsToAttempt, int minimumIncludes)
         {
-            int counter = 0;
-            if (strings != null && strings.Length > 0)
+            var counter = 0;
+            if (strings == null || strings.Length <= 0) return false;
+            foreach (var role in stringsToAttempt)
             {
-                foreach (string role in stringsToAttempt)
-                {
-                    if (strings.Contains(role)) counter++;
-                    if (counter >= minimumIncludes) return true;
-                }
+                if (strings.Contains(role)) counter++;
+                if (counter >= minimumIncludes) return true;
             }
+
             return false;
         }
 
         public static bool StringContains(string stringToValidate, int[] idsToAttempt, string[] splitters,
             int minimumIncludes)
         {
-            if (!string.IsNullOrEmpty(stringToValidate))
-            {
-                int[] values = NumericUtils.GetIntegerArrayFromString(stringToValidate, splitters);
-                return NumericUtils.ArrayContainsAny(values, idsToAttempt, minimumIncludes);
-            }
-            return false;
+            if (string.IsNullOrEmpty(stringToValidate)) return false;
+            var values = NumericUtils.GetIntegerArrayFromString(stringToValidate, splitters);
+            return NumericUtils.ArrayContainsAny(values, idsToAttempt, minimumIncludes);
         }
 
         /// <summary>
@@ -163,11 +159,7 @@ namespace OElite
         /// <returns></returns>
         public static string GenerateRandomId()
         {
-            long i = 1;
-            foreach (byte b in Guid.NewGuid().ToByteArray())
-            {
-                i *= (b + 1);
-            }
+            var i = Guid.NewGuid().ToByteArray().Aggregate<byte, long>(1, (current, b) => current * (b + 1));
             return string.Format("{0:x}", i - DateTime.Now.Ticks);
         }
 
@@ -213,8 +205,8 @@ namespace OElite
         public static string ToSeoFriendly(string title, int maxLength = -1)
         {
             var match = Regex.Match(title.ToLower(), "[\\w]+");
-            StringBuilder result = new StringBuilder("");
-            bool maxLengthHit = false;
+            var result = new StringBuilder("");
+            var maxLengthHit = false;
             while (match.Success && !maxLengthHit)
             {
                 if (result.Length + match.Value.Length <= maxLength || maxLength <= 0)
@@ -227,8 +219,10 @@ namespace OElite
                     // Handle a situation where there is only one word and it is greater than the max length.
                     if (result.Length == 0) result.Append(match.Value.Substring(0, maxLength));
                 }
+
                 match = match.NextMatch();
             }
+
             // Remove trailing '-'
             if (result[result.Length - 1] == '-') result.Remove(result.Length - 1, 1);
             return result.ToString();
@@ -255,7 +249,9 @@ namespace OElite
             }
             catch (Exception ex)
             {
-                //OEliteHelper.Logger.Error("JSON serializing an object type of " + (value != null ? value.GetType().Name : "null :" + ex.Message), ex);
+                RestmeLogger.LogDebug(
+                    "JSON serializing an object type of " +
+                    (value != null ? value.GetType().Name : "null :" + ex.Message), ex);
                 return string.Empty;
             }
         }
@@ -290,8 +286,12 @@ namespace OElite
                 {
                     // ignored
                 }
-                //OEliteHelper.Logger.Warn($"Deserializing an object to type {typeof(T).FullName} has failed. The original value was: \n {value}", ex);
+
+                RestmeLogger.LogDebug(
+                    $"Deserializing an object to type {typeof(T).FullName} has failed. The original value was: \n {value}",
+                    ex);
             }
+
             return default(T);
         }
 

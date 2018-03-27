@@ -77,17 +77,16 @@ namespace OElite
                 if (response == null) return default(T);
 
                 var content = await response.Content.ReadAsStringAsync();
+
                 try
                 {
                     if (typeof(T).IsPrimitiveType())
                     {
                         return (T) Convert.ChangeType(content, typeof(T));
                     }
-                    else
-                    {
-                        return content.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization,
-                            restme.Configuration.SerializerSettings);
-                    }
+
+                    return content.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization,
+                        restme.Configuration.SerializerSettings);
                 }
                 catch (Exception ex)
                 {

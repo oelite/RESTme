@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using OElite.Restme.Utils;
 
 namespace OElite
 {
@@ -11,8 +12,7 @@ namespace OElite
             var result = GetDateTimeFromObjectValue(objectValue);
             if (result == null || result == DateTime.MinValue || result == DateTime.MaxValue)
                 throw new OEliteException("Null, minimum datetime value or maximum datetime value are not allowed.");
-            else
-                return result;
+            return result;
         }
 
         public static DateTime GetDateTimeFromObjectValue(object objectValue)
@@ -25,14 +25,19 @@ namespace OElite
             }
             catch (Exception ex)
             {
-                //OEliteHelper.Logger.Info("Failed to convert object with type of [ " + objectValue.GetType() + " ] into a DateTime value", ex);
+                RestmeLogger.LogDebug(
+                    "Failed to convert object with type of [ " + objectValue.GetType() + " ] into a DateTime value",
+                    ex);
             }
+
             return DateTime.MinValue;
         }
+
         public static DateTime GetUtcDateTimeFromObjectValue(object objectValue)
         {
             return GetDateTimeFromObjectValue(objectValue).ToUniversalTime();
         }
+
         public static DateTime GetLocalDateTimeFromObjectValue(object objectValue)
         {
             return GetDateTimeFromObjectValue(objectValue).ToLocalTime();
@@ -41,12 +46,15 @@ namespace OElite
         public static bool IsValidSqlDateTimeValue(object objectValue)
         {
             var result = GetDateTimeFromObjectValue(objectValue);
-            return result != DateTime.MaxValue && result != DateTime.MinValue && result.Year >= 1753 && result.Year < 9999;
+            return result != DateTime.MaxValue && result != DateTime.MinValue && result.Year >= 1753 &&
+                   result.Year < 9999;
         }
+
         public static bool IsValidSqlDateTime(this DateTime dateTime)
         {
             return IsValidSqlDateTimeValue(dateTime);
         }
+
         public static bool IsValidSqlDateTime(this DateTime? dateTime)
         {
             return IsValidSqlDateTimeValue(dateTime);
@@ -61,6 +69,7 @@ namespace OElite
         {
             return TimeZoneInfo.FindSystemTimeZoneById(id);
         }
+
         /// <summary>
         /// Returns a sorted collection of all the time zones
         /// </summary>
@@ -69,6 +78,5 @@ namespace OElite
         {
             return TimeZoneInfo.GetSystemTimeZones().ToList();
         }
-
     }
 }

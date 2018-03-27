@@ -11,10 +11,12 @@ namespace OElite
         public bool Success { get; set; }
 
         public string AssociatedTotalCountPropertyName { get; set; }
+
         public ResponseMessage()
         {
             AssociatedTotalCountPropertyName = "TotalRecordsCount";
         }
+
         public ResponseMessage(string associatedTotalCountPropertyName = "TotalRecordsCount")
         {
             AssociatedTotalCountPropertyName = associatedTotalCountPropertyName.IsNullOrEmpty()
@@ -38,14 +40,14 @@ namespace OElite
             Total = propInfo != null ? NumericUtils.GetIntegerValueFromObject(propInfo.GetValue(data)) : 1;
             if (Total != 0) return;
 
-            var list = data as IList;
-            if (list != null)
+            switch (data)
             {
-                Total = (list?.Count).GetValueOrDefault();
-            }
-            else if (data is ICollection)
-            {
-                Total = (((ICollection)data)?.Count).GetValueOrDefault();
+                case IList list:
+                    Total = (list?.Count).GetValueOrDefault();
+                    break;
+                case ICollection _:
+                    Total = (((ICollection) data)?.Count).GetValueOrDefault();
+                    break;
             }
         }
     }
@@ -62,14 +64,13 @@ namespace OElite
                 result = msg.Data.ToString().JsonDeserialize<T>(false);
             }
             else
-                result = (T)Convert.ChangeType(msg.Data, typeof(T));
+                result = (T) Convert.ChangeType(msg.Data, typeof(T));
 
-            if (result != null)
-            {
-                var propInfo = typeof(T).GetProperty(msg.AssociatedTotalCountPropertyName);
-                if (propInfo != null)
-                    result.SetPropertyValue(msg.AssociatedTotalCountPropertyName, msg.Total);
-            }
+            if (result == null) return result;
+            var propInfo = typeof(T).GetProperty(msg.AssociatedTotalCountPropertyName);
+            if (propInfo != null)
+                result.SetPropertyValue(msg.AssociatedTotalCountPropertyName, msg.Total);
+
             return result;
         }
     }

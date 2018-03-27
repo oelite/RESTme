@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using OElite.Utils;
 
@@ -11,24 +12,23 @@ namespace OElite
             MustBeRedisMode(restme);
             string stringValue = await restme.redisDatabase.StringGetAsync(redisKey);
 
-            if (stringValue.IsNotNullOrEmpty())
+            restme.LogDebug($" RestmeRedis - GET:  {redisKey}\n RESULT: \n {stringValue}");
+            if (!stringValue.IsNotNullOrEmpty()) return default(T);
+            if (typeof(T).IsPrimitiveType())
             {
-                if (typeof(T).IsPrimitiveType())
-                {
-                    return (T) Convert.ChangeType(stringValue, typeof(T));
-                }
-
-                return stringValue.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization);
+                return (T) Convert.ChangeType(stringValue, typeof(T));
             }
-            else
-                return default(T);
+
+            return stringValue.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization);
         }
 
         public static async Task<T> RedisPostAsync<T>(this Rest restme, string redisKey, object dataObject)
         {
             MustBeRedisMode(restme);
-            if (await restme.redisDatabase.StringSetAsync(redisKey, dataObject.JsonSerialize(
-                restme.Configuration.UseRestConvertForCollectionSerialization)))
+            var objectInString =
+                dataObject.JsonSerialize(restme.Configuration.UseRestConvertForCollectionSerialization);
+            restme.LogDebug($"Redis convert - object to string:  {objectInString}");
+            if (await restme.redisDatabase.StringSetAsync(redisKey, objectInString))
                 return (T) dataObject;
             return default(T);
         }

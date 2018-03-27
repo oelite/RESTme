@@ -1,4 +1,5 @@
 ﻿using System;
+using OElite.Restme.Utils;
 
 namespace OElite
 {
@@ -10,12 +11,14 @@ namespace OElite
             {
                 try
                 {
-                    if (objectValue.GetType() == typeof(string) && StringUtils.GetStringValueOrEmpty(objectValue) == "1")
+                    if (objectValue.GetType() == typeof(string) &&
+                        StringUtils.GetStringValueOrEmpty(objectValue) == "1")
                         return true;
                     return Convert.ToBoolean(objectValue);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    RestmeLogger.LogDebug(ex.Message, ex);
                     return boolReturnedIfFailed;
                 }
             }
