@@ -6,7 +6,7 @@
     <PackageTags>RESTme</PackageTags>
     <RepositoryUrl>https://github.com/oelite/RESTme</RepositoryUrl>
     <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
-    <VersionPrefix>2.0.1-dev5</VersionPrefix>
+    <VersionPrefix>2.0.2</VersionPrefix>
     <Authors>OElite Limited</Authors>
     <Owners>OElite Limited</Owners>
   </PropertyGroup>
