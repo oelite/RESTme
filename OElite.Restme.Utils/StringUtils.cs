@@ -241,8 +241,7 @@ namespace OElite
             {
                 return result.Substring(0, maxLength) + "...";
             }
-            else
-                return result.Substring(0, maxLength);
+            return result?.Substring(0, maxLength);
         }
 
         #endregion
