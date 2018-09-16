@@ -50,6 +50,8 @@ namespace OElite.Restme.GoogleUtils
                     return result?.Success == true;
                 }
             }
+
+            return false;
         }
     }
 }
