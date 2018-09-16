@@ -1,4 +1,6 @@
 ﻿using System.Collections;
+using System.Web;
+using HtmlAgilityPack;
 using Newtonsoft.Json;
 
 namespace OElite
@@ -104,6 +106,21 @@ namespace OElite
                 @"(\p{Ll})(\P{Ll})",
                 "$1 $2"
             );
+        }
+
+        public static string HtmlToText(this string html, int maxLength = -1)
+        {
+            if (string.IsNullOrEmpty(html)) return "";
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+            var result = HttpUtility.HtmlDecode(doc.DocumentNode.InnerText);
+            if (maxLength <= 0) return result;
+            if (result?.Length - 3 > maxLength)
+            {
+                return result.Substring(0, maxLength) + "...";
+            }
+
+            return result?.Substring(0, maxLength);
         }
 
         public static T JsonDeserialize<T>(this string value, bool attemptResponseMessageConvertIfListType = true,

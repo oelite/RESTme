@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Web;
+using HtmlAgilityPack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OElite.Restme.Utils;
@@ -228,6 +230,20 @@ namespace OElite
             return result.ToString();
         }
 
+        public static string HtmlToText(string html, int maxLength = -1)
+        {
+            if (string.IsNullOrEmpty(html)) return "";
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+            var result = HttpUtility.HtmlDecode(doc.DocumentNode.InnerText);
+            if (maxLength <= 0) return result;
+            if (result?.Length - 3 > maxLength)
+            {
+                return result.Substring(0, maxLength) + "...";
+            }
+            return result?.Substring(0, maxLength);
+        }
+
         #endregion
 
         public static string JsonSerialize(object value,
@@ -294,7 +310,6 @@ namespace OElite
 
             return default(T);
         }
-
 
         public static class ByXPath
         {

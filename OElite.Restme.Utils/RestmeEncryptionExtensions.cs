@@ -1,6 +1,6 @@
 ﻿namespace OElite.Utils
 {
-    public class Restme
+    public partial class Restme
     {
         public static string MD5(string value)
         {

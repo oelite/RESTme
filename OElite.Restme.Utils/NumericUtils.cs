@@ -5,7 +5,7 @@ using OElite.Restme.Utils;
 
 namespace OElite
 {
-    public class NumericUtils
+    public static class NumericUtils
     {
         public static int GetIntegerValueFromObject(object objectValue)
         {
@@ -25,8 +25,8 @@ namespace OElite
                 catch (Exception ex)
                 {
                     RestmeLogger.LogDebug(
-                        String.Format("Failed converting object [{0}] into integer value, 0 will be returned. ",
-                            objectValue.GetType()), ex);
+                        $"Failed converting object [{objectValue.GetType()}] into integer value, 0 will be returned. ",
+                        ex);
                     return 0;
                 }
             }
@@ -44,8 +44,8 @@ namespace OElite
                 catch (Exception ex)
                 {
                     RestmeLogger.LogDebug(
-                        string.Format("Failed converting object [{0}] into integer value, 0 will be returned. ",
-                            objectValue.GetType()), ex);
+                        $"Failed converting object [{objectValue.GetType()}] into integer value, 0 will be returned. ",
+                        ex);
                     return 0;
                 }
             }
@@ -63,8 +63,8 @@ namespace OElite
                 catch (Exception ex)
                 {
                     RestmeLogger.LogDebug(
-                        string.Format("Failed converting object [{0}] into decimal value, 0 will be returned. ",
-                            objectValue.GetType()), ex);
+                        $"Failed converting object [{objectValue.GetType()}] into decimal value, 0 will be returned. ",
+                        ex);
                     return 0;
                 }
             }
@@ -75,16 +75,19 @@ namespace OElite
         {
             try
             {
-                T result = default(T);
+                var result = default(T);
                 if (val <= 0) throw new OEliteException("value cannot be less than or equal to 0.");
                 if (result is int)
                 {
-                    return GetIntegerValueFromObject(val);
+                    var varResult = GetIntegerValueFromObject((object) val);
+                    return varResult.ToString().JsonDeserialize<T>();
                 }
 
                 if (result is long)
-                    return GetLongIntegerValueFromObject(val);
-                return result is decimal ? (T) GetDecimalValueFromObject(val) : (T) val;
+                    return GetLongIntegerValueFromObject((object) val).ToString().JsonDeserialize<T>();
+                return result is decimal
+                    ? GetDecimalValueFromObject((object) val).ToString().JsonDeserialize<T>()
+                    : (T) val;
             }
             catch (Exception ex)
             {
@@ -98,7 +101,7 @@ namespace OElite
             var result = new List<int>();
             if (string.IsNullOrEmpty(stringToConvert) || splitters == null) return result.ToArray();
             var values = stringToConvert.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
-            if (values == null || values.Length <= 0) return result.ToArray();
+            if (values.Length <= 0) return result.ToArray();
             result.AddRange(values.Select(GetIntegerValueFromObject));
 
             return result.ToArray();
@@ -109,7 +112,7 @@ namespace OElite
             var result = new List<long>();
             if (string.IsNullOrEmpty(stringToConvert) || splitters == null) return result.ToArray();
             var values = stringToConvert.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
-            if (values == null || values.Length <= 0) return result.ToArray();
+            if (values.Length <= 0) return result.ToArray();
             result.AddRange(values.Select(GetLongIntegerValueFromObject));
 
             return result.ToArray();
