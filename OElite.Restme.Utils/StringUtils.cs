@@ -311,7 +311,6 @@ namespace OElite
             return default(T);
         }
 
-
         public static class ByXPath
         {
             public const string AnchorTag = "a";
