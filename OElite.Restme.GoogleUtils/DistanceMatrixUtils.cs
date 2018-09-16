@@ -8,7 +8,7 @@ namespace OElite.Restme.GoogleUtils
 {
     public class DistanceMatrixUtils
     {
-        public const string RequestUrl = "https://maps.googleapis.com/maps/api/distancematrix";
+        public const string RequestUrl = "https://maps.googleapis.com/maps/api/distancematrix/";
 
         public static Task<DistanceMatrixResponse> GetDistanceAsync(string apiKey, List<string> originAddresses,
             List<string> destinationAddresses,
@@ -24,9 +24,9 @@ namespace OElite.Restme.GoogleUtils
                 var destinations = string.Join("|", destinationAddresses.Select(item => item.Trim()));
 
                 path += $"&origins={origins}&destinations={destinations}";
-                using (var rest = new Rest(new Uri(RequestUrl), path))
+                using (var rest = new Rest(new Uri(RequestUrl)))
                 {
-                    return rest.GetAsync<DistanceMatrixResponse>();
+                    return rest.GetAsync<DistanceMatrixResponse>(path);
                 }
             }
 
