@@ -5,12 +5,15 @@ namespace OElite
 {
     public static class QueryUtils
     {
-        public static Dictionary<string, string> IdentifyQueryParams(this string value)
+        public static Dictionary<string, string> IdentifyQueryParams(this string value, bool noQuestionMark = false)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
-            var paramIndex = value?.IndexOf('?');
-            if (paramIndex < 0) return result;
-            value = value.Substring(paramIndex.GetValueOrDefault() + 1);
+            if (!noQuestionMark)
+            {
+                var paramIndex = value?.IndexOf('?');
+                if (paramIndex < 0) return result;
+                value = value.Substring(paramIndex.GetValueOrDefault() + 1);
+            }
 
             var paramPairs = value.Split('&');
             foreach (var pair in paramPairs)
