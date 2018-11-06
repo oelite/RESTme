@@ -27,7 +27,7 @@ namespace OElite
         }
 
         public static string ParseIntoQueryString(this Dictionary<string, string> values,
-            bool includeQuestionMark = true)
+            bool includeQuestionMark = true, bool encode = true)
         {
             string result = null;
             if (values?.Count > 0)
@@ -36,11 +36,12 @@ namespace OElite
                 foreach (var k in values.Keys)
                 {
                     result = index == 0
-                        ? $"{k}={WebUtility.UrlEncode(values[k])}"
-                        : result + $"&{k}={WebUtility.UrlEncode(values[k])}";
+                        ? $"{k}={(encode ? WebUtility.UrlEncode(values[k]) : values[k])}"
+                        : result + $"&{k}={(encode ? WebUtility.UrlEncode(values[k]) : values[k])}";
                     index++;
                 }
             }
+
             if (includeQuestionMark && result.IsNotNullOrEmpty())
                 result = $"?{result}";
 
