@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Text;
 using System.Security.Cryptography;
 
@@ -74,5 +75,48 @@ namespace OElite
             return des;
         }
 
+        
+        
+        /// <summary>
+        /// Encrypts input string using Rijndael (AES) algorithm with CBC blocking and PKCS7 padding.
+        /// </summary>
+        /// <param name="inputText">text string to encrypt </param>
+        /// <returns>Encrypted text in Byte array</returns>
+        /// <remarks>The key and IV are the same, in this method - using encryptionPassword.</remarks>
+        private static byte[] AESEncrypt(string inputText, string encryptionPassword)
+        {
+
+            RijndaelManaged AES = new RijndaelManaged();
+            byte[] outBytes = null;
+
+            //set the mode, padding and block size for the key
+            AES.Padding = PaddingMode.PKCS7;
+            AES.Mode = CipherMode.CBC;
+            AES.KeySize = 128;
+            AES.BlockSize = 128;
+
+            //convert key and plain text input into byte arrays
+            System.Text.Encoding encoding = System.Text.Encoding.GetEncoding("iso-8859-1");
+            byte[] keyAndIvBytes = encoding.GetBytes(encryptionPassword);
+            byte[] inputBytes = encoding.GetBytes(inputText);
+
+            //create streams and encryptor object
+            MemoryStream memoryStream = new MemoryStream();
+            CryptoStream cryptoStream = new CryptoStream(memoryStream, AES.CreateEncryptor(keyAndIvBytes, keyAndIvBytes), CryptoStreamMode.Write);
+
+            //perform encryption
+            cryptoStream.Write(inputBytes, 0, inputBytes.Length);
+            cryptoStream.FlushFinalBlock();
+
+            //get encrypted stream into byte array
+            outBytes = memoryStream.ToArray();
+
+            //close streams
+            memoryStream.Close();
+            cryptoStream.Close();
+            AES.Clear();
+
+            return outBytes;
+        }
     }
 }
