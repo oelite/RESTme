@@ -10,8 +10,9 @@ namespace OElite
             Dictionary<string, string> result = new Dictionary<string, string>();
             var paramIndex = value?.IndexOf('?');
             if (!(paramIndex >= 0)) return result;
+            if (paramIndex >= 0) value = value.Substring(paramIndex.GetValueOrDefault() + 1);
 
-            var paramPairs = value.Substring(paramIndex.GetValueOrDefault() + 1).Split('&');
+            var paramPairs = value.Split('&');
             foreach (var pair in paramPairs)
             {
                 var pairArray = pair.Split('=');
