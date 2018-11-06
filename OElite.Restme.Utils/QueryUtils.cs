@@ -5,8 +5,7 @@ namespace OElite
 {
     public static class QueryUtils
     {
-        public static Dictionary<string, string> IdentifyQueryParams(this string value,
-            bool cancelIfNoQuestionMark = true)
+        public static Dictionary<string, string> IdentifyQueryParams(this string value)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
             var paramIndex = value?.IndexOf('?');
