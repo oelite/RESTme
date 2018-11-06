@@ -17,8 +17,8 @@ namespace OElite
             {
                 ret += data[i].ToString("x2").ToLower();
             }
-            return ret;
 
+            return ret;
         }
 
         public static byte[] MD5Encrypt(byte[] sourceToEncrypt)
@@ -61,9 +61,11 @@ namespace OElite
                         cs.Write(inputByteArray, 0, inputByteArray.Length);
                         cs.FlushFinalBlock();
                     }
+
                     returnValue = ms.ToArray();
                 }
             }
+
             return returnValue;
         }
 
@@ -75,17 +77,15 @@ namespace OElite
             return des;
         }
 
-        
-        
+
         /// <summary>
         /// Encrypts input string using Rijndael (AES) algorithm with CBC blocking and PKCS7 padding.
         /// </summary>
         /// <param name="inputText">text string to encrypt </param>
         /// <returns>Encrypted text in Byte array</returns>
         /// <remarks>The key and IV are the same, in this method - using encryptionPassword.</remarks>
-        private static byte[] AESEncrypt(string inputText, string encryptionPassword)
+        public static byte[] AESEncrypt(string inputText, string encryptionPassword)
         {
-
             RijndaelManaged AES = new RijndaelManaged();
             byte[] outBytes = null;
 
@@ -102,7 +102,8 @@ namespace OElite
 
             //create streams and encryptor object
             MemoryStream memoryStream = new MemoryStream();
-            CryptoStream cryptoStream = new CryptoStream(memoryStream, AES.CreateEncryptor(keyAndIvBytes, keyAndIvBytes), CryptoStreamMode.Write);
+            CryptoStream cryptoStream = new CryptoStream(memoryStream,
+                AES.CreateEncryptor(keyAndIvBytes, keyAndIvBytes), CryptoStreamMode.Write);
 
             //perform encryption
             cryptoStream.Write(inputBytes, 0, inputBytes.Length);
