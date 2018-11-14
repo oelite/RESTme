@@ -13,7 +13,8 @@ namespace OElite
             {
                 try
                 {
-                    var valueString = StringUtils.GetStringValueOrEmpty(objectValue);
+                    var valueString = StringUtils.GetStringValueOrEmpty(objectValue)
+                        ?.Trim(new char[] {'\"', '\'', ' ', ','});
                     if (valueString.IsNullOrEmpty())
                         return 0;
                     var dotIndex = valueString.IndexOf('.');
@@ -39,7 +40,7 @@ namespace OElite
             {
                 try
                 {
-                    return long.Parse(objectValue.ToString());
+                    return long.Parse(objectValue.ToString().Trim(new char[] {'\"', '\'', ' ', ','}));
                 }
                 catch (Exception ex)
                 {
@@ -58,7 +59,7 @@ namespace OElite
             {
                 try
                 {
-                    return decimal.Parse(objectValue.ToString());
+                    return decimal.Parse(objectValue.ToString().Trim(new char[] {'\"', '\'', ' ', ','}));
                 }
                 catch (Exception ex)
                 {
