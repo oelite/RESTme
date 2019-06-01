@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Security.Cryptography;
 
@@ -75,6 +77,22 @@ namespace OElite
             des.Mode = CipherMode.ECB;
             des.Padding = PaddingMode.PKCS7;
             return des;
+        }
+
+        public static string GetHMACSHA256(string key, string message)
+        {
+            var keyByte = Encoding.UTF8.GetBytes(key);
+            using (var hmacSha256 = new HMACSHA256(keyByte))
+            {
+                hmacSha256.ComputeHash(Encoding.UTF8.GetBytes(message));
+
+                return ByteToString(hmacSha256.Hash);
+            }
+        }
+
+        private static string ByteToString(IEnumerable<byte> buff)
+        {
+            return buff.Aggregate("", (current, t) => current + t.ToString("X2"));
         }
 
 

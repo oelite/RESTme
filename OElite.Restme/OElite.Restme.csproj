@@ -16,10 +16,10 @@
         <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="StackExchange.Redis" Version="1.2.7-alpha-00002"/>
-        <PackageReference Include="WindowsAzure.Storage" Version="8.2.1"/>
+        <PackageReference Include="StackExchange.Redis" Version="1.2.7-alpha-00002" />
+        <PackageReference Include="WindowsAzure.Storage" Version="8.2.1" />
     </ItemGroup>
     <ItemGroup>
-        <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj"/>
+        <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
     </ItemGroup>
 </Project>

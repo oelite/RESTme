@@ -12,6 +12,8 @@ namespace OElite
 
         public string AssociatedTotalCountPropertyName { get; set; }
 
+        public object MetaData { get; set; }
+
         public ResponseMessage()
         {
             AssociatedTotalCountPropertyName = "TotalRecordsCount";
@@ -37,6 +39,7 @@ namespace OElite
             Success = success;
             Data = data;
             Message = message;
+            MetaData = data.GetPropertyValue("MetaData");
             Total = propInfo != null ? NumericUtils.GetIntegerValueFromObject(propInfo.GetValue(data)) : 1;
             if (Total != 0) return;
 
