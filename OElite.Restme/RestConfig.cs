@@ -18,7 +18,8 @@ namespace OElite
                                  new JsonSerializerSettings()
                                  {
                                      ContractResolver = new OEliteJsonResolver(),
-                                     NullValueHandling = NullValueHandling.Ignore
+                                     NullValueHandling = NullValueHandling.Ignore,
+                                     MissingMemberHandling = MissingMemberHandling.Ignore
                                  };
             DefaultEncoding = encoding ?? Encoding.UTF8;
             UseRestConvertForCollectionSerialization = useRestConvertForCollectionSerialization;

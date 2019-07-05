@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using OElite.Restme.GoogleUtils.Models;
 
 namespace OElite.Restme.GoogleUtils
@@ -10,7 +11,7 @@ namespace OElite.Restme.GoogleUtils
         public const string RequestUrl = "https://maps.googleapis.com/maps/api/geocode/";
 
 
-        public static Task<GeoAddress> GetGeoAddressAsync(string apiKey, string originAddress,
+        public static async Task<GeoAddress> GetGeoAddressAsync(string apiKey, string originAddress,
             GeoUnit geoUnit = GeoUnit.Metric, RequestOutputFormat outputFormat = RequestOutputFormat.Json)
         {
             if (apiKey.IsNotNullOrEmpty() && originAddress.IsNotNullOrEmpty())
@@ -22,11 +23,23 @@ namespace OElite.Restme.GoogleUtils
                 path += $"&address={originAddress}";
                 using (var rest = new Rest(new Uri(RequestUrl)))
                 {
-                    return rest.GetAsync<GeoAddress>(path);
+                    var result = await rest.GetAsync<string>(path);
+                    if (result.IsNotNullOrEmpty())
+                    {
+                        var jobject = JObject.Parse(result);
+                        if (jobject.ContainsKey("results"))
+                        {
+                            var valueResult = jobject["results"].ToObject<GeoAddress[]>();
+                            if (valueResult?.Length > 0)
+                            {
+                                return valueResult[0];
+                            }
+                        }
+                    }
                 }
             }
 
-            return Task.FromResult(default(GeoAddress));
+            return null;
         }
     }
 }

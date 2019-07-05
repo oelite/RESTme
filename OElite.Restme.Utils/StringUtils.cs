@@ -241,6 +241,7 @@ namespace OElite
             {
                 return result.Substring(0, maxLength) + "...";
             }
+
             return result?.Substring(0, maxLength);
         }
 
@@ -260,7 +261,8 @@ namespace OElite
                                                           {
                                                               ContractResolver =
                                                                   new OEliteJsonResolver(),
-                                                              NullValueHandling = NullValueHandling.Ignore
+                                                              NullValueHandling = NullValueHandling.Ignore,
+                                                              MissingMemberHandling = MissingMemberHandling.Ignore
                                                           });
             }
             catch (Exception ex)
@@ -286,7 +288,8 @@ namespace OElite
                     new JsonSerializerSettings
                     {
                         ContractResolver = new OEliteJsonResolver(),
-                        NullValueHandling = NullValueHandling.Ignore
+                        NullValueHandling = NullValueHandling.Ignore,
+                        MissingMemberHandling = MissingMemberHandling.Ignore
                     });
             }
             catch (Exception ex)
@@ -310,7 +313,7 @@ namespace OElite
 
             return default(T);
         }
-        
+
         /// <summary>
         /// Converts a string of characters representing hexadecimal values into an array of bytes
         /// </summary>
@@ -318,7 +321,6 @@ namespace OElite
         /// <returns>A byte array</returns>
         public static byte[] HEXStringToBytes(string strInput)
         {
-
             int numBytes = (strInput.Length / 2);
             byte[] bytes = new byte[numBytes];
 
@@ -328,7 +330,6 @@ namespace OElite
             }
 
             return bytes;
-
         }
 
         /// <summary>
@@ -338,12 +339,9 @@ namespace OElite
         /// <returns>String of hexadecimal values.</returns>
         public static string ByteArrayToHexString(byte[] ba)
         {
-
             return BitConverter.ToString(ba).Replace("-", "");
-
         }
-        
-        
+
 
         public static class ByXPath
         {
