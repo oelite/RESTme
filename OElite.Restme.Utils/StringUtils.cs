@@ -241,6 +241,7 @@ namespace OElite
             {
                 return result.Substring(0, maxLength) + "...";
             }
+
             return result?.Substring(0, maxLength);
         }
 
@@ -260,7 +261,8 @@ namespace OElite
                                                           {
                                                               ContractResolver =
                                                                   new OEliteJsonResolver(),
-                                                              NullValueHandling = NullValueHandling.Ignore
+                                                              NullValueHandling = NullValueHandling.Ignore,
+                                                              MissingMemberHandling = MissingMemberHandling.Ignore
                                                           });
             }
             catch (Exception ex)
@@ -286,7 +288,8 @@ namespace OElite
                     new JsonSerializerSettings
                     {
                         ContractResolver = new OEliteJsonResolver(),
-                        NullValueHandling = NullValueHandling.Ignore
+                        NullValueHandling = NullValueHandling.Ignore,
+                        MissingMemberHandling = MissingMemberHandling.Ignore
                     });
             }
             catch (Exception ex)
@@ -310,6 +313,35 @@ namespace OElite
 
             return default(T);
         }
+
+        /// <summary>
+        /// Converts a string of characters representing hexadecimal values into an array of bytes
+        /// </summary>
+        /// <param name="strInput">A hexadecimal string of characters to convert to binary.</param>
+        /// <returns>A byte array</returns>
+        public static byte[] HEXStringToBytes(string strInput)
+        {
+            int numBytes = (strInput.Length / 2);
+            byte[] bytes = new byte[numBytes];
+
+            for (int x = 0; x <= numBytes - 1; x++)
+            {
+                bytes[x] = System.Convert.ToByte(strInput.Substring(x * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        /// <summary>
+        /// Converts an array of bytes into a hexadecimal string representation.
+        /// </summary>
+        /// <param name="ba">Array of bytes to convert</param>
+        /// <returns>String of hexadecimal values.</returns>
+        public static string ByteArrayToHexString(byte[] ba)
+        {
+            return BitConverter.ToString(ba).Replace("-", "");
+        }
+
 
         public static class ByXPath
         {

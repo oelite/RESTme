@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using OElite.Restme.GoogleUtils.Models;
 
 namespace OElite.Restme.GoogleUtils
@@ -6,6 +7,7 @@ namespace OElite.Restme.GoogleUtils
     public class ReCaptchaUtils
     {
         public const string GoogleSiteVerifyUrl = "https://www.google.com/recaptcha/api/siteverify";
+        public const string GoogleResponseFieldName = "g-recaptcha-response";
 
         public static async Task<bool> VerifyRecaptchaResponse(string secretKey, string response,
             string remoteIp = null)
@@ -52,6 +54,17 @@ namespace OElite.Restme.GoogleUtils
             }
 
             return false;
+        }
+
+        public static Task<bool> VerifyRecaptchaResponse(string secretKey, HttpRequest request)
+        {
+            var gResponse = request.HasFormContentType && request.Form.ContainsKey(GoogleResponseFieldName)
+                ? request.Form[GoogleResponseFieldName].ToString()
+                : (request.Query.ContainsKey(GoogleResponseFieldName)
+                    ? request.Query[GoogleResponseFieldName].ToString()
+                    : string.Empty);
+            var remoteIp = request?.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            return VerifyRecaptchaResponse(secretKey, gResponse, remoteIp);
         }
     }
 }

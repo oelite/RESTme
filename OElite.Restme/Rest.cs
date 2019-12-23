@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
@@ -119,9 +120,9 @@ namespace OElite
                 _headers.Add(header, new List<string> {value});
         }
 
-        public void AddBearerToken(string token)
+        public void AddBearerToken(string token, bool addBearerPrefix = true)
         {
-            AddHeader("Authorization", $"Bearer {token}");
+            AddHeader("Authorization", $"{(addBearerPrefix ? "Bearer " : "")}{token}");
         }
 
         public T Request<T>(HttpMethod method, string relativeUrlPath = null)
@@ -154,22 +155,27 @@ namespace OElite
         {
             var task = Task.Run(() =>
             {
-                switch (CurrentMode)
+                if (keyOrRelativeUrlPath.IsNotNullOrEmpty())
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
-                        return this.HttpGetAsync<T>(keyOrRelativeUrlPath)
-                            .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                        return this.StorageGetAsync<T>(keyOrRelativeUrlPath)
-                            .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.RedisCacheClient:
-                        return this.RedisGetAsync<T>(keyOrRelativeUrlPath)
-                            .WaitAndGetResult(Configuration.DefaultTimeout);
-                    default:
-                        throw new NotSupportedException(
-                            "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
+                    switch (CurrentMode)
+                    {
+                        case RestMode.HTTPClient:
+                        case RestMode.HTTPRestClient:
+                            return this.HttpGetAsync<T>(keyOrRelativeUrlPath)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
+                        case RestMode.AzureStorageClient:
+                            return this.StorageGetAsync<T>(keyOrRelativeUrlPath)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
+                        case RestMode.RedisCacheClient:
+                            return this.RedisGetAsync<T>(keyOrRelativeUrlPath)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
+                        default:
+                            throw new NotSupportedException(
+                                "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
+                    }
                 }
+
+                throw new SyntaxErrorException("No key or relative url path provided.");
             });
             return task;
         }

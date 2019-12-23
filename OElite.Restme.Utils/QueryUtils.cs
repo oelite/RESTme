@@ -5,13 +5,17 @@ namespace OElite
 {
     public static class QueryUtils
     {
-        public static Dictionary<string, string> IdentifyQueryParams(this string value)
+        public static Dictionary<string, string> IdentifyQueryParams(this string value, bool noQuestionMark = false)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
-            var paramIndex = value?.IndexOf('?');
-            if (!(paramIndex >= 0)) return result;
+            if (!noQuestionMark)
+            {
+                var paramIndex = value?.IndexOf('?');
+                if (paramIndex < 0) return result;
+                value = value.Substring(paramIndex.GetValueOrDefault() + 1);
+            }
 
-            var paramPairs = value.Substring(paramIndex.GetValueOrDefault() + 1).Split('&');
+            var paramPairs = value.Split('&');
             foreach (var pair in paramPairs)
             {
                 var pairArray = pair.Split('=');
@@ -27,7 +31,7 @@ namespace OElite
         }
 
         public static string ParseIntoQueryString(this Dictionary<string, string> values,
-            bool includeQuestionMark = true)
+            bool includeQuestionMark = true, bool encode = true)
         {
             string result = null;
             if (values?.Count > 0)
@@ -36,11 +40,12 @@ namespace OElite
                 foreach (var k in values.Keys)
                 {
                     result = index == 0
-                        ? $"{k}={WebUtility.UrlEncode(values[k])}"
-                        : result + $"&{k}={WebUtility.UrlEncode(values[k])}";
+                        ? $"{k}={(encode ? WebUtility.UrlEncode(values[k]) : values[k])}"
+                        : result + $"&{k}={(encode ? WebUtility.UrlEncode(values[k]) : values[k])}";
                     index++;
                 }
             }
+
             if (includeQuestionMark && result.IsNotNullOrEmpty())
                 result = $"?{result}";
 

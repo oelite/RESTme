@@ -89,13 +89,13 @@ namespace OElite
             bool throwExceptionIfNotExist = false)
         {
             if (obj == null)
-                throw new ArgumentNullException("obj");
+                throw new ArgumentNullException(nameof(obj));
             var objType = obj.GetType();
             var propInfo = GetPropertyInfo(objType, propertyName);
             if (propInfo == null && throwExceptionIfNotExist)
-                throw new ArgumentOutOfRangeException("propertyName",
-                    string.Format("Couldn't find property {0} in type {1}", propertyName, objType.FullName));
-            return propInfo.GetValue(obj, null);
+                throw new ArgumentOutOfRangeException(nameof(propertyName),
+                    $"Couldn't find property {propertyName} in type {objType.FullName}");
+            return propInfo == null ? null : propInfo.GetValue(obj, null);
         }
 
         public static object GetPropertyValueEnhanced(this object obj, string propName)

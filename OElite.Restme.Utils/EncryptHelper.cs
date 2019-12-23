@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Security.Cryptography;
 
@@ -16,8 +19,8 @@ namespace OElite
             {
                 ret += data[i].ToString("x2").ToLower();
             }
-            return ret;
 
+            return ret;
         }
 
         public static byte[] MD5Encrypt(byte[] sourceToEncrypt)
@@ -60,9 +63,11 @@ namespace OElite
                         cs.Write(inputByteArray, 0, inputByteArray.Length);
                         cs.FlushFinalBlock();
                     }
+
                     returnValue = ms.ToArray();
                 }
             }
+
             return returnValue;
         }
 
@@ -74,5 +79,63 @@ namespace OElite
             return des;
         }
 
+        public static string GetHMACSHA256(string key, string message)
+        {
+            var keyByte = Encoding.UTF8.GetBytes(key);
+            using (var hmacSha256 = new HMACSHA256(keyByte))
+            {
+                hmacSha256.ComputeHash(Encoding.UTF8.GetBytes(message));
+
+                return ByteToString(hmacSha256.Hash);
+            }
+        }
+
+        private static string ByteToString(IEnumerable<byte> buff)
+        {
+            return buff.Aggregate("", (current, t) => current + t.ToString("X2"));
+        }
+
+
+        /// <summary>
+        /// Encrypts input string using Rijndael (AES) algorithm with CBC blocking and PKCS7 padding.
+        /// </summary>
+        /// <param name="inputText">text string to encrypt </param>
+        /// <returns>Encrypted text in Byte array</returns>
+        /// <remarks>The key and IV are the same, in this method - using encryptionPassword.</remarks>
+        public static byte[] AESEncrypt(string inputText, string encryptionPassword)
+        {
+            RijndaelManaged AES = new RijndaelManaged();
+            byte[] outBytes = null;
+
+            //set the mode, padding and block size for the key
+            AES.Padding = PaddingMode.PKCS7;
+            AES.Mode = CipherMode.CBC;
+            AES.KeySize = 128;
+            AES.BlockSize = 128;
+
+            //convert key and plain text input into byte arrays
+            System.Text.Encoding encoding = System.Text.Encoding.GetEncoding("iso-8859-1");
+            byte[] keyAndIvBytes = encoding.GetBytes(encryptionPassword);
+            byte[] inputBytes = encoding.GetBytes(inputText);
+
+            //create streams and encryptor object
+            MemoryStream memoryStream = new MemoryStream();
+            CryptoStream cryptoStream = new CryptoStream(memoryStream,
+                AES.CreateEncryptor(keyAndIvBytes, keyAndIvBytes), CryptoStreamMode.Write);
+
+            //perform encryption
+            cryptoStream.Write(inputBytes, 0, inputBytes.Length);
+            cryptoStream.FlushFinalBlock();
+
+            //get encrypted stream into byte array
+            outBytes = memoryStream.ToArray();
+
+            //close streams
+            memoryStream.Close();
+            cryptoStream.Close();
+            AES.Clear();
+
+            return outBytes;
+        }
     }
 }
