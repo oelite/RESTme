@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -77,22 +78,38 @@ namespace OElite
 
                 if (response == null) return default(T);
 
-                var content = await response.Content.ReadAsStringAsync();
-
-                try
+                if (typeof(T).IsSubclassOf(typeof(Stream)))
                 {
-                    if (typeof(T).IsPrimitiveType())
+                    var content = await response.Content.ReadAsStreamAsync();
+                    try
                     {
                         return (T) Convert.ChangeType(content, typeof(T));
                     }
-
-                    return content.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization,
-                        restme.Configuration.SerializerSettings);
+                    catch (Exception ex)
+                    {
+                        restme.LogError(ex.Message, ex);
+                        return default(T);
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    restme?.LogError(ex.Message, ex);
-                    return default(T);
+                    var content = await response.Content.ReadAsStringAsync();
+
+                    try
+                    {
+                        if (typeof(T).IsPrimitiveType())
+                        {
+                            return (T) Convert.ChangeType(content, typeof(T));
+                        }
+
+                        return content.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization,
+                            restme.Configuration.SerializerSettings);
+                    }
+                    catch (Exception ex)
+                    {
+                        restme?.LogError(ex.Message, ex);
+                        return default(T);
+                    }
                 }
             }
         }
@@ -116,8 +133,5 @@ namespace OElite
         {
             return restme.HttpRequestAsync<T>(HttpMethod.Post, relativeUrlPath);
         }
-        
-        
-        
     }
 }
