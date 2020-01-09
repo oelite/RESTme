@@ -9,7 +9,7 @@ namespace OElite
     {
         public static T HttpRequest<T>(this Rest restme, HttpMethod method, string relativeUrlPath = null)
         {
-            return restme.HttpRequestAsync<T>(method, relativeUrlPath)
+            return HttpRequestAsync<T>(restme, method, relativeUrlPath)
                 .WaitAndGetResult(restme.Configuration.DefaultTimeout);
         }
 
@@ -17,8 +17,6 @@ namespace OElite
         {
             using (var httpClient = new HttpClient {BaseAddress = restme.BaseUri})
             {
-                httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
-                    "CapitalStackers Restme Client");
                 restme.PrepareHeaders(httpClient.DefaultRequestHeaders);
                 HttpResponseMessage response = null;
                 ByteArrayContent submitContent = null;
@@ -106,7 +104,7 @@ namespace OElite
 
         public static Task<T> HttpGetAsync<T>(this Rest restme, string relativeUrlPath = null)
         {
-            return restme.RequestAsync<T>(HttpMethod.Get, relativeUrlPath);
+            return restme.HttpRequestAsync<T>(HttpMethod.Get, relativeUrlPath);
         }
 
         public static T HttpPost<T>(this Rest restme, string relativeUrlPath = null)
@@ -116,7 +114,10 @@ namespace OElite
 
         public static Task<T> HttpPostAsync<T>(this Rest restme, string relativeUrlPath = null)
         {
-            return restme.RequestAsync<T>(HttpMethod.Post, relativeUrlPath);
+            return restme.HttpRequestAsync<T>(HttpMethod.Post, relativeUrlPath);
         }
+        
+        
+        
     }
 }

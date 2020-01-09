@@ -125,19 +125,20 @@ namespace OElite
             AddHeader("Authorization", $"{authTypePrefix}{token}");
         }
 
-        public T Request<T>(HttpMethod method, string relativeUrlPath = null)
+        public T HttpRequest<T>(HttpMethod method, string relativeUrlPath = null)
         {
-            return RequestAsync<T>(method, relativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
+            return HttpRequestAsync<T>(method, relativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public Task<T> RequestAsync<T>(HttpMethod method, string relativePath = null)
+        public Task<T> HttpRequestAsync<T>(HttpMethod method, string relativePath = null)
         {
             switch (CurrentMode)
             {
                 case RestMode.HTTPClient:
                 case RestMode.HTTPRestClient:
                     return Task.Run(() =>
-                        this.HttpRequestAsync<T>(method, relativePath).WaitAndGetResult(Configuration.DefaultTimeout));
+                        RestmeHttpExtensions.HttpRequestAsync<T>(this, method, relativePath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout));
                 case RestMode.AzureStorageClient:
                 case RestMode.RedisCacheClient:
                 default:
@@ -146,13 +147,20 @@ namespace OElite
             }
         }
 
-        public T Get<T>(string keyOrRelativeUrlPath = null)
+        #region GET
+
+        public T Get<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
         {
-            return GetAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
+            return GetAsync<T>(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public Task<T> GetAsync<T>(string keyOrRelativeUrlPath = null)
+        public Task<T> GetAsync<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
         {
+            if (dataObject != null)
+            {
+                _objAsParam = dataObject;
+            }
+
             var task = Task.Run(() =>
             {
                 if (keyOrRelativeUrlPath.IsNotNullOrEmpty())
@@ -180,16 +188,144 @@ namespace OElite
             return task;
         }
 
-        public string Get(string keyOrRelativePath = null)
+        public string Get(string keyOrRelativePath = null, object dataObject = null)
         {
-            return GetAsync(keyOrRelativePath).WaitAndGetResult(Configuration.DefaultTimeout);
+            return GetAsync(keyOrRelativePath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public Task<string> GetAsync(string keyOrRelativePath = null)
+        public Task<string> GetAsync(string keyOrRelativePath = null, object dataObject = null)
         {
-            return GetAsync<string>(keyOrRelativePath);
+            return GetAsync<string>(keyOrRelativePath, dataObject);
         }
 
+        #endregion
+
+        #region PUT
+
+        public T Put<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
+        {
+            return PostAsync<T>(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+        }
+
+        public Task<T> PutAsync<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
+        {
+            if (dataObject != null)
+                _objAsParam = dataObject;
+            var task = Task.Run<T>(() =>
+            {
+                switch (CurrentMode)
+                {
+                    case RestMode.HTTPClient:
+                    case RestMode.HTTPRestClient:
+                        return HttpRequestAsync<T>(HttpMethod.Put, keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.AzureStorageClient:
+                        if (dataObject != null)
+                            return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
+                        if (_objAsParam == null)
+                        {
+                            DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
+                            return default(T);
+                        }
+                        else if (_objAsParam.GetType() is T)
+                        {
+                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                        }
+                        else
+                        {
+                            throw new NotSupportedException(
+                                "A object parameter is detected, however it is not same generic type as the return type for the current call.");
+                        }
+
+                        return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.RedisCacheClient:
+                        if (dataObject != null)
+                            return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
+                        if (_objAsParam == null)
+                        {
+                            DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
+                            return default(T);
+                        }
+                        else if (_objAsParam is T)
+                        {
+                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                        }
+                        else
+                        {
+                            throw new NotSupportedException(
+                                "A object parameter is detected, however it is not same generic type as the return type for the current call.");
+                        }
+
+                        return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    default:
+                        throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
+                }
+            });
+
+            return task;
+        }
+
+        public Task<string> PutAsync(string keyOrRelativeUrlPath = null, object dataObject = null)
+        {
+            return PutAsync<string>(keyOrRelativeUrlPath, dataObject);
+        }
+
+        public string Put(string keyOrRelativeUrlPath = null, object dataObject = null)
+        {
+            return PutAsync(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+        }
+
+        #endregion
+
+        #region DELETE
+
+        public T Delete<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
+        {
+            return DeleteAsync<T>(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+        }
+
+        public Task<T> DeleteAsync<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
+        {
+            if (dataObject != null)
+                _objAsParam = dataObject;
+            var task = Task.Run(() =>
+            {
+                switch (CurrentMode)
+                {
+                    case RestMode.HTTPClient:
+                    case RestMode.HTTPRestClient:
+                        return HttpRequestAsync<T>(HttpMethod.Delete, keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.AzureStorageClient:
+                        return this.StorageDeleteAsync<T>(keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.RedisCacheClient:
+                        return this.RedisDeleteAsync<T>(keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    default:
+                        throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
+                }
+            });
+            return task;
+        }
+
+        public Task<string> DeleteAsync(string keyOrRelativeUrlPath = null, object dataObject = null)
+        {
+            return DeleteAsync<string>(keyOrRelativeUrlPath, dataObject);
+        }
+
+        public string Delete(string keyOrRelativeUrlPath = null, object dataObject = null)
+        {
+            return DeleteAsync(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+        }
+
+        #endregion
+
+        #region POST
 
         public T Post<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
         {
@@ -206,7 +342,7 @@ namespace OElite
                     case RestMode.HTTPRestClient:
                         if (dataObject != null)
                             _objAsParam = dataObject;
-                        return RequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath)
+                        return HttpRequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.AzureStorageClient:
                         if (dataObject != null)
@@ -268,42 +404,8 @@ namespace OElite
             return PostAsync(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public T Delete<T>(string keyOrRelativeUrlPath = null)
-        {
-            return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
-        }
+        #endregion
 
-        public Task<T> DeleteAsync<T>(string keyOrRelativeUrlPath = null)
-        {
-            var task = Task.Run(() =>
-            {
-                switch (CurrentMode)
-                {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
-                        return Request<T>(HttpMethod.Delete, keyOrRelativeUrlPath);
-                    case RestMode.AzureStorageClient:
-                        return this.StorageDeleteAsync<T>(keyOrRelativeUrlPath)
-                            .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.RedisCacheClient:
-                        return this.RedisDeleteAsync<T>(keyOrRelativeUrlPath)
-                            .WaitAndGetResult(Configuration.DefaultTimeout);
-                    default:
-                        throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
-                }
-            });
-            return task;
-        }
-
-        public Task<bool> DeleteAsync(string keyOrRelativeUrlPath = null)
-        {
-            return DeleteAsync<bool>(keyOrRelativeUrlPath);
-        }
-
-        public bool Delete(string keyOrRelativeUrlPath = null)
-        {
-            return DeleteAsync(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
-        }
 
         #region Private Methods
 
