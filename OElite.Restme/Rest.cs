@@ -120,9 +120,9 @@ namespace OElite
                 _headers.Add(header, new List<string> {value});
         }
 
-        public void AddBearerToken(string token, bool addBearerPrefix = true)
+        public void AddAuthorizationHeader(string token, string authTypePrefix = "Bearer ")
         {
-            AddHeader("Authorization", $"{(addBearerPrefix ? "Bearer " : "")}{token}");
+            AddHeader("Authorization", $"{authTypePrefix}{token}");
         }
 
         public T Request<T>(HttpMethod method, string relativeUrlPath = null)
@@ -315,9 +315,9 @@ namespace OElite
             {
                 try
                 {
-                    headers.Add(item.Key, item.Value);
+                    headers.TryAddWithoutValidation(item.Key, item.Value);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     //ignore
                 }

@@ -14,7 +14,7 @@ namespace OElite
         void Add(object value);
 
         void AddHeader(string header, string value, bool allowMultipleValues = false);
-        void AddBearerToken(string token, bool addBearerPrefix = true);
+        void AddAuthorizationHeader(string token, string authTypePrefix = "Bearer ");
 
 
         T Request<T>(HttpMethod method, string keyOrRelativePath = null);
