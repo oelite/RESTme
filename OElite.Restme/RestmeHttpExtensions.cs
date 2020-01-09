@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace OElite
@@ -16,6 +17,8 @@ namespace OElite
         {
             using (var httpClient = new HttpClient {BaseAddress = restme.BaseUri})
             {
+                httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
+                    "CapitalStackers Restme Client");
                 restme.PrepareHeaders(httpClient.DefaultRequestHeaders);
                 HttpResponseMessage response = null;
                 ByteArrayContent submitContent = null;
