@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using System.Web;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 
 namespace OElite
 {
@@ -426,7 +429,7 @@ namespace OElite
             }
         }
 
-        public string PrepareInjectParamsIntoQuery(string urlPath)
+        public string PrepareInjectParamsIntoQuery(string urlPath, bool convertObjectAsParam = true)
         {
             urlPath = urlPath ?? string.Empty;
             var nvc = urlPath.IdentifyQueryParams();
@@ -435,6 +438,27 @@ namespace OElite
                 foreach (var k in _params.Keys)
                 {
                     nvc.Add(k, _params[k]);
+                }
+            }
+
+            if (convertObjectAsParam && _objAsParam != null)
+            {
+                var values = _objAsParam.GetType().GetProperties()
+                    .Where(item => item.GetValue(_objAsParam, null) != null)
+                    .Select(item =>
+                        new KeyValuePair<string, string>(item.Name, item.GetValue(_objAsParam, null)?.ToString()));
+                var keyValuePairs = values as KeyValuePair<string, string>[] ?? values.ToArray();
+                if (keyValuePairs?.Count() > 0)
+                {
+                    foreach (var item in keyValuePairs)
+                    {
+                        if (!nvc.ContainsKey(item.Key))
+                        {
+                            nvc.Add(item.Key, HttpUtility.UrlEncode(item.Value));
+                        }
+
+                        //respect existing parameters so ignore the value from object
+                    }
                 }
             }
 
