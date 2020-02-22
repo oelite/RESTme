@@ -14,13 +14,15 @@
             {
                 var connectionString = restme.ConnectionString.ToLower();
                 if ((connectionString.Contains("defaultendpointsprotocol") &&
-                    connectionString.Contains("accountname") &&
-                    connectionString.Contains("accountkey")) ||
+                     connectionString.Contains("accountname") &&
+                     connectionString.Contains("accountkey")) ||
                     (connectionString.Contains("usedevelopmentstorage") &&
-                    connectionString.Contains("true")
+                     connectionString.Contains("true")
                     ))
                     restme.CurrentMode = RestMode.AzureStorageClient;
-                else if (restme.ConnectionString.ToLower().Contains("redis.cache.windows.net"))
+                else if (restme.ConnectionString.ToLower().Contains("redis.cache.windows.net") ||
+                         restme.ConnectionString.ToLower().Contains(":6379") ||
+                         restme.ConnectionString.ToLower().Contains(":6380"))
                     restme.CurrentMode = RestMode.RedisCacheClient;
             }
         }
