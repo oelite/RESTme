@@ -8,7 +8,8 @@ namespace OElite.Restme.Utils
     {
         public T Data { get; set; }
 
-        public HttpHeaders Headers { get; set; }
+        public HttpHeaders ResponseHeaders { get; set; }
+        public HttpHeaders RequestHeaders { get; set; }
         public HttpStatusCode StatusCode { get; set; }
         public DateTime ReceivedOnUtc { get; set; }
 

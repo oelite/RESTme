@@ -90,7 +90,8 @@ namespace OElite
                 if (response == null) return default;
 
                 var result = new HttpResponseMessage<T>();
-                result.Headers = response.Headers;
+                result.ResponseHeaders = response.Headers;
+                result.RequestHeaders = httpClient.DefaultRequestHeaders;
                 result.StatusCode = response.StatusCode;
                 result.ReceivedOnUtc = DateTime.UtcNow;
 
