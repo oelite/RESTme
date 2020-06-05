@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using OElite.Restme.Utils;
 
 namespace OElite
 {
@@ -19,6 +20,9 @@ namespace OElite
 
         T HttpRequest<T>(HttpMethod method, string keyOrRelativePath = null);
         Task<T> HttpRequestAsync<T>(HttpMethod method, string keyOrRelativePath = null);
+
+        HttpResponseMessage<T> HttpRequestFull<T>(HttpMethod method, string keyOrRelativePath = null);
+        Task<HttpResponseMessage<T>> HttpRequestFullAsync<T>(HttpMethod method, string keyOrRelativePath = null);
 
         T Get<T>(string keyOrRelativePath = null, object dataObject = null);
         Task<T> GetAsync<T>(string keyOrRelativePath = null, object dataObject = null);

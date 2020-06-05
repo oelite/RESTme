@@ -1,20 +1,31 @@
 ﻿using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using OElite.Restme.Utils;
 
 namespace OElite
 {
     public static class RestmeHttpExtensions
     {
         public static T HttpRequest<T>(this Rest restme, HttpMethod method, string relativeUrlPath = null)
+            where T : class
         {
             return HttpRequestAsync<T>(restme, method, relativeUrlPath)
                 .WaitAndGetResult(restme.Configuration.DefaultTimeout);
         }
 
-        public static async Task<T> HttpRequestAsync<T>(this Rest restme, HttpMethod method, string relativePath = null)
+        public static HttpResponseMessage<T> HttpRequestFull<T>(this Rest restme, HttpMethod method,
+            string relativePath = null)
+        {
+            return HttpRequestFullAsync<T>(restme, method, relativePath)
+                .WaitAndGetResult(restme.Configuration.DefaultTimeout);
+        }
+
+        public static async Task<HttpResponseMessage<T>> HttpRequestFullAsync<T>(this Rest restme, HttpMethod method,
+            string relativePath = null)
         {
             using (var httpClient = new HttpClient {BaseAddress = restme.BaseUri})
             {
@@ -76,19 +87,26 @@ namespace OElite
                                 restme.PrepareInjectParamsIntoQuery(relativePath)));
                 }
 
-                if (response == null) return default(T);
+                if (response == null) return default;
+
+                var result = new HttpResponseMessage<T>();
+                result.Headers = response.Headers;
+                result.StatusCode = response.StatusCode;
+                result.ReceivedOnUtc = DateTime.UtcNow;
+
 
                 if (typeof(T).IsSubclassOf(typeof(Stream)))
                 {
                     var content = await response.Content.ReadAsStreamAsync();
                     try
                     {
-                        return (T) Convert.ChangeType(content, typeof(T));
+                        result.Data = (T) Convert.ChangeType(content, typeof(T));
                     }
                     catch (Exception ex)
                     {
                         restme.LogError(ex.Message, ex);
-                        return default(T);
+                        result.ErrorMessage = ex;
+                        result.Data = default;
                     }
                 }
                 else
@@ -99,19 +117,32 @@ namespace OElite
                     {
                         if (typeof(T).IsPrimitiveType())
                         {
-                            return (T) Convert.ChangeType(content, typeof(T));
+                            result.Data = (T) Convert.ChangeType(content, typeof(T));
                         }
-
-                        return content.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization,
-                            restme.Configuration.SerializerSettings);
+                        else
+                        {
+                            result.Data = content.JsonDeserialize<T>(
+                                restme.Configuration.UseRestConvertForCollectionSerialization,
+                                restme.Configuration.SerializerSettings);
+                        }
                     }
                     catch (Exception ex)
                     {
                         restme?.LogError(ex.Message, ex);
-                        return default(T);
+                        result.ErrorMessage = ex;
+                        result.Data = default;
                     }
                 }
+
+                return result;
             }
+        }
+
+
+        public static async Task<T> HttpRequestAsync<T>(this Rest restme, HttpMethod method, string relativePath = null)
+        {
+            var result = await HttpRequestFullAsync<T>(restme, method, relativePath);
+            return result != null ? result.Data : default;
         }
 
         public static T HttpGet<T>(this Rest restme, string relativeUrlPath = null)
