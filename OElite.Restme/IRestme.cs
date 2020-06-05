@@ -21,8 +21,11 @@ namespace OElite
         T HttpRequest<T>(HttpMethod method, string keyOrRelativePath = null);
         Task<T> HttpRequestAsync<T>(HttpMethod method, string keyOrRelativePath = null);
 
-        HttpResponseMessage<T> HttpRequestFull<T>(HttpMethod method, string keyOrRelativePath = null);
-        Task<HttpResponseMessage<T>> HttpRequestFullAsync<T>(HttpMethod method, string keyOrRelativePath = null);
+        HttpResponseMessage<T> HttpRequestFull<T>(HttpMethod method, string keyOrRelativePath = null,
+            object dataObject = null);
+
+        Task<HttpResponseMessage<T>> HttpRequestFullAsync<T>(HttpMethod method, string keyOrRelativePath = null,
+            object dataObject = null);
 
         T Get<T>(string keyOrRelativePath = null, object dataObject = null);
         Task<T> GetAsync<T>(string keyOrRelativePath = null, object dataObject = null);
