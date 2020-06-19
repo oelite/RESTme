@@ -96,6 +96,15 @@ namespace OElite
                 result.ReceivedOnUtc = DateTime.UtcNow;
 
 
+                try
+                {
+                    result.DataInString = await response.Content.ReadAsStringAsync();
+                }
+                catch
+                {
+                    // ignore
+                }
+
                 if (typeof(T).IsSubclassOf(typeof(Stream)))
                 {
                     var content = await response.Content.ReadAsStreamAsync();
@@ -112,7 +121,7 @@ namespace OElite
                 }
                 else
                 {
-                    var content = await response.Content.ReadAsStringAsync();
+                    var content = result.DataInString;
 
                     try
                     {

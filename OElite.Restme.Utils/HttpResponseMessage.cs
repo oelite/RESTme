@@ -14,5 +14,6 @@ namespace OElite.Restme.Utils
         public DateTime ReceivedOnUtc { get; set; }
 
         public Exception ErrorMessage { get; set; }
+        public string DataInString { get; set; }
     }
 }
