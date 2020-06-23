@@ -59,7 +59,7 @@ namespace OElite.Restme.Utils
             int period = 30)
         {
             var v =
-                $"http://totp/{Uri.EscapeUriString(label)}:{Uri.EscapeUriString(user)}?secret={secret}&issuer={Uri.EscapeUriString(issuer)}";
+                $"otpauth://totp/{Uri.EscapeUriString(label)}:{Uri.EscapeUriString(user)}?secret={secret}&issuer={Uri.EscapeUriString(issuer)}";
             if (digits != 6 && digits > 0)
             {
                 v += $"&digits={digits}";
