@@ -566,7 +566,7 @@ namespace OElite
                     return (char) (b + 24);
                 }
 
-                throw new ArgumentException("Byte is not a value Base32 value.", "b");
+                throw new ArgumentException("Byte is not a Base32 value.", "b");
             }
         }
     }
