@@ -1,5 +1,6 @@
 using System;
 using System.Security.Cryptography;
+using System.Web;
 
 namespace OElite.Restme.Utils
 {
@@ -69,7 +70,7 @@ namespace OElite.Restme.Utils
                 v += $"&period={period}";
             }
 
-            return v;
+            return HttpUtility.UrlEncode(v);
         }
     }
 }
