@@ -59,7 +59,7 @@ namespace OElite.Restme.Utils
             int period = 30)
         {
             var v =
-                $"http://totp/{label}:{user}?secret={secret}&issuer={issuer}";
+                $"http://totp/{HttpUtility.UrlEncode(label)}:{HttpUtility.UrlEncode(user)}?secret={secret}&issuer={HttpUtility.UrlEncode(issuer)}";
             if (digits != 6 && digits > 0)
             {
                 v += $"&digits={digits}";
@@ -70,7 +70,7 @@ namespace OElite.Restme.Utils
                 v += $"&period={period}";
             }
 
-            return HttpUtility.UrlEncode(v).Replace("http://", "otpauth://");
+            return v;
         }
     }
 }
