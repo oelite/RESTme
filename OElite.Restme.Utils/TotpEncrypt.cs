@@ -5,7 +5,7 @@ namespace OElite.Restme.Utils
 {
     public class TotpEncryptor
     {
-        private byte[] K;
+        public byte[] Key;
 
         public TotpEncryptor()
         {
@@ -18,15 +18,15 @@ namespace OElite.Restme.Utils
             {
                 /*    Keys SHOULD be of the length of the HMAC output to facilitate
                       interoperability.*/
-                K = new byte[HMACSHA1.Create().HashSize / 8];
-                rng.GetBytes(K);
+                Key = new byte[HMACSHA1.Create().HashSize / 8];
+                rng.GetBytes(Key);
             }
         }
 
         public int HOTP(UInt64 C, int digits = 6)
         {
             var hmac = HMACSHA1.Create();
-            hmac.Key = K;
+            hmac.Key = Key;
             hmac.ComputeHash(BitConverter.GetBytes(C));
             return Truncate(hmac.Hash, digits);
         }
