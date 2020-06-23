@@ -5,7 +5,7 @@ namespace OElite.Restme.Utils
 {
     public class TotpEncryptor
     {
-        public byte[] Key;
+        public byte[] Key { get; set; }
 
         public TotpEncryptor()
         {
