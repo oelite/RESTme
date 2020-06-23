@@ -6,10 +6,12 @@ namespace OElite.Restme.Utils
     public class TotpEncryptor
     {
         private byte[] K;
+
         public TotpEncryptor()
         {
             GenerateKey();
         }
+
         public void GenerateKey()
         {
             using (RandomNumberGenerator rng = new RNGCryptoServiceProvider())
@@ -20,6 +22,7 @@ namespace OElite.Restme.Utils
                 rng.GetBytes(K);
             }
         }
+
         public int HOTP(UInt64 C, int digits = 6)
         {
             var hmac = HMACSHA1.Create();
@@ -27,11 +30,14 @@ namespace OElite.Restme.Utils
             hmac.ComputeHash(BitConverter.GetBytes(C));
             return Truncate(hmac.Hash, digits);
         }
+
         public UInt64 CounterNow(int T1 = 30)
         {
-            var secondsSinceEpoch = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
-            return (UInt64)Math.Floor(secondsSinceEpoch / T1);
+            var secondsSinceEpoch =
+                (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+            return (UInt64) Math.Floor(secondsSinceEpoch / T1);
         }
+
         private int DT(byte[] hmac_result)
         {
             int offset = hmac_result[19] & 0xf;
@@ -41,12 +47,29 @@ namespace OElite.Restme.Utils
                            | (hmac_result[offset + 3] & 0xff);
             return bin_code;
         }
- 
+
         private int Truncate(byte[] hmac_result, int digits)
         {
             var Snum = DT(hmac_result);
-            return Snum % (int)Math.Pow(10, digits);
+            return Snum % (int) Math.Pow(10, digits);
         }
 
+        public static string GenerateQrCodeUri(string label, string issuer, string user, string secret, int digits = 6,
+            int period = 30)
+        {
+            var v =
+                $"otpauth://totp/{label}:{user}?secret={secret}&issuer={issuer}";
+            if (digits != 6 && digits > 0)
+            {
+                v += $"&digits={digits}";
+            }
+
+            if (period != 30 && period > 0)
+            {
+                v += $"&period={period}";
+            }
+
+            return v;
+        }
     }
 }
