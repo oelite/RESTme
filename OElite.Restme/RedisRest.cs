@@ -61,7 +61,7 @@ namespace OElite
                 LogError(ex.Message, ex);
                 throw new OEliteDbException("failed to initialize Redis connection:\n" + ex.Message, ex);
             }
-            if (redisConnection?.IsConnected == true && redisDatabase?.Database > 0)
+            if (redisConnection?.IsConnected == true)
                 Initialized = true;
         }
 
