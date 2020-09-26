@@ -30,29 +30,33 @@ namespace OElite
             return task.Result;
         }
 
-        public static void WaitTillAvailableToProcess<TA>(List<TA> processingObjects, TA newObject)
+        public static void WaitTillAvailableToProcess<TA>(this SimpleRestmeQueue<TA> queue, TA newObject)
         {
-            if (processingObjects?.Count >= 0)
+            if (queue != null)
             {
-                #region This code can be better improved using queue mechanism
+                #region This code can be better improved using message queue mechanism
 
-                var executionWaitRequired = true;
-
-                while (executionWaitRequired)
+                while (queue.ExecutionWaitRequired)
                 {
-                    lock (processingObjects)
+                    lock (queue)
                     {
-                        executionWaitRequired = processingObjects.FirstOrDefault() != null;
-                        if (executionWaitRequired)
+                        queue.ExecutionWaitRequired = queue.QueueItems.FirstOrDefault() != null;
+                        if (queue.ExecutionWaitRequired)
                             Thread.Sleep(1);
                         else
                         {
-                            processingObjects.Add(newObject);
-                        }
-                    }
+                            if (queue.QueueItems == null)
+                            {
+                                queue.QueueItems = new List<TA>();
+                            }
 
-                    if (executionWaitRequired)
-                        Thread.Sleep(100);
+                            queue.QueueItems.Add(newObject);
+                            break;
+                        }
+
+                        if (queue.ExecutionWaitRequired)
+                            Thread.Sleep(100);
+                    }
                 }
 
                 #endregion
