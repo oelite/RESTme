@@ -40,7 +40,6 @@ namespace OElite
                 {
                     lock (queue)
                     {
-                        queue.ExecutionWaitRequired = queue.QueueItems.FirstOrDefault() != null;
                         if (queue.ExecutionWaitRequired)
                             Thread.Sleep(1);
                         else
@@ -63,19 +62,29 @@ namespace OElite
             }
         }
 
-        public static void ClearProcessingObject<TA>(List<TA> processingObjects, TA singleObjectToRemove = default,
-            bool throwExceptionIfObjectNotFound = true)
+        public static void ClearProcessingObject<TA>(this SimpleRestmeQueue<TA> queue,
+            TA singleObjectToRemove = default,
+            bool throwExceptionIfObjectNotFound = true, bool updateWaitRequired = true)
         {
-            if (processingObjects?.Count > 0)
+            if (queue != null)
             {
-                lock (processingObjects)
+                lock (queue)
                 {
                     if (singleObjectToRemove != null)
                     {
-                        var indexOfObject = processingObjects.IndexOf(singleObjectToRemove);
+                        if (queue.QueueItems == null)
+                        {
+                            queue.QueueItems = new List<TA>();
+                        }
+
+                        var indexOfObject = queue.QueueItems.IndexOf(singleObjectToRemove);
                         if (indexOfObject >= 0)
                         {
-                            processingObjects.Remove(singleObjectToRemove);
+                            queue.QueueItems.Remove(singleObjectToRemove);
+                            if (updateWaitRequired)
+                            {
+                                queue.ExecutionWaitRequired = false;
+                            }
                         }
                         else if (throwExceptionIfObjectNotFound)
                         {
@@ -84,7 +93,11 @@ namespace OElite
                     }
                     else
                     {
-                        processingObjects.Clear();
+                        queue.QueueItems.Clear();
+                        if (updateWaitRequired)
+                        {
+                            queue.ExecutionWaitRequired = false;
+                        }
                     }
                 }
             }
