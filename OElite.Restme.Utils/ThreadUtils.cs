@@ -36,26 +36,38 @@ namespace OElite
             {
                 #region This code can be better improved using message queue mechanism
 
-                while (queue.ExecutionWaitRequired)
+                if (queue.ExecutionWaitRequired)
                 {
-                    lock (queue)
+                    while (queue.ExecutionWaitRequired)
                     {
-                        if (queue.ExecutionWaitRequired)
-                            Thread.Sleep(1);
-                        else
+                        lock (queue)
                         {
                             if (queue.QueueItems == null)
                             {
                                 queue.QueueItems = new List<TA>();
                             }
 
-                            queue.QueueItems.Add(newObject);
-                            break;
-                        }
+                            if (queue.ExecutionWaitRequired)
+                                Thread.Sleep(1);
+                            else
+                            {
+                                queue.QueueItems.Add(newObject);
+                                break;
+                            }
 
-                        if (queue.ExecutionWaitRequired)
-                            Thread.Sleep(100);
+                            if (queue.ExecutionWaitRequired)
+                                Thread.Sleep(100);
+                        }
                     }
+                }
+                else
+                {
+                    if (queue.QueueItems == null)
+                    {
+                        queue.QueueItems = new List<TA>();
+                    }
+
+                    queue.QueueItems.Add(newObject);
                 }
 
                 #endregion
