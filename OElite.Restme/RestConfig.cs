@@ -7,6 +7,10 @@ namespace OElite
     {
         public RestMode OperationMode { get; set; }
         public Encoding DefaultEncoding { get; set; }
+
+        public string RestKey { get; set; }
+        public string RestSecret { get; set; }
+        public bool RestSSL { get; set; }
         public JsonSerializerSettings SerializerSettings { get; set; }
         public bool UseRestConvertForCollectionSerialization { get; set; }
         public int DefaultTimeout { get; set; }

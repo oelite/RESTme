@@ -1,4 +1,7 @@
-﻿namespace OElite
+﻿using System;
+using System.Collections.Generic;
+
+namespace OElite
 {
     public static class RestmeGeneralExtensions
     {
@@ -19,11 +22,19 @@
                     (connectionString.Contains("usedevelopmentstorage") &&
                      connectionString.Contains("true")
                     ))
+                {
                     restme.CurrentMode = RestMode.AzureStorageClient;
+                }
                 else if (restme.ConnectionString.ToLower().Contains("redis.cache.windows.net") ||
                          restme.ConnectionString.ToLower().Contains(":6379") ||
                          restme.ConnectionString.ToLower().Contains(":6380"))
+                {
                     restme.CurrentMode = RestMode.RedisCacheClient;
+                }
+                else if (connectionString.IsS3Provider())
+                {
+                    restme.CurrentMode = RestMode.S3Client;
+                }
             }
         }
     }

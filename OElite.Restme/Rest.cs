@@ -62,7 +62,10 @@ namespace OElite
                 switch (value)
                 {
                     case RestMode.AzureStorageClient:
-                        PrepareStorageRestme();
+                        PrepareAzureStorageRestme();
+                        break;
+                    case RestMode.S3Client:
+                        PrepareS3StorageRestme();
                         break;
                     case RestMode.RedisCacheClient:
                         PrepareRedisRestme();
@@ -175,10 +178,13 @@ namespace OElite
                             return this.HttpGetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         case RestMode.AzureStorageClient:
-                            return this.StorageGetAsync<T>(keyOrRelativeUrlPath)
+                            return this.AzureStorageGetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         case RestMode.RedisCacheClient:
                             return this.RedisGetAsync<T>(keyOrRelativeUrlPath)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
+                        case RestMode.S3Client:
+                            return this.S3GetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         default:
                             throw new NotSupportedException(
@@ -224,7 +230,7 @@ namespace OElite
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.AzureStorageClient:
                         if (dataObject != null)
-                            return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                            return this.AzureStoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         if (_objAsParam == null)
                         {
@@ -241,7 +247,7 @@ namespace OElite
                                 "A object parameter is detected, however it is not same generic type as the return type for the current call.");
                         }
 
-                        return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                        return this.AzureStoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.RedisCacheClient:
                         if (dataObject != null)
@@ -263,6 +269,27 @@ namespace OElite
                         }
 
                         return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.S3Client:
+                        if (dataObject != null)
+                            return this.S3PostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
+                        if (_objAsParam == null)
+                        {
+                            DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
+                            return default(T);
+                        }
+                        else if (_objAsParam is T)
+                        {
+                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                        }
+                        else
+                        {
+                            throw new NotSupportedException(
+                                "A object parameter is detected, however it is not same generic type as the return type for the current call.");
+                        }
+
+                        return this.S3PostAsync<T>(keyOrRelativeUrlPath, dataObject)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     default:
                         throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
@@ -304,10 +331,13 @@ namespace OElite
                         return HttpRequestAsync<T>(HttpMethod.Delete, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.AzureStorageClient:
-                        return this.StorageDeleteAsync<T>(keyOrRelativeUrlPath)
+                        return this.AzureStorageDeleteAsync<T>(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.RedisCacheClient:
                         return this.RedisDeleteAsync<T>(keyOrRelativeUrlPath)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.S3Client:
+                        return this.S3DeleteAsync<T>(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     default:
                         throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
@@ -349,7 +379,7 @@ namespace OElite
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.AzureStorageClient:
                         if (dataObject != null)
-                            return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                            return this.AzureStoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         if (_objAsParam == null)
                         {
@@ -366,7 +396,7 @@ namespace OElite
                                 "A object parameter is detected, however it is not same generic type as the return type for the current call.");
                         }
 
-                        return this.StoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                        return this.AzureStoragePostAsync<T>(keyOrRelativeUrlPath, dataObject)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.RedisCacheClient:
                         if (dataObject != null)
@@ -388,6 +418,27 @@ namespace OElite
                         }
 
                         return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                    case RestMode.S3Client:
+                        if (dataObject != null)
+                            return this.S3PostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                                .WaitAndGetResult(Configuration.DefaultTimeout);
+                        if (_objAsParam == null)
+                        {
+                            DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
+                            return default(T);
+                        }
+                        else if (_objAsParam is T)
+                        {
+                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                        }
+                        else
+                        {
+                            throw new NotSupportedException(
+                                "A object parameter is detected, however it is not same generic type as the return type for the current call.");
+                        }
+
+                        return this.S3PostAsync<T>(keyOrRelativeUrlPath, dataObject)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     default:
                         throw new NotSupportedException("Unexpected RestMode, let me call it a break!");

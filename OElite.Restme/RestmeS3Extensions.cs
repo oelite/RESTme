@@ -1,15 +1,89 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using OElite.Data;
+using System.Linq;
 
 namespace OElite
 {
-    public static class RestmeAzureStorageExtensions
+    public static class RestmeS3Extensions
     {
-        public static async Task<T> AzureStorageGetAsync<T>(this Rest restme, string storageRelativePath)
+        private static IEnumerable<string> IdentifiedS3ProviderEndpoints
         {
-            MustBeStorageMode(restme);
+            get
+            {
+                var identifiedList = new List<string> {"stackpathstorage.com"}
+                    .AddAmazonEndpoints();
+                return identifiedList;
+            }
+        }
+
+        public static bool IsS3Provider(this string connectionString)
+        {
+            if (connectionString.IsNotNullOrEmpty())
+            {
+                return IdentifiedS3ProviderEndpoints.Count(item =>
+                    connectionString.ToLower().Contains(item)) > 0;
+            }
+
+            return false;
+        }
+
+        internal static string S3BucketName(this string storageRelativePath)
+        {
+            if (storageRelativePath.IsNotNullOrEmpty())
+            {
+                var segments = storageRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (segments?.Length > 0)
+                {
+                    return segments[0];
+                }
+            }
+
+            return null;
+        }
+
+        internal static string S3FileName(this string storageRelativePath)
+        {
+            if (storageRelativePath.IsNotNullOrEmpty())
+            {
+                var segments = storageRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (segments?.Length > 1)
+                {
+                    return segments[^1];
+                }
+            }
+
+            return null;
+        }
+
+        internal static string S3ObjectPath(this string storageRelativePath, bool fromFilePath = true)
+        {
+            if (storageRelativePath.IsNotNullOrEmpty())
+            {
+                var result = storageRelativePath.Trim('/')
+                    .Replace(storageRelativePath.S3BucketName(), string.Empty)
+                    .Trim('/');
+                if (fromFilePath)
+                {
+                    result = result.Replace(storageRelativePath.S3FileName(), string.Empty)
+                        .Trim('/');
+                }
+
+                return result;
+            }
+
+            return null;
+        }
+
+
+        public static async Task<T> S3GetAsync<T>(this Rest restme, string storageRelativePath)
+        {
+            restme.S3Client.GetObjectAsync(storageRelativePath.S3BucketName(),storageRelativePath.S3ObjectPath())
+
             var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
             var blobItemPath = restme.IdentifyBlobItemPath(storageRelativePath);
             if (blobItemPath.IsNullOrEmpty())
@@ -54,9 +128,9 @@ namespace OElite
             }
         }
 
-        public static async Task<T> AzureStoragePostAsync<T>(this Rest restme, string storageRelativePath, object dataObject)
+        public static async Task<T> S3PostAsync<T>(this Rest restme, string storageRelativePath, object dataObject)
         {
-            MustBeStorageMode(restme);
+            MustBeS3Mode(restme);
             if (dataObject == null)
                 throw new OEliteWebException(
                     "Uploading null blob is not supported, use delete method if you intended to delete.");
@@ -101,9 +175,9 @@ namespace OElite
             }
         }
 
-        public static async Task<T> AzureStorageDeleteAsync<T>(this Rest restme, string storageRelativePath)
+        public static async Task<T> S3DeleteAsync<T>(this Rest restme, string storageRelativePath)
         {
-            MustBeStorageMode(restme);
+            MustBeS3Mode(restme);
             var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
             var blobItemPath = restme.IdentifyBlobItemPath(storageRelativePath);
             if (blobItemPath.IsNullOrEmpty())
@@ -125,9 +199,9 @@ namespace OElite
 
         #region Private Methods
 
-        private static void MustBeStorageMode(Rest restme)
+        private static void MustBeS3Mode(Rest restme)
         {
-            if (restme?.CurrentMode != RestMode.AzureStorageClient)
+            if (restme?.CurrentMode != RestMode.S3Client)
                 throw new InvalidOperationException(
                     $"current request is not valid operation, you are under RestMode: {restme.CurrentMode.ToString()}");
         }

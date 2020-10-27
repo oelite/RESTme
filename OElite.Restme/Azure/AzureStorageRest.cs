@@ -17,7 +17,7 @@ namespace OElite
         public bool CreateAzureBlobContainerIfNotExists { get; set; }
         public BlobContainerPublicAccessType BlobContainerPublicAccessType { get; set; }
 
-        private void PrepareStorageRestme()
+        private void PrepareAzureStorageRestme()
         {
             if (ConnectionString.IsNullOrEmpty())
                 throw new OEliteWebException("Unable to fetch azure storage connection string.");
