@@ -82,7 +82,7 @@ namespace OElite
 
         public static async Task<T> S3GetAsync<T>(this Rest restme, string storageRelativePath)
         {
-            restme.S3Client.GetObjectAsync(storageRelativePath.S3BucketName(),storageRelativePath.S3ObjectPath())
+            // restme.S3Client.GetObjectAsync(storageRelativePath.S3BucketName(),storageRelativePath.S3ObjectPath())
 
             var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
             var blobItemPath = restme.IdentifyBlobItemPath(storageRelativePath);

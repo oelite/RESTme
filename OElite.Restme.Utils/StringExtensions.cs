@@ -95,6 +95,11 @@ namespace OElite
             return sb.ToString();
         }
 
+        public static string ToUpperFirstLetter(this string source)
+        {
+            return StringUtils.ToUpperFirstLetter(source);
+        }
+
         public static string SplitCamelCase(this string str)
         {
             return Regex.Replace(
