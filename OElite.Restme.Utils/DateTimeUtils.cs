@@ -80,7 +80,8 @@ namespace OElite
         }
 
         public static int TotalMonthsBetween(DateTime time1, DateTime time2) =>
-            DateTimeSpan.CompareDates(time1, time2).Months;
+            DateTimeSpan.CompareDates(time1, time2).Months +
+            DateTimeSpan.CompareDates(time1, time2).Years * 12;
 
         public static int TotalDaysBetween(DateTime time1, DateTime time2) =>
             DateTimeSpan.CompareDates(time1, time2).Days;
