@@ -1,11 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Xml.XPath;
 
 namespace OElite
 {
     public class FileUtils
     {
+        private static readonly string[] imageExtensions = {"jpg", "bmp", "gif", "png", "jpeg"}; //  etc
+
         public static byte[] ReadStreamToEnd(System.IO.Stream stream)
         {
             long originalPosition = stream.Position;
@@ -42,6 +46,7 @@ namespace OElite
                     buffer = new byte[totalBytesRead];
                     Buffer.BlockCopy(readBuffer, 0, buffer, 0, totalBytesRead);
                 }
+
                 return buffer;
             }
             finally
@@ -71,6 +76,25 @@ namespace OElite
             string mime;
 
             return _mappings.TryGetValue(extension, out mime) ? mime : "application/octet-stream";
+        }
+
+        public static bool IsImageExtension(string extension)
+        {
+            if (extension.IsNotNullOrEmpty())
+            {
+                if (extension.StartsWith(".", StringComparison.Ordinal))
+                {
+                    extension = extension.Substring(1);
+                }
+
+                if (imageExtensions.Count(item =>
+                    item.Equals(extension, StringComparison.InvariantCultureIgnoreCase)) == 1)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
 
