@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Description>Restme.Utils (RESTme) is the common library for Restme</Description>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <AssemblyName>OElite.Restme.Utils</AssemblyName>
     <PackageTags>RESTme</PackageTags>
     <RepositoryUrl>https://github.com/oelite/RESTme</RepositoryUrl>
