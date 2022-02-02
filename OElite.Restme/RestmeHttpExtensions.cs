@@ -27,7 +27,7 @@ namespace OElite
         public static async Task<HttpResponseMessage<T>> HttpRequestFullAsync<T>(this Rest restme, HttpMethod method,
             string relativePath = null)
         {
-            using (var httpClient = new HttpClient {BaseAddress = restme.BaseUri})
+            using (var httpClient = new HttpClient { BaseAddress = restme.BaseUri })
             {
                 restme.PrepareHeaders(httpClient.DefaultRequestHeaders);
                 HttpResponseMessage response = null;
@@ -58,42 +58,53 @@ namespace OElite
                         new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
                 }
 
-                if (method == HttpMethod.Post)
-                {
-                    response =
-                        await
-                            httpClient.PostAsync(new Uri(restme.BaseUri, relativePath),
-                                submitContent);
-                }
-                else if (method == HttpMethod.Put)
-                {
-                    response =
-                        await
-                            httpClient.PutAsync(new Uri(restme.BaseUri, relativePath),
-                                submitContent);
-                }
-                else if (method == HttpMethod.Get)
-                {
-                    response =
-                        await
-                            httpClient.GetAsync(new Uri(restme.BaseUri,
-                                restme.PrepareInjectParamsIntoQuery(relativePath)));
-                }
-                else if (method == HttpMethod.Delete)
-                {
-                    response =
-                        await
-                            httpClient.DeleteAsync(new Uri(restme.BaseUri,
-                                restme.PrepareInjectParamsIntoQuery(relativePath)));
-                }
-
-                if (response == null) return default;
-
                 var result = new HttpResponseMessage<T>();
+
+                try
+                {
+                    if (method == HttpMethod.Post)
+                    {
+                        response =
+                            await
+                                httpClient.PostAsync(new Uri(restme.BaseUri, relativePath),
+                                    submitContent);
+                    }
+                    else if (method == HttpMethod.Put)
+                    {
+                        response =
+                            await
+                                httpClient.PutAsync(new Uri(restme.BaseUri, relativePath),
+                                    submitContent);
+                    }
+                    else if (method == HttpMethod.Get)
+                    {
+                        response =
+                            await
+                                httpClient.GetAsync(new Uri(restme.BaseUri,
+                                    restme.PrepareInjectParamsIntoQuery(relativePath)));
+                    }
+                    else if (method == HttpMethod.Delete)
+                    {
+                        response =
+                            await
+                                httpClient.DeleteAsync(new Uri(restme.BaseUri,
+                                    restme.PrepareInjectParamsIntoQuery(relativePath)));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    result.ErrorMessage = ex;
+                }
+                finally
+                {
+                    result.RequestHeaders = httpClient.DefaultRequestHeaders;
+                    result.ReceivedOnUtc = DateTime.UtcNow;
+                }
+
+                if (response == null) return result;
+
                 result.ResponseHeaders = response.Headers;
-                result.RequestHeaders = httpClient.DefaultRequestHeaders;
                 result.StatusCode = response.StatusCode;
-                result.ReceivedOnUtc = DateTime.UtcNow;
 
 
                 try
@@ -110,7 +121,7 @@ namespace OElite
                     var content = await response.Content.ReadAsStreamAsync();
                     try
                     {
-                        result.Data = (T) Convert.ChangeType(content, typeof(T));
+                        result.Data = (T)Convert.ChangeType(content, typeof(T));
                     }
                     catch (Exception ex)
                     {
@@ -127,7 +138,7 @@ namespace OElite
                     {
                         if (typeof(T).IsPrimitiveType())
                         {
-                            result.Data = (T) Convert.ChangeType(content, typeof(T));
+                            result.Data = (T)Convert.ChangeType(content, typeof(T));
                         }
                         else
                         {
