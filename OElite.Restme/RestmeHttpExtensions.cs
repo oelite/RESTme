@@ -29,6 +29,11 @@ namespace OElite
         {
             using (var httpClient = new HttpClient { BaseAddress = restme.BaseUri })
             {
+                if (restme.Configuration.DefaultTimeout > 0)
+                {
+                    httpClient.Timeout = TimeSpan.FromMilliseconds(restme.Configuration.DefaultTimeout);
+                }
+
                 restme.PrepareHeaders(httpClient.DefaultRequestHeaders);
                 HttpResponseMessage response = null;
                 ByteArrayContent submitContent = null;
@@ -59,7 +64,6 @@ namespace OElite
                 }
 
                 var result = new HttpResponseMessage<T>();
-
                 try
                 {
                     if (method == HttpMethod.Post)
