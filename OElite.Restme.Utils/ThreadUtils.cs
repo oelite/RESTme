@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,12 +21,26 @@ namespace OElite
         public static T WaitAndGetResult<T>(this Task<T> task, int timeoutMiliseconds = -1)
         {
             if (task == null) return default(T);
+
+
             if (timeoutMiliseconds > 0)
             {
-                task.Wait(timeoutMiliseconds);
+                return Task.Run(async () =>
+                {
+                    using var timeoutCancellationTokenSource = new CancellationTokenSource();
+                    var completedTask = await Task
+                        .WhenAny(task, Task.Delay(timeoutMiliseconds, timeoutCancellationTokenSource.Token));
+                    if (completedTask == task)
+                    {
+                        timeoutCancellationTokenSource.Cancel();
+                        return await task;
+                    }
+
+                    return task.Result;
+                }).Result;
             }
-            else
-                task.Wait();
+
+            task.Wait();
 
             return task.Result;
         }
