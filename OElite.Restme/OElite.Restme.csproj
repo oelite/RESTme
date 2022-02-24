@@ -4,7 +4,7 @@
             Client, Redis Client as well as many Convertors &amp; Extensions implemented in .NET Core
         </Description>
         <VersionPrefix>2.0.2</VersionPrefix>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net5.0</TargetFramework>
         <AssemblyName>OElite.Restme</AssemblyName>
         <PackageTags>HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
         <RepositoryUrl>https://github.com/oelite/RESTme</RepositoryUrl>
@@ -16,7 +16,7 @@
         <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="StackExchange.Redis" Version="2.2.88" />
+        <PackageReference Include="StackExchange.Redis" Version="2.2.4" />
         <PackageReference Include="WindowsAzure.Storage" Version="9.3.3" />
     </ItemGroup>
     <ItemGroup>

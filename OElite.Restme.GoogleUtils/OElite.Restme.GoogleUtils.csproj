@@ -1,17 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net5.0</TargetFramework>
         <VersionPrefix>2.0.2</VersionPrefix>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj"/>
-        <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj"/>
+        <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
+        <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2"/>
+        <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2" />
     </ItemGroup>
 
 </Project>
