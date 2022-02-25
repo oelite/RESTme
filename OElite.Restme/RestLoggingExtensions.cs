@@ -18,6 +18,17 @@ namespace OElite
             }
         }
 
+        public void LogWarning(string errorMessage, Exception ex = null, int eventId = 0)
+        {
+            try
+            {
+                Logger?.LogWarning(eventId, ex, errorMessage ?? "empty error message");
+            }
+            catch
+            {
+            }
+        }
+
         public void LogInfo(string info, Exception ex = null, int eventId = 0)
         {
             try
