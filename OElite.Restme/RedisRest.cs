@@ -21,13 +21,21 @@ namespace OElite
                     ConnectionMultiplexer result = null;
                     var redisConfig =
                         ConfigurationOptions.Parse(this.ConnectionString);
+
+                    var success = false;
                     try
                     {
                         result = ConnectionMultiplexer.Connect(redisConfig);
+                        success = result.IsConnected;
                     }
                     catch (Exception ex)
                     {
                         LogError(ex.Message, ex);
+                        success = false;
+                    }
+
+                    if (!success)
+                    {
                         var endPoints = redisConfig.EndPoints;
                         foreach (DnsEndPoint endpoint in endPoints)
                         {
@@ -36,7 +44,8 @@ namespace OElite
                                 var port = endpoint.Port;
                                 if (!IsIpAddress(endpoint.Host))
                                 {
-                                    IPHostEntry ip = Dns.GetHostEntryAsync(endpoint.Host).WaitAndGetResult(Configuration.DefaultTimeout);
+                                    IPHostEntry ip = Dns.GetHostEntryAsync(endpoint.Host)
+                                        .WaitAndGetResult(Configuration.DefaultTimeout);
                                     redisConfig.EndPoints.Remove(endpoint);
                                     redisConfig.EndPoints.Add(ip.AddressList.First(), port);
                                 }
@@ -48,10 +57,12 @@ namespace OElite
                                 LogError(innerEx.Message, innerEx);
                                 continue;
                             }
+
                             if (result != null)
                                 break;
                         }
                     }
+
                     return result;
                 }).Value;
                 redisDatabase = redisConnection?.GetDatabase();
@@ -61,6 +72,7 @@ namespace OElite
                 LogError(ex.Message, ex);
                 throw new OEliteDbException("failed to initialize Redis connection:\n" + ex.Message, ex);
             }
+
             if (redisConnection?.IsConnected == true)
                 Initialized = true;
         }
