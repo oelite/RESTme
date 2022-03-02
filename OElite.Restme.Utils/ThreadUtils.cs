@@ -18,7 +18,8 @@ namespace OElite
             Task.Run(action).RunInBackgroundAndForget();
         }
 
-        public static T WaitAndGetResult<T>(this Task<T> task, int timeoutMiliseconds = -1)
+        public static T WaitAndGetResult<T>(this Task<T> task, int timeoutMiliseconds = -1,
+            CancellationToken token = default)
         {
             if (task == null) return default(T);
 
@@ -29,7 +30,9 @@ namespace OElite
                 {
                     using var timeoutCancellationTokenSource = new CancellationTokenSource();
                     var completedTask = await Task
-                        .WhenAny(task, Task.Delay(timeoutMiliseconds, timeoutCancellationTokenSource.Token));
+                        .WhenAny(task,
+                            Task.Delay(timeoutMiliseconds,
+                                token == default ? timeoutCancellationTokenSource.Token : token));
                     if (completedTask == task)
                     {
                         timeoutCancellationTokenSource.Cancel();

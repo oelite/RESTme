@@ -10,6 +10,10 @@ namespace OElite
         public string Message { get; set; }
         public bool Success { get; set; }
 
+        public DateTime CreatedOnUtc { get; set; }
+        public DateTime ExpiryOnUtc { get; set; }
+        public DateTime GraceTillUtc { get; set; }
+
         public string AssociatedTotalCountPropertyName { get; set; }
 
         public object MetaData { get; set; }
@@ -17,10 +21,12 @@ namespace OElite
         public ResponseMessage()
         {
             AssociatedTotalCountPropertyName = "TotalRecordsCount";
+            CreatedOnUtc = DateTime.UtcNow;
         }
 
         public ResponseMessage(string associatedTotalCountPropertyName = "TotalRecordsCount")
         {
+            CreatedOnUtc = DateTime.UtcNow;
             AssociatedTotalCountPropertyName = associatedTotalCountPropertyName.IsNullOrEmpty()
                 ? "TotalRecordsCount"
                 : associatedTotalCountPropertyName;
@@ -49,7 +55,7 @@ namespace OElite
                     Total = (list?.Count).GetValueOrDefault();
                     break;
                 case ICollection _:
-                    Total = (((ICollection) data)?.Count).GetValueOrDefault();
+                    Total = (((ICollection)data)?.Count).GetValueOrDefault();
                     break;
             }
         }
@@ -67,7 +73,7 @@ namespace OElite
                 result = msg.Data.ToString().JsonDeserialize<T>(false);
             }
             else
-                result = (T) Convert.ChangeType(msg.Data, typeof(T));
+                result = (T)Convert.ChangeType(msg.Data, typeof(T));
 
             if (result == null) return result;
             var propInfo = typeof(T).GetProperty(msg.AssociatedTotalCountPropertyName);
