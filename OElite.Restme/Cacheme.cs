@@ -23,7 +23,7 @@ public static class RestmeCacheExtensions
     /// </summary>
     public const int defaultCacheRefreshInSeconds = 60;
 
-    public static async Task<ResponseMessage> Cacheme(this Rest rest, string uid, object data, int expiryInSeconds = -1,
+    public static async Task<ResponseMessage> CachemeAsync(this Rest rest, string uid, object data, int expiryInSeconds = -1,
         int graceInSeconds = -1)
     {
         var result = default(ResponseMessage);
@@ -44,13 +44,13 @@ public static class RestmeCacheExtensions
         return result;
     }
 
-    public static async Task<T> Findme<T>(this Rest rest, string uid, bool returnExpired = false,
+    public static async Task<T> FindmeAsync<T>(this Rest rest, string uid, bool returnExpired = false,
         bool returnInGrace = true) where T : class
     {
         var obj = rest?.Get<ResponseMessage>(uid);
         if (obj is { Data: { } })
         {
-            var result = obj as T;
+            var result = obj.Data as T;
             if (returnExpired) return result;
             if (returnInGrace && obj.GraceTillUtc >= DateTime.UtcNow) return result;
             if (obj.ExpiryOnUtc >= DateTime.UtcNow) return result;
