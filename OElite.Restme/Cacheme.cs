@@ -46,25 +46,34 @@ public static class RestmeCacheExtensions
     }
 
     public static async Task<T> FindmeAsync<T>(this Rest rest, string uid, bool returnExpired = false,
-        bool returnInGrace = true, Func<Task<T>> refreshAction = null) where T : class
+        bool returnInGrace = true,
+        Func<T, Task<bool>> additionalValidation = null,
+        Func<Task<T>> refreshAction = null) where T : class
 
     {
         var obj = rest?.Get<ResponseMessage>(uid);
         if (obj is { Data: { } })
         {
             var result = obj.GetOriginalData<T>();
-            if (returnExpired) return result;
-            if (returnInGrace && obj.GraceTillUtc >= DateTime.UtcNow)
+
+            var customValidationResult = (additionalValidation == null || await additionalValidation.Invoke(result));
+
+            if (customValidationResult)
             {
-                if (obj.ExpiryOnUtc <= DateTime.UtcNow)
+                if (returnExpired) return result;
+                if (returnInGrace && obj.GraceTillUtc >= DateTime.UtcNow)
                 {
-                    refreshAction.Invoke().RunInBackgroundAndForget();
+                    if (obj.ExpiryOnUtc <= DateTime.UtcNow)
+                    {
+                        refreshAction.Invoke().RunInBackgroundAndForget();
+                    }
+
+                    return result;
                 }
 
-                return result;
+                if (obj.ExpiryOnUtc >= DateTime.UtcNow) return result;
             }
 
-            if (obj.ExpiryOnUtc >= DateTime.UtcNow) return result;
             return await refreshAction.Invoke();
         }
 
