@@ -68,6 +68,7 @@ namespace OElite
             if (msg == null) return default(T);
             T result = default(T);
             if ((msg.Data is string && typeof(T) != typeof(string)) ||
+                (msg.Data is Newtonsoft.Json.Linq.JObject) ||
                 (msg.Data is Newtonsoft.Json.Linq.JArray && typeof(T) != typeof(Newtonsoft.Json.Linq.JArray)))
             {
                 result = msg.Data.ToString().JsonDeserialize<T>(false);
