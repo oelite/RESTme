@@ -73,10 +73,8 @@ public static class RestmeCacheExtensions
 
                 if (obj.ExpiryOnUtc >= DateTime.UtcNow) return result;
             }
-
-            return await refreshAction.Invoke();
         }
 
-        return default;
+        return await refreshAction.Invoke();
     }
 }
