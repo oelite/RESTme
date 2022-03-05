@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
+// ReSharper disable once CheckNamespace
 namespace OElite;
 
 /// <summary>
@@ -11,17 +12,7 @@ public static class RestmeCacheExtensions
     /// <summary>
     /// default expiry in seconds for cached item
     /// </summary>
-    public const int defaultCacheExpiryInSeconds = 60;
-
-    /// <summary>
-    /// default expiry in seconds as cache grace period
-    /// </summary>
-    public const int defaultCacheGraceInSeconds = 3600;
-
-    /// <summary>
-    /// default refresh in seconds based on a cache's cachedOnUtc
-    /// </summary>
-    public const int defaultCacheRefreshInSeconds = 60;
+    private const int DefaultCacheExpiryInSeconds = 60;
 
     public static async Task<ResponseMessage> CachemeAsync(this Rest rest, string uid, object data,
         int expiryInSeconds = -1,
@@ -32,7 +23,7 @@ public static class RestmeCacheExtensions
 
         var expiry = expiryInSeconds > 0
             ? DateTime.UtcNow.AddSeconds(expiryInSeconds)
-            : DateTime.UtcNow.AddSeconds(defaultCacheExpiryInSeconds);
+            : DateTime.UtcNow.AddSeconds(DefaultCacheExpiryInSeconds);
         var grace = graceInSeconds > 0 ? expiry.AddSeconds(graceInSeconds) : expiry;
 
         var responseMessage = new ResponseMessage(data)
@@ -52,7 +43,7 @@ public static class RestmeCacheExtensions
 
     {
         var obj = rest?.Get<ResponseMessage>(uid);
-        if (obj is { Data: { } })
+        if (obj is {Data: { }})
         {
             var result = obj.GetOriginalData<T>();
 
