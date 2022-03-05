@@ -27,6 +27,8 @@ public static class RestmeCacheExtensions
         int expiryInSeconds = -1,
         int graceInSeconds = -1)
     {
+        if (rest?.CurrentMode != RestMode.RedisCacheClient)
+            throw new OEliteException("Cacheme currently only support Redis mode");
         var result = default(ResponseMessage);
         if (rest == null || !uid.IsNotNullOrEmpty()) return result;
 
@@ -51,6 +53,8 @@ public static class RestmeCacheExtensions
         Func<Task<T>> refreshAction = null) where T : class
 
     {
+        if (rest?.CurrentMode != RestMode.RedisCacheClient)
+            throw new OEliteException("Cacheme currently only support Redis mode");
         var obj = rest?.Get<ResponseMessage>(uid);
         if (obj is { Data: { } })
         {
