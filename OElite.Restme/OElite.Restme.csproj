@@ -16,6 +16,7 @@
         <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="RabbitMQ.Client" Version="6.2.4" />
         <PackageReference Include="StackExchange.Redis" Version="2.2.88" />
         <PackageReference Include="WindowsAzure.Storage" Version="9.3.3" />
     </ItemGroup>
