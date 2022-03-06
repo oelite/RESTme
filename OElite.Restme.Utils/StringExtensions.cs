@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.IO;
 using System.Web;
 using HtmlAgilityPack;
 using Newtonsoft.Json;
@@ -140,6 +141,11 @@ namespace OElite
             return msg != null
                 ? msg.GetOriginalData<T>()
                 : StringUtils.JsonDeserialize<T>(value, serializerSettings);
+        }
+
+        public static Stream ToStream(this string value)
+        {
+            return StringUtils.GenerateStreamFromString(value);
         }
     }
 }

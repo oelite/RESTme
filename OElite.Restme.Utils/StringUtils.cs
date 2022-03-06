@@ -331,6 +331,7 @@ namespace OElite
 
             return bytes;
         }
+        
 
         /// <summary>
         /// Converts an array of bytes into a hexadecimal string representation.
