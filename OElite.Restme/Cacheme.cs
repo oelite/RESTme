@@ -14,6 +14,34 @@ public static class RestmeCacheExtensions
     /// </summary>
     private const int DefaultCacheExpiryInSeconds = 60;
 
+    public static async Task<bool> ExpiremeAsync(this Rest rest, string uid, bool invalidateGracePeriod = true)
+    {
+        if (rest?.CurrentMode != RestMode.RedisCacheClient)
+            throw new OEliteException("Cacheme currently only support Redis mode");
+        var obj = rest?.Get<ResponseMessage>(uid);
+        if (obj is { Data: { } })
+        {
+            if (invalidateGracePeriod)
+            {
+                await rest?.DeleteAsync<ResponseMessage>(uid);
+            }
+            else
+            {
+                obj.ExpiryOnUtc = DateTime.UtcNow.AddMilliseconds(-1);
+                if (invalidateGracePeriod)
+                {
+                    obj.GraceTillUtc = obj.ExpiryOnUtc;
+                }
+
+                await rest?.PostAsync<ResponseMessage>(uid, obj);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     public static async Task<ResponseMessage> CachemeAsync(this Rest rest, string uid, object data,
         int expiryInSeconds = -1,
         int graceInSeconds = -1)
