@@ -12,8 +12,8 @@ public static class RestmeMessageQueueExtensions
 {
     public static ConnectionFactory RabbitMqConnectionFactory { get; set; }
 
-    public static bool Queueme<T>(this Rest rest,
-        T message,
+    public static bool Queueme(this Rest rest,
+        object message,
         string queueName = default, string key = default,
         string exchangeName = default,
         bool isDurable = true,
@@ -51,7 +51,7 @@ public static class RestmeMessageQueueExtensions
                 {
                     channel.QueueDeclare(queueName, isDurable, isExclusive, autoDelete);
                 }
-                
+
                 if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty())
                     channel.QueueBind(queueName, exchangeName, key);
 
