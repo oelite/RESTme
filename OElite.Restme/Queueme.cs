@@ -114,9 +114,9 @@ public static class RestmeMessageQueueExtensions
                 queueName = channel.QueueDeclare().QueueName;
             }
 
-            if (key.IsNullOrEmpty()) key = string.Empty;
+            if (key.IsNullOrEmpty()) key = queueName;
 
-            if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty())
+            if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty() && key.IsNotNullOrEmpty())
                 channel.QueueBind(queueName, exchangeName, key);
 
             var consumer = new EventingBasicConsumer(channel);
