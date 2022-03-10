@@ -77,8 +77,8 @@ public static class RestmeMessageQueueExtensions
     }
 
     public static void Dome<T>(this Rest rest,
-        Func<T, bool> queueTask,
-        Func<bool> deliverCompleteCondition,
+        Func<T, Task<bool>> queueTask,
+        Func<Task<bool>> deliverCompleteCondition,
         string exchangeName = default,
         string queueName = default, string key = default,
         ushort prefetchCount = 1,
