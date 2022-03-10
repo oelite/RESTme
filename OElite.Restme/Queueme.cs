@@ -126,11 +126,11 @@ public static class RestmeMessageQueueExtensions
                     .JsonDeserialize<T>();
                 if (queueTask == null || (await queueTask?.Invoke(result)))
                 {
-                    channel.BasicAck(args.DeliveryTag, true);
+                    channel.BasicAck(args.DeliveryTag, false);
                 }
                 else
                 {
-                    channel.BasicNack(args.DeliveryTag, true, true);
+                    channel.BasicNack(args.DeliveryTag, false, true);
                 }
             };
             // prefetchCount = 1  ---> accept only one unack-ed message at a time
