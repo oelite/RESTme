@@ -50,12 +50,14 @@ public static class RestmeMessageQueueExtensions
                 if (queueName.IsNotNullOrEmpty())
                 {
                     channel.QueueDeclare(queueName, isDurable, isExclusive, autoDelete);
+                    if (key.IsNullOrEmpty()) key = queueName;
                 }
 
-                if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty())
+                if (key.IsNullOrEmpty()) key = string.Empty;
+
+                if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty() && key.IsNotNullOrEmpty())
                     channel.QueueBind(queueName, exchangeName, key);
 
-                if (key.IsNullOrEmpty()) key = string.Empty;
 
                 var objBytes = message.JsonSerialize().ToStream().ToBytes();
                 channel.BasicPublish(exchangeName, key,
