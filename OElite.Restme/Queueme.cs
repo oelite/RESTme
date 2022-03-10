@@ -128,6 +128,10 @@ public static class RestmeMessageQueueExtensions
                 {
                     channel.BasicAck(args.DeliveryTag, true);
                 }
+                else
+                {
+                    channel.BasicNack(args.DeliveryTag, true, true);
+                }
             };
             // prefetchCount = 1  ---> accept only one unack-ed message at a time
             channel.BasicQos(0, prefetchCount, false);
