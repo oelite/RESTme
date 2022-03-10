@@ -76,7 +76,7 @@ public static class RestmeMessageQueueExtensions
         return false;
     }
 
-    public static void Dome<T>(this Rest rest,
+    public static async Task Dome<T>(this Rest rest,
         Func<T, Task<bool>> queueTask,
         Func<Task<bool>> deliverCompleteCondition,
         string exchangeName = default,
@@ -120,11 +120,11 @@ public static class RestmeMessageQueueExtensions
                 channel.QueueBind(queueName, exchangeName, key);
 
             var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (chn, args) =>
+            consumer.Received += async (chn, args) =>
             {
                 var result = StringUtils.GetStringFromStream(new MemoryStream(args.Body.ToArray()))
                     .JsonDeserialize<T>();
-                if (queueTask == null || queueTask?.Invoke(result) == true)
+                if (queueTask == null || (await queueTask?.Invoke(result)))
                 {
                     channel.BasicAck(args.DeliveryTag, true);
                 }
@@ -138,8 +138,10 @@ public static class RestmeMessageQueueExtensions
             channel.BasicConsume(queueName, false, consumer);
 
             if (deliverCompleteCondition == null) return;
-            while (!deliverCompleteCondition.Invoke())
+            var isComplete = false;
+            while (!isComplete)
             {
+                isComplete = await deliverCompleteCondition.Invoke();
                 //no nothing, keep the loop await
             }
         }
