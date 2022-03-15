@@ -15,7 +15,7 @@ namespace OElite
         public static string JsonSerialize(this object objectValue, bool attemptResponseMessageConvertIfListType = true,
             JsonSerializerSettings serializerSettings = null)
         {
-            if (!(objectValue is IList) || !attemptResponseMessageConvertIfListType)
+            if (objectValue is not IEnumerable || !attemptResponseMessageConvertIfListType)
                 return StringUtils.JsonSerialize(objectValue,
                     serializerSettings);
 
