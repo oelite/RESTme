@@ -151,7 +151,7 @@ public static class RestmeMessageQueueExtensions
         }
     }
 
-    public static async Task Dome<T>(this Rest rest,
+    public static void Dome<T>(this Rest rest,
         Func<T, bool> queueTask,
         Func<bool> deliverCompleteCondition,
         string exchangeName = default,
