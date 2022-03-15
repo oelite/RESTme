@@ -124,7 +124,7 @@ public static class RestmeMessageQueueExtensions
             {
                 var result = StringUtils.GetStringFromStream(new MemoryStream(args.Body.ToArray()))
                     .JsonDeserialize<T>();
-                if (queueTask == null || (await queueTask?.Invoke(result)))
+                if (queueTask == null || (await queueTask(result)))
                 {
                     channel.BasicAck(args.DeliveryTag, false);
                 }
@@ -142,6 +142,81 @@ public static class RestmeMessageQueueExtensions
             while (!isComplete)
             {
                 isComplete = await deliverCompleteCondition.Invoke();
+                //no nothing, keep the loop await
+            }
+        }
+        catch (Exception ex)
+        {
+            rest.LogError(ex?.Message, ex);
+        }
+    }
+
+    public static async Task Dome<T>(this Rest rest,
+        Func<T, bool> queueTask,
+        Func<bool> deliverCompleteCondition,
+        string exchangeName = default,
+        string queueName = default, string key = default,
+        ushort prefetchCount = 1,
+        bool isDurable = true,
+        bool isExclusive = false,
+        bool autoDelete = true,
+        string exchangeType = "direct")
+    {
+        try
+        {
+            RabbitMqConnectionFactory = new ConnectionFactory
+            {
+                UserName = rest.Configuration.RestKey,
+                Password = rest.Configuration.RestSecret,
+                Endpoint = new AmqpTcpEndpoint(rest.BaseUri),
+                ClientProvidedName = "Restme MQ"
+            };
+
+            using var conn = RabbitMqConnectionFactory.CreateConnection();
+            using var channel = conn.CreateModel();
+            if (exchangeName.IsNotNullOrEmpty())
+            {
+                channel.ExchangeDeclare(exchangeName, exchangeType, isDurable, autoDelete);
+            }
+            else exchangeName = string.Empty;
+
+            if (queueName.IsNotNullOrEmpty())
+            {
+                channel.QueueDeclare(queueName, isDurable, isExclusive, autoDelete);
+            }
+            else
+            {
+                queueName = channel.QueueDeclare().QueueName;
+            }
+
+            if (key.IsNullOrEmpty()) key = queueName;
+
+            if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty() && key.IsNotNullOrEmpty())
+                channel.QueueBind(queueName, exchangeName, key);
+
+            var consumer = new EventingBasicConsumer(channel);
+            consumer.Received += (chn, args) =>
+            {
+                var result = StringUtils.GetStringFromStream(new MemoryStream(args.Body.ToArray()))
+                    .JsonDeserialize<T>();
+                if (queueTask == null || queueTask(result))
+                {
+                    channel.BasicAck(args.DeliveryTag, false);
+                }
+                else
+                {
+                    channel.BasicNack(args.DeliveryTag, false, true);
+                }
+            };
+            // prefetchCount = 1  ---> accept only one unack-ed message at a time
+            channel.BasicQos(0, prefetchCount, false);
+            channel.BasicConsume(queueName, false, consumer);
+
+            if (deliverCompleteCondition == null) return;
+            var isComplete = false;
+            while (!isComplete)
+            {
+                isComplete = deliverCompleteCondition.Invoke();
                 //no nothing, keep the loop await
             }
         }
