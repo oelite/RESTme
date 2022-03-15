@@ -76,7 +76,7 @@ public static class RestmeMessageQueueExtensions
         return false;
     }
 
-    public static async Task DomeAsync<T>(this Rest rest,
+    public static void Dome<T>(this Rest rest,
         Func<T, Task<bool>> queueTask,
         Func<Task<bool>> deliverCompleteCondition,
         string exchangeName = default,
@@ -141,7 +141,7 @@ public static class RestmeMessageQueueExtensions
             var isComplete = false;
             while (!isComplete)
             {
-                isComplete = await deliverCompleteCondition.Invoke();
+                isComplete = deliverCompleteCondition.Invoke().WaitAndGetResult();
                 //no nothing, keep the loop await
             }
         }
