@@ -59,6 +59,9 @@ namespace OElite
                     break;
             }
         }
+
+        public static ResponseMessage SimpleFail => new ResponseMessage() { Success = false };
+        public static ResponseMessage SimpleSuccess => new ResponseMessage(true);
     }
 
     public static class ResponseMessageExtensions
