@@ -32,11 +32,6 @@ namespace OElite
                 : associatedTotalCountPropertyName;
         }
 
-        public ResponseMessage(bool success = true)
-        {
-            Success = success;
-        }
-
         public ResponseMessage(object data, string message = "", bool success = true,
             string associatedTotalCountPropertyName = "TotalRecordsCount")
         {
