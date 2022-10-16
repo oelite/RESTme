@@ -281,7 +281,7 @@ namespace OElite
             {
                 if (!value.IsNotNullOrEmpty()) return default(T);
                 if (typeof(T).IsPrimitiveType())
-                    return (T) Convert.ChangeType(value, typeof(T));
+                    return (T)Convert.ChangeType(value, typeof(T));
 
                 return JsonConvert.DeserializeObject<T>(value,
                     jsonSerializerSettings ??
@@ -298,8 +298,8 @@ namespace OElite
                 {
                     //in case it is JSON encoded as a JSON string
                     var token = JToken.Parse(value);
-                    return JObject.Parse((string) token)
-                        .ToObject<T>(new JsonSerializer() {ContractResolver = new OEliteJsonResolver()});
+                    return JObject.Parse((string)token)
+                        .ToObject<T>(new JsonSerializer() { ContractResolver = new OEliteJsonResolver() });
                 }
                 catch (Exception ex2)
                 {
@@ -313,6 +313,47 @@ namespace OElite
 
             return default(T);
         }
+
+        public static object JsonDeserialize(Type type, string value,
+            JsonSerializerSettings jsonSerializerSettings = null)
+        {
+            try
+            {
+                if (!value.IsNotNullOrEmpty()) return null;
+                if (type.IsPrimitiveType())
+                    return Convert.ChangeType(value, type);
+
+                return JsonConvert.DeserializeObject(value, type,
+                    jsonSerializerSettings ??
+                    new JsonSerializerSettings
+                    {
+                        ContractResolver = new OEliteJsonResolver(),
+                        NullValueHandling = NullValueHandling.Ignore,
+                        MissingMemberHandling = MissingMemberHandling.Ignore
+                    });
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    //in case it is JSON encoded as a JSON string
+                    var token = JToken.Parse(value);
+                    return JObject.Parse((string)token)
+                        .ToObject(type, new JsonSerializer() { ContractResolver = new OEliteJsonResolver() });
+                }
+                catch (Exception ex2)
+                {
+                    // ignored
+                }
+
+                RestmeLogger.LogDebug(
+                    $"Deserializing an object to type {type.FullName} has failed. The original value was: \n {value}",
+                    ex);
+            }
+
+            return default;
+        }
+
 
         /// <summary>
         /// Converts a string of characters representing hexadecimal values into an array of bytes
@@ -331,7 +372,7 @@ namespace OElite
 
             return bytes;
         }
-        
+
 
         /// <summary>
         /// Converts an array of bytes into a hexadecimal string representation.
@@ -480,15 +521,15 @@ namespace OElite
                     if (bitsRemaining > 5)
                     {
                         mask = cValue << (bitsRemaining - 5);
-                        curByte = (byte) (curByte | mask);
+                        curByte = (byte)(curByte | mask);
                         bitsRemaining -= 5;
                     }
                     else
                     {
                         mask = cValue >> (5 - bitsRemaining);
-                        curByte = (byte) (curByte | mask);
+                        curByte = (byte)(curByte | mask);
                         returnArray[arrayIndex++] = curByte;
-                        curByte = (byte) (cValue << (3 + bitsRemaining));
+                        curByte = (byte)(cValue << (3 + bitsRemaining));
                         bitsRemaining += 3;
                     }
                 }
@@ -509,7 +550,7 @@ namespace OElite
                     throw new ArgumentNullException("input");
                 }
 
-                int charCount = (int) Math.Ceiling(input.Length / 5d) * 8;
+                int charCount = (int)Math.Ceiling(input.Length / 5d) * 8;
                 char[] returnArray = new char[charCount];
 
                 byte nextChar = 0, bitsRemaining = 5;
@@ -517,18 +558,18 @@ namespace OElite
 
                 foreach (byte b in input)
                 {
-                    nextChar = (byte) (nextChar | (b >> (8 - bitsRemaining)));
+                    nextChar = (byte)(nextChar | (b >> (8 - bitsRemaining)));
                     returnArray[arrayIndex++] = ValueToChar(nextChar);
 
                     if (bitsRemaining < 4)
                     {
-                        nextChar = (byte) ((b >> (3 - bitsRemaining)) & 31);
+                        nextChar = (byte)((b >> (3 - bitsRemaining)) & 31);
                         returnArray[arrayIndex++] = ValueToChar(nextChar);
                         bitsRemaining += 5;
                     }
 
                     bitsRemaining -= 3;
-                    nextChar = (byte) ((b << bitsRemaining) & 31);
+                    nextChar = (byte)((b << bitsRemaining) & 31);
                 }
 
                 //if we didn't end with a full char
@@ -543,7 +584,7 @@ namespace OElite
 
             private static int CharToValue(char c)
             {
-                int value = (int) c;
+                int value = (int)c;
 
                 //65-90 == uppercase letters
                 if (value < 91 && value > 64)
@@ -570,12 +611,12 @@ namespace OElite
             {
                 if (b < 26)
                 {
-                    return (char) (b + 65);
+                    return (char)(b + 65);
                 }
 
                 if (b < 32)
                 {
-                    return (char) (b + 24);
+                    return (char)(b + 24);
                 }
 
                 throw new ArgumentException("Byte is not a Base32 value.", "b");

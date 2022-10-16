@@ -83,5 +83,26 @@ namespace OElite
 
             return result;
         }
+
+        public static object GetOriginalData(this ResponseMessage msg, Type type)
+        {
+            object result = default;
+            if (msg == null) return result;
+            if ((msg.Data is string && type != typeof(string)) ||
+                (msg.Data is Newtonsoft.Json.Linq.JObject) ||
+                (msg.Data is Newtonsoft.Json.Linq.JArray && type != typeof(Newtonsoft.Json.Linq.JArray)))
+            {
+                result = msg.Data.ToString().JsonDeserialize(type, false);
+            }
+            else
+                result = Convert.ChangeType(msg.Data, type);
+
+            if (result == null) return result;
+            var propInfo = type.GetProperty(msg.AssociatedTotalCountPropertyName);
+            if (propInfo != null)
+                result.SetPropertyValue(msg.AssociatedTotalCountPropertyName, msg.Total);
+
+            return result;
+        }
     }
 }

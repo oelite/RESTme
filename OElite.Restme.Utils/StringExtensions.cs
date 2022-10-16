@@ -143,6 +143,21 @@ namespace OElite
                 : StringUtils.JsonDeserialize<T>(value, serializerSettings);
         }
 
+        public static object JsonDeserialize(this string value, Type type,
+            bool attemptResponseMessageConvertIfListType = true,
+            JsonSerializerSettings serializerSettings = null)
+        {
+            if (!(typeof(IEnumerable).IsAssignableFrom(type)) || !attemptResponseMessageConvertIfListType)
+                return StringUtils.JsonDeserialize(type, value, serializerSettings);
+
+            if (value?.ToLower()?.Contains("AssociatedTotalCountPropertyName".ToLower()) != true)
+                return StringUtils.JsonDeserialize(type, value, serializerSettings);
+            var msg = StringUtils.JsonDeserialize<ResponseMessage>(value);
+            return msg != null
+                ? msg.GetOriginalData(type)
+                : StringUtils.JsonDeserialize(type, value, serializerSettings);
+        }
+
         public static Stream ToStream(this string value)
         {
             return StringUtils.GenerateStreamFromString(value);
