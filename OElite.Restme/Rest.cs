@@ -70,6 +70,9 @@ namespace OElite
                     case RestMode.RedisCacheClient:
                         PrepareRedisRestme();
                         break;
+                    case RestMode.RabbitMq:
+                        PrepareRabbitRestme();
+                        break;
                     case RestMode.HTTPClient:
                     case RestMode.HTTPRestClient:
                     default:
@@ -120,10 +123,10 @@ namespace OElite
                 if (allowMultipleValues)
                     _headers[header].Add(value);
                 else
-                    _headers[header] = new List<string> {value};
+                    _headers[header] = new List<string> { value };
             }
             else
-                _headers.Add(header, new List<string> {value});
+                _headers.Add(header, new List<string> { value });
         }
 
         public void AddAuthorizationHeader(string token, string authTypePrefix = "Bearer ")
@@ -239,7 +242,7 @@ namespace OElite
                         }
                         else if (_objAsParam.GetType() is T)
                         {
-                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                            dataObject = (T)Convert.ChangeType(_objAsParam, typeof(T));
                         }
                         else
                         {
@@ -260,7 +263,7 @@ namespace OElite
                         }
                         else if (_objAsParam is T)
                         {
-                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                            dataObject = (T)Convert.ChangeType(_objAsParam, typeof(T));
                         }
                         else
                         {
@@ -281,7 +284,7 @@ namespace OElite
                         }
                         else if (_objAsParam is T)
                         {
-                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                            dataObject = (T)Convert.ChangeType(_objAsParam, typeof(T));
                         }
                         else
                         {
@@ -388,7 +391,7 @@ namespace OElite
                         }
                         else if (_objAsParam.GetType() is T)
                         {
-                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                            dataObject = (T)Convert.ChangeType(_objAsParam, typeof(T));
                         }
                         else
                         {
@@ -409,7 +412,7 @@ namespace OElite
                         }
                         else if (_objAsParam is T)
                         {
-                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                            dataObject = (T)Convert.ChangeType(_objAsParam, typeof(T));
                         }
                         else
                         {
@@ -430,7 +433,7 @@ namespace OElite
                         }
                         else if (_objAsParam is T)
                         {
-                            dataObject = (T) Convert.ChangeType(_objAsParam, typeof(T));
+                            dataObject = (T)Convert.ChangeType(_objAsParam, typeof(T));
                         }
                         else
                         {
@@ -524,7 +527,7 @@ namespace OElite
 
         public void Dispose()
         {
-            var disposeTasks = new List<Task> {AttemptDisposeRedis()};
+            var disposeTasks = new List<Task> { AttemptDisposeRedis() };
 
             Task.WaitAll(disposeTasks.ToArray());
         }
