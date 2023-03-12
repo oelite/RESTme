@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Security.Cryptography;
 
@@ -38,41 +39,32 @@ namespace OElite
         }
 
 
-        /// <summary>
-        /// Decrypts input string from Rijndael (AES) algorithm with CBC blocking and PKCS7 padding.
-        /// </summary>
-        /// <param name="inputBytes">Encrypted binary array to decrypt</param>
-        /// <returns>string of Decrypted data</returns>
-        /// <remarks>The key and IV are the same, and use SagePaySettings.EncryptionPassword.</remarks>
-        public static string AESDecrypt(byte[] inputBytes, string encryptionPassword)
+        public static string AesDecrypt(string cipherText, string passPhrase)
         {
-            RijndaelManaged AES = new RijndaelManaged();
-            System.Text.Encoding encoding = System.Text.Encoding.GetEncoding("iso-8859-1");
-            byte[] keyAndIvBytes = encoding.GetBytes(encryptionPassword);
-            byte[] outputBytes = new byte[inputBytes.Length + 1];
+            // Get the complete stream of bytes that represent:
+            // [32 bytes of Salt] + [32 bytes of IV] + [n bytes of CipherText]
+            var cipherTextBytesWithSaltAndIv = Convert.FromBase64String(cipherText);
+            // Get the saltbytes by extracting the first 32 bytes from the supplied cipherText bytes.
+            var saltStringBytes = cipherTextBytesWithSaltAndIv.Take(CryptoHelper.DefaultKeySize / 8).ToArray();
+            // Get the IV bytes by extracting the next 32 bytes from the supplied cipherText bytes.
+            var ivStringBytes = cipherTextBytesWithSaltAndIv.Skip(CryptoHelper.DefaultKeySize / 8)
+                .Take(CryptoHelper.DefaultKeySize / 8).ToArray();
+            // Get the actual cipher text bytes by removing the first 64 bytes from the cipherText string.
+            var cipherTextBytes = cipherTextBytesWithSaltAndIv.Skip((CryptoHelper.DefaultKeySize / 8) * 2)
+                .Take(cipherTextBytesWithSaltAndIv.Length - ((CryptoHelper.DefaultKeySize / 8) * 2)).ToArray();
 
-            //set the mode, padding and block size
-            AES.Padding = PaddingMode.PKCS7;
-            AES.Mode = CipherMode.CBC;
-            AES.KeySize = 128;
-            AES.BlockSize = 128;
-
-            //create streams and decryptor object
-            dynamic memoryStream = new MemoryStream(inputBytes);
-            dynamic cryptoStream = new CryptoStream(memoryStream, AES.CreateDecryptor(keyAndIvBytes, keyAndIvBytes),
-                CryptoStreamMode.Read);
-
-            //perform decryption
-            cryptoStream.Read(outputBytes, 0, outputBytes.Length);
-
-            //close streams
-            memoryStream.Close();
-            cryptoStream.Close();
-            AES.Clear();
-
-            //convert decryted data into string, assuming original text was UTF-8 encoded
-            return encoding.GetString(outputBytes);
+            using var password =
+                new Rfc2898DeriveBytes(passPhrase, saltStringBytes, CryptoHelper.DefaultDerivationIterations);
+            var keyBytes = password.GetBytes(CryptoHelper.DefaultKeySize / 8);
+            using var symmetricKey = Aes.Create();
+            symmetricKey.BlockSize = 256;
+            symmetricKey.Mode = CipherMode.CBC;
+            symmetricKey.Padding = PaddingMode.PKCS7;
+            using var decrypt = symmetricKey.CreateDecryptor(keyBytes, ivStringBytes);
+            using var memoryStream = new MemoryStream(cipherTextBytes);
+            using var cryptoStream = new CryptoStream(memoryStream, decrypt, CryptoStreamMode.Read);
+            using var streamReader = new StreamReader(cryptoStream, Encoding.UTF8);
+            return streamReader.ReadToEnd();
         }
     }
-    
 }

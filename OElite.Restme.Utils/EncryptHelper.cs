@@ -90,52 +90,38 @@ namespace OElite
             }
         }
 
-        private static string ByteToString(IEnumerable<byte> buff)
+        public static string AesEncrypt(string plainText, string passPhrase)
         {
-            return buff.Aggregate("", (current, t) => current + t.ToString("X2"));
+            // Salt and IV is randomly generated each time, but is preprended to encrypted cipher text
+            // so that the same Salt and IV values can be used when decrypting.  
+            var saltStringBytes = RandomNumberGenerator.GetBytes(32);
+            var ivStringBytes = RandomNumberGenerator.GetBytes(32);
+            var plainTextBytes = Encoding.UTF8.GetBytes(plainText);
+            using var password =
+                new Rfc2898DeriveBytes(passPhrase, saltStringBytes, CryptoHelper.DefaultDerivationIterations);
+            var keyBytes = password.GetBytes(CryptoHelper.DefaultKeySize / 8);
+            using var symmetricKey = Aes.Create();
+            symmetricKey.BlockSize = 256;
+            symmetricKey.Mode = CipherMode.CBC;
+            symmetricKey.Padding = PaddingMode.PKCS7;
+            using var encryptor = symmetricKey.CreateEncryptor(keyBytes, ivStringBytes);
+            using var memoryStream = new MemoryStream();
+            using var cryptoStream = new CryptoStream(memoryStream, encryptor, CryptoStreamMode.Write);
+            cryptoStream.Write(plainTextBytes, 0, plainTextBytes.Length);
+            cryptoStream.FlushFinalBlock();
+            // Create the final bytes as a concatenation of the random salt bytes, the random iv bytes and the cipher bytes.
+            var cipherTextBytes = saltStringBytes;
+            cipherTextBytes = cipherTextBytes.Concat(ivStringBytes).ToArray();
+            cipherTextBytes = cipherTextBytes.Concat(memoryStream.ToArray()).ToArray();
+            memoryStream.Close();
+            cryptoStream.Close();
+            return Convert.ToBase64String(cipherTextBytes);
         }
 
 
-        /// <summary>
-        /// Encrypts input string using Rijndael (AES) algorithm with CBC blocking and PKCS7 padding.
-        /// </summary>
-        /// <param name="inputText">text string to encrypt </param>
-        /// <returns>Encrypted text in Byte array</returns>
-        /// <remarks>The key and IV are the same, in this method - using encryptionPassword.</remarks>
-        public static byte[] AESEncrypt(string inputText, string encryptionPassword)
+        public static string ByteToString(IEnumerable<byte> buff)
         {
-            RijndaelManaged AES = new RijndaelManaged();
-            byte[] outBytes = null;
-
-            //set the mode, padding and block size for the key
-            AES.Padding = PaddingMode.PKCS7;
-            AES.Mode = CipherMode.CBC;
-            AES.KeySize = 128;
-            AES.BlockSize = 128;
-
-            //convert key and plain text input into byte arrays
-            System.Text.Encoding encoding = System.Text.Encoding.GetEncoding("iso-8859-1");
-            byte[] keyAndIvBytes = encoding.GetBytes(encryptionPassword);
-            byte[] inputBytes = encoding.GetBytes(inputText);
-
-            //create streams and encryptor object
-            MemoryStream memoryStream = new MemoryStream();
-            CryptoStream cryptoStream = new CryptoStream(memoryStream,
-                AES.CreateEncryptor(keyAndIvBytes, keyAndIvBytes), CryptoStreamMode.Write);
-
-            //perform encryption
-            cryptoStream.Write(inputBytes, 0, inputBytes.Length);
-            cryptoStream.FlushFinalBlock();
-
-            //get encrypted stream into byte array
-            outBytes = memoryStream.ToArray();
-
-            //close streams
-            memoryStream.Close();
-            cryptoStream.Close();
-            AES.Clear();
-
-            return outBytes;
+            return buff.Aggregate("", (current, t) => current + t.ToString("X2"));
         }
 
     }
