@@ -57,7 +57,7 @@ namespace OElite
                 new Rfc2898DeriveBytes(passPhrase, saltStringBytes, CryptoHelper.DefaultDerivationIterations);
             var keyBytes = password.GetBytes(CryptoHelper.DefaultKeySize / 8);
             using var symmetricKey = Aes.Create();
-            symmetricKey.BlockSize = 256;
+            symmetricKey.BlockSize = 128;
             symmetricKey.Mode = CipherMode.CBC;
             symmetricKey.Padding = PaddingMode.PKCS7;
             using var decrypt = symmetricKey.CreateDecryptor(keyBytes, ivStringBytes);
