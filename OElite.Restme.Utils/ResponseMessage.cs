@@ -46,6 +46,7 @@ namespace OElite
             Data = data;
             Message = message;
             MetaData = data.GetPropertyValue("MetaData");
+            CreatedOnUtc = DateTime.UtcNow;
             Total = propInfo != null ? NumericUtils.GetIntegerValueFromObject(propInfo.GetValue(data)) : 1;
             if (Total != 0) return;
 

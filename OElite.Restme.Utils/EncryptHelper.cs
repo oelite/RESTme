@@ -94,14 +94,14 @@ namespace OElite
         {
             // Salt and IV is randomly generated each time, but is preprended to encrypted cipher text
             // so that the same Salt and IV values can be used when decrypting.  
-            var saltStringBytes = RandomNumberGenerator.GetBytes(32);
-            var ivStringBytes = RandomNumberGenerator.GetBytes(32);
+            var saltStringBytes = RandomNumberGenerator.GetBytes(16);
+            var ivStringBytes = RandomNumberGenerator.GetBytes(16);
             var plainTextBytes = Encoding.UTF8.GetBytes(plainText);
             using var password =
                 new Rfc2898DeriveBytes(passPhrase, saltStringBytes, CryptoHelper.DefaultDerivationIterations);
             var keyBytes = password.GetBytes(CryptoHelper.DefaultKeySize / 8);
             using var symmetricKey = Aes.Create();
-            symmetricKey.BlockSize = 256;
+            symmetricKey.BlockSize = 128;
             symmetricKey.Mode = CipherMode.CBC;
             symmetricKey.Padding = PaddingMode.PKCS7;
             using var encryptor = symmetricKey.CreateEncryptor(keyBytes, ivStringBytes);
