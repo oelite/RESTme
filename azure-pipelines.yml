@@ -5,9 +5,46 @@ trigger:
 pool: oelite-build-agents
 
 steps:
-- task: AzureKeyVault@2
-  inputs:
-    azureSubscription: 'OElite Platform Azure Subscription(10136124-f099-450c-a694-41ac5b6560a8)'
-    KeyVaultName: 'oelite-devops-cred'
-    SecretsFilter: '*'
-    RunAsPreJob: true
+  - task: AzureKeyVault@2
+    displayName: 'Get devops secrets from Key Vault'
+    inputs:
+      azureSubscription: 'OElite Platform Azure Subscription (10136124-f099-450c-a694-41ac5b6560a8)'
+      KeyVaultName: 'oelite-devops-cred'
+      SecretsFilter: '*'
+      RunAsPreJob: true
+
+  - task: mirror-git-repository-vsts-task@1
+    displayName: 'Mirror code to Github'
+    inputs:
+      sourceGitRepositoryUri: '$(Build.Repository.Uri)'
+      sourceGitRepositoryPersonalAccessToken: 'jwj26rhvrejbnhvlbxk636ejnqqegvmkyogryw7ld4y2uvamysxq'
+      destinationGitRepositoryUri: 'https://github.com/oelite/RESTme.git'
+      destinationGitRepositoryPersonalAccessToken: 'ccb0a3f99814d26991e19436ac87b828d0dc19a4'
+
+  - task: UseDotNet@2
+    inputs:
+      version: '6.x'
+      packageType: sdk
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'restore'
+      feedsToUse: 'config'
+      nugetConfigPath: 'NuGet.config'
+
+  - task: CmdLine@2
+    displayName: 'Pack Restme Nuget Packages'
+    inputs:
+      script: |
+        dotnet pack OElite.Restme/OElite.Restme.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
+        dotnet pack OElite.Restme.GoogleUtils/OElite.GoogleUtils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
+        dotnet pack OElite.Restme.Utils/OElite.Utils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
+
+  - task: NuGetCommand@2
+    displayName: 'Push Restme Nuget Packages'
+    inputs:
+      command: 'push'
+      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
+      nuGetFeedType: 'internal'
+      publishVstsFeed: 'e89aaa35-ebc6-4df0-a763-4a5f58ef878f'
+
