@@ -17,9 +17,9 @@ steps:
     displayName: 'Mirror code to Github'
     inputs:
       sourceGitRepositoryUri: '$(Build.Repository.Uri)'
-      sourceGitRepositoryPersonalAccessToken: '$lida-devops-token'
+      sourceGitRepositoryPersonalAccessToken: '$(lida-devops-token)'
       destinationGitRepositoryUri: 'https://github.com/oelite/RESTme.git'
-      destinationGitRepositoryPersonalAccessToken: '$lida-github-token'
+      destinationGitRepositoryPersonalAccessToken: '$(lida-github-token)'
 
   - task: UseDotNet@2
     inputs:
