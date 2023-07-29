@@ -13,6 +13,14 @@ steps:
       SecretsFilter: '*'
       RunAsPreJob: true
 
+  - task: mirror-git-repository-vsts-task@1
+    displayName: 'Mirror code to Github'
+    inputs:
+      sourceGitRepositoryUri: '$(Build.Repository.Uri)'
+      sourceGitRepositoryPersonalAccessToken: 'jwj26rhvrejbnhvlbxk636ejnqqegvmkyogryw7ld4y2uvamysxq'
+      destinationGitRepositoryUri: 'https://github.com/oelite/RESTme.git'
+      destinationGitRepositoryPersonalAccessToken: 'ccb0a3f99814d26991e19436ac87b828d0dc19a4'
+      
   - task: UseDotNet@2
     inputs:
       version: '6.x'
@@ -39,3 +47,4 @@ steps:
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
       nuGetFeedType: 'internal'
       publishVstsFeed: 'e89aaa35-ebc6-4df0-a763-4a5f58ef878f'
+
