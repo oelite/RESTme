@@ -4,8 +4,8 @@
             Client, Redis Client as well as many Convertors &amp; Extensions implemented in .NET Core
         </Description>
         <TargetFramework>net6.0</TargetFramework>
-        <AssemblyVersion>2.0.3</AssemblyVersion>
-        <Version>2.0.3</Version>
+        <AssemblyVersion>2.0.4</AssemblyVersion>
+        <VersionPrefix>2.0.4</VersionPrefix>
         <AssemblyName>OElite.Restme</AssemblyName>
         <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
