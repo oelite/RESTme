@@ -2,7 +2,14 @@
 
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
-        <VersionPrefix>2.0.2</VersionPrefix>
+        <AssemblyVersion>2.0.3</AssemblyVersion>
+        <VersionPrefix>2.0.3</VersionPrefix>
+        <AssemblyName>OElite.Restme.GoogleUtils</AssemblyName>
+        <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
+        <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
+        <Authors>OElite Limited</Authors>
+        <Copyright>OElite Limited</Copyright>
+        <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
     </PropertyGroup>
 
     <ItemGroup>

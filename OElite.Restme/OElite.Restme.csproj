@@ -3,17 +3,21 @@
         <Description>RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage
             Client, Redis Client as well as many Convertors &amp; Extensions implemented in .NET Core
         </Description>
-        <VersionPrefix>2.0.2</VersionPrefix>
         <TargetFramework>net6.0</TargetFramework>
+        <AssemblyVersion>2.0.3</AssemblyVersion>
+        <VersionPrefix>2.0.3</VersionPrefix>
         <AssemblyName>OElite.Restme</AssemblyName>
-        <PackageTags>HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
-        <RepositoryUrl>https://github.com/oelite/RESTme</RepositoryUrl>
+        <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
+        <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
+        <Authors>OElite Limited</Authors>
+        <Copyright>OElite Limited</Copyright>
+        <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
+        <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
+        <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
         <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
         <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
         <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
-        <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
-        <Authors>OElite Limited</Authors>
-        <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+        <Title>OElite.Restme</Title>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="RabbitMQ.Client" Version="6.2.4" />
