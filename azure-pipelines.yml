@@ -17,9 +17,9 @@ steps:
     displayName: 'Mirror code to Github'
     inputs:
       sourceGitRepositoryUri: '$(Build.Repository.Uri)'
-      sourceGitRepositoryPersonalAccessToken: 'jwj26rhvrejbnhvlbxk636ejnqqegvmkyogryw7ld4y2uvamysxq'
+      sourceGitRepositoryPersonalAccessToken: '$lida-devops-token'
       destinationGitRepositoryUri: 'https://github.com/oelite/RESTme.git'
-      destinationGitRepositoryPersonalAccessToken: 'ccb0a3f99814d26991e19436ac87b828d0dc19a4'
+      destinationGitRepositoryPersonalAccessToken: '$lida-github-token'
 
   - task: UseDotNet@2
     inputs:
@@ -37,8 +37,8 @@ steps:
     inputs:
       script: |
         dotnet pack OElite.Restme/OElite.Restme.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
-        dotnet pack OElite.Restme.GoogleUtils/OElite.GoogleUtils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
-        dotnet pack OElite.Restme.Utils/OElite.Utils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
+        dotnet pack OElite.Restme.GoogleUtils/OElite.Restme.oogleUtils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
+        dotnet pack OElite.Restme.Utils/OElite.Restme.Utils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
 
   - task: NuGetCommand@2
     displayName: 'Push Restme Nuget Packages'
