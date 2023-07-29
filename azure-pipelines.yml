@@ -1,6 +1,5 @@
 trigger:
   - develop
-  - uat
 
 pool: oelite-build-agents
 
