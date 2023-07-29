@@ -4,7 +4,7 @@
         <TargetFramework>net6.0</TargetFramework>
         <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
         <AssemblyVersion>2.0.3</AssemblyVersion>
-        <VersionPrefix>2.0.3</VersionPrefix>
+        <Version>2.0.3</Version>
         <AssemblyName>OElite.Restme.Utils</AssemblyName>
         <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
