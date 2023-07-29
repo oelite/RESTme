@@ -6,12 +6,12 @@ pool: oelite-build-agents
 
 steps:
   - task: AzureKeyVault@2
-    displayName: 'Get devops secrets from Key Vault'
     inputs:
-      azureSubscription: 'OElite Platform Azure Subscription (10136124-f099-450c-a694-41ac5b6560a8)'
+      azureSubscription: 'OElite Platform Azure Subscription(10136124-f099-450c-a694-41ac5b6560a8)'
       KeyVaultName: 'oelite-devops-cred'
       SecretsFilter: '*'
       RunAsPreJob: true
+
 #
 #  - task: mirror-git-repository-vsts-task@1
 #    displayName: 'Mirror code to Github'
