@@ -37,7 +37,7 @@ steps:
     inputs:
       script: |
         dotnet pack OElite.Restme/OElite.Restme.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
-        dotnet pack OElite.Restme.GoogleUtils/OElite.Restme.oogleUtils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
+        dotnet pack OElite.Restme.GoogleUtils/OElite.Restme.GoogleUtils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
         dotnet pack OElite.Restme.Utils/OElite.Restme.Utils.csproj -o $(Build.ArtifactStagingDirectory)/oelite-pack -c Release --version-suffix ci$(Build.BuildId)
 
   - task: NuGetCommand@2
