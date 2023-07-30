@@ -27,6 +27,7 @@ public partial class Rest
                     UserName = Configuration.RestKey,
                     Password = Configuration.RestSecret,
                     Endpoint = new AmqpTcpEndpoint(BaseUri),
+                    VirtualHost = RequestUrlPath.IsNullOrEmpty() ? "/" : RequestUrlPath,
                     ClientProvidedName = "Restme MQ"
                 };
 
