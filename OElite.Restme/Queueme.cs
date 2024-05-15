@@ -16,7 +16,7 @@ public static class RestmeMessageQueueExtensions
         string exchangeName = default,
         bool isDurable = true,
         bool isExclusive = false,
-        bool autoDelete = true, string exchangeType = "direct")
+        bool autoDelete = true, string exchangeType = "direct", bool isMessagePersistent = true)
     {
         try
         {
@@ -39,9 +39,19 @@ public static class RestmeMessageQueueExtensions
 
 
             var objBytes = message.JsonSerialize().ToStream().ToBytes();
-            rest.RabbitMqChannel.BasicPublish(exchangeName, key,
-                body: objBytes);
-
+            if (isMessagePersistent)
+            {
+                var props = rest.RabbitMqChannel.CreateBasicProperties();
+                props.DeliveryMode = 2; // persistent
+                rest.RabbitMqChannel.BasicPublish(exchangeName, key,
+                    basicProperties: props,
+                    body: objBytes);
+            }
+            else
+            {
+                rest.RabbitMqChannel.BasicPublish(exchangeName, key,
+                    body: objBytes);
+            }
 
             return true;
         }

@@ -1,0 +1,45 @@
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://dockerhost:2375/
+  DOCKER_TLS_CERTDIR: ""
+  GIT_SUBMODULE_STRATEGY: recursive
+  NODE_OPTIONS: --max_old_space_size=2048
+
+services:
+  - name: docker:dind
+    alias: dockerhost
+    command: [ "--tls=false", "--mtu=1340" ]
+
+
+stages:
+  - build_code_dev
+
+build_code_dev:
+  stage: build_code
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  script:
+    # - dotnet build
+    - dotnet restore OElite.Restme/OElite.Restme.csproj --configfile NuGet.config
+    - dotnet restore OElite.Restme.GoogleUtils/OElite.Restme.GoogleUtils.csproj --configfile NuGet.config
+    - dotnet restore OElite.Restme.Utils/OElite.Restme.Utils.csproj --configfile NuGet.config
+
+    - if [ "$CI_COMMIT_REF_NAME" = "develop" ]; then
+      prereleaseTag="dev";
+      fi
+    - if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+      prereleaseTag="main";
+      fi
+    - if [ "$CI_COMMIT_REF_NAME" = "uat" ]; then
+      prereleaseTag="uat";
+      else
+      prereleaseTag="ci";
+      fi
+    - echo prereleaseTag $prereleaseTag
+    - dotnet pack OElite.Restme/OElite.Restme.csproj -o oelite-pack --version-suffix ${prereleaseTag}$CI_PIPELINE_ID -c Release
+    - dotnet pack OElite.Restme.GoogleUtils/OElite.Restme.GoogleUtils.csproj -o oelite-pack --version-suffix ${prereleaseTag}$CI_PIPELINE_ID -c Release
+    - dotnet pack OElite.Restme.Utils/OElite.Restme.Utils.csproj -o oelite-pack --version-suffix ${prereleaseTag}$CI_PIPELINE_ID -c Release
+
+    - dotnet nuget push oelite-pack/OElite.Restme.*.nupkg -k $NUGET_TOKEN -s https://packages.webcider.dev/v3/index.json
+    - package_version=`ls oelite-pack/OElite.Restme.*.nupkg | cut -d'.' -f 3-5`
+    #    - sh mattermost-ci-webhook.sh oelite-ci oelite-ci OElite.Common $package_version
+
