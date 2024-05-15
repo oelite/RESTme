@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFrameworks>net8.0;net7.0</TargetFrameworks>
         <AssemblyVersion>2.0.4</AssemblyVersion>
         <VersionPrefix>2.0.4</VersionPrefix>
         <AssemblyName>OElite.Restme.GoogleUtils</AssemblyName>
