@@ -15,7 +15,7 @@ stages:
   - build_code_dev
 
 build_code_dev:
-  stage: build_code
+  stage: build_code_dev
   image: mcr.microsoft.com/dotnet/sdk:8.0
   script:
     # - dotnet build
