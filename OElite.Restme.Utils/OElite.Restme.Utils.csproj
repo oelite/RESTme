@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <Description>Restme.Utils (RESTme) is the common library for Restme</Description>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net7.0</TargetFramework>
         <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
         <AssemblyVersion>2.0.4</AssemblyVersion>
         <VersionPrefix>2.0.4</VersionPrefix>
