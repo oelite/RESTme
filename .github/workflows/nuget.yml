@@ -26,6 +26,6 @@ jobs:
       # package project nuget artifacts and push with the run_number and current branch name together as suffix to the version
       - name: Build and push nuget package
         run: |
-          dotnet pack -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}-${{github.run_number}}
+          dotnet pack -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}
           dotnet nuget push oelite-package/*.nupkg -s https://packages.services.phanes.technology/v3/index.json -k $NUGET_TOKEN --skip-duplicate oelite-pack
 
