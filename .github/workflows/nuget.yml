@@ -25,8 +25,7 @@ jobs:
       - name: Build and push nuget package
         run: |
           echo current version suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}
-          dotnet pack OElite.Restme/OElite.Restme.csproj  -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}
-          dotnet pack OElite.Restme.GoogleUtils/OElite.Restme.GoogleUtils.csproj  -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}
-          dotnet pack OElite.Restme.Utils/OElite.Restme.Utils.csproj  -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}
+          dotnet pack OElite.Restme.Dapper/OElite.Restme.Dapper.csproj  -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}
+          dotnet pack OElite.Restme.Dapper.Common/OElite.Restme.Dapper.Common.csproj  -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}
           dotnet nuget push oelite-package/*.nupkg -s https://packages.services.phanes.technology/v3/index.json -k ${{ secrets.NUGET_TOKEN }} --skip-duplicate oelite-pack
 
