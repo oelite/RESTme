@@ -1,0 +1,30 @@
+name: dotnet package
+# run only when it is under branch develop and uat
+on:
+  push:
+    branches:
+      - '!master'
+      - '!main'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+        env:
+          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+      # github.run_number is a number of the pipeline run. It is increased automatically.
+      # That's why we can use it to increase the version of the nuget package.
+      # Here we replace the last number in the version with github.run_number.
+      - name: Set version
+        run: |
+          echo "Buid version is ${{github.run_number}}"
+      # package project nuget artifacts and push with the run_number and current branch name together as suffix to the version
+      - name: Build and push nuget package
+        run: |
+          dotnet pack -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}-${{github.run_number}}
+          dotnet nuget push oelite-package/*.nupkg -s https://packages.services.phanes.technology/v3/index.json -k $NUGET_TOKEN --skip-duplicate oelite-pack
+

@@ -39,7 +39,7 @@ build_code_dev:
     - dotnet pack OElite.Restme.GoogleUtils/OElite.Restme.GoogleUtils.csproj -o oelite-pack --version-suffix ${prereleaseTag}$CI_PIPELINE_ID -c Release
     - dotnet pack OElite.Restme.Utils/OElite.Restme.Utils.csproj -o oelite-pack --version-suffix ${prereleaseTag}$CI_PIPELINE_ID -c Release
 
-    - dotnet nuget push oelite-pack/OElite.Restme.*.nupkg -k $NUGET_TOKEN -s https://packages.webcider.dev/v3/index.json
+    - dotnet nuget push oelite-pack/OElite.Restme.*.nupkg -k $NUGET_TOKEN -s https://packages.services.phanes.technology/v3/index.json
     - package_version=`ls oelite-pack/OElite.Restme.*.nupkg | cut -d'.' -f 3-5`
     #    - sh mattermost-ci-webhook.sh oelite-ci oelite-ci OElite.Common $package_version
 
