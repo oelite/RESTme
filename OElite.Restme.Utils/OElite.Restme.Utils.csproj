@@ -3,8 +3,8 @@
         <Description>Restme.Utils (RESTme) is the common library for Restme</Description>
         <TargetFrameworks>net8.0;net7.0;net6.0</TargetFrameworks>
         <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
-        <AssemblyVersion>2.0.4</AssemblyVersion>
-        <VersionPrefix>2.0.4</VersionPrefix>
+        <AssemblyVersion>2.0.5</AssemblyVersion>
+        <VersionPrefix>2.0.5</VersionPrefix>
         <AssemblyName>OElite.Restme.Utils</AssemblyName>
         <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
