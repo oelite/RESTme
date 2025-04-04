@@ -21,6 +21,12 @@ namespace OElite
                     ConnectionMultiplexer result = null;
                     var redisConfig =
                         ConfigurationOptions.Parse(this.ConnectionString);
+                    if (Configuration.DefaultTimeout > 0)
+                    {
+                        redisConfig.ConnectTimeout = Configuration.DefaultTimeout;
+                        redisConfig.AsyncTimeout = Configuration.DefaultTimeout;
+                        redisConfig.SyncTimeout = Configuration.DefaultTimeout;
+                    }
 
                     var success = false;
                     try
