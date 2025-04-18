@@ -16,7 +16,7 @@ stages:
 
 build_code_dev:
   stage: build_code_dev
-  image: mcr.microsoft.com/dotnet/sdk:8.0
+  image: mcr.microsoft.com/dotnet/sdk:9.0
   script:
     # - dotnet build
     - dotnet restore OElite.Restme/OElite.Restme.csproj --configfile NuGet.config
