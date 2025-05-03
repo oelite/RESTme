@@ -39,6 +39,7 @@ public partial class Rest
 
         if (RabbitMqConnection?.IsOpen == true)
         {
+            Initialized = true;
         }
     }
 }

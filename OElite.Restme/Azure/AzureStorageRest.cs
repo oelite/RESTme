@@ -24,6 +24,7 @@ namespace OElite
 
             azureStorageAccount = CloudStorageAccount.Parse(ConnectionString);
             azureBlobClient = azureStorageAccount.CreateCloudBlobClient();
+            Initialized = true;
         }
 
         internal async Task<CloudBlobContainer> GetAzureBlobContainerAsync(string? relativePath)

@@ -25,6 +25,8 @@ namespace OElite
                 {
                     // S3Client = S3Client.WithTimeout(Configuration.DefaultTimeout);
                 }
+
+                Initialized = true;
             }
             else
             {

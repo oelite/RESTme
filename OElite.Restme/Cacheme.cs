@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 // ReSharper disable once CheckNamespace
@@ -40,7 +41,7 @@ public static class RestmeCacheExtensions
 
     public static async Task<ResponseMessage?> CachemeAsync(this Rest? rest, string? uid, object data,
         int expiryInSeconds = -1,
-        int graceInSeconds = -1)
+        int graceInSeconds = -1, [CallerMemberName] string callerName = "")
     {
         if (rest?.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
@@ -80,7 +81,7 @@ public static class RestmeCacheExtensions
         if (rest?.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
         var obj = rest.Get<ResponseMessage>(uid);
-        if (obj is null) return await refreshAction?.Invoke()!;
+        if (obj is null) return refreshAction != null ? await refreshAction.Invoke() : null;
         var result = obj.GetOriginalData<T>();
 
         var customValidationResult = additionalValidation == null || await additionalValidation.Invoke(result);
@@ -99,40 +100,42 @@ public static class RestmeCacheExtensions
 
         if (obj.ExpiryOnUtc >= DateTime.UtcNow) return result;
 
-        return await refreshAction?.Invoke()!;
+        return refreshAction != null ? await refreshAction.Invoke() : null;
     }
 
 
     public static Task<T?> FindmeAsync<T>(this Rest rest, object queryObject, bool returnExpired = false,
         bool returnInGrace = true,
         Func<T, Task<bool>>? additionalValidation = null,
-        Func<Task<T>>? refreshAction = null) where T : class
+        Func<Task<T>>? refreshAction = null,
+        [CallerMemberName] string callerName = "") where T : class
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
         var json = queryObject.JsonSerialize();
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
-        var md5 = EncryptHelper.Md5Encrypt(queryObject.JsonSerialize());
+        var md5 = EncryptHelper.Md5Encrypt($"{callerName}:{json}");
         return rest.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction);
     }
 
     public static Task<ResponseMessage?> CachemeAsync(this Rest rest, object queryObject, object data,
         int expiryInSeconds = -1,
-        int graceInSeconds = -1)
+        int graceInSeconds = -1,
+        [CallerMemberName] string callerName = "")
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
         var json = queryObject.JsonSerialize();
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
-        var md5 = EncryptHelper.Md5Encrypt(queryObject.JsonSerialize());
+        var md5 = EncryptHelper.Md5Encrypt($"{callerName}:{json}");
         return rest.CachemeAsync(md5, data, expiryInSeconds, graceInSeconds);
     }
 
-    public static Task<bool> ExpiremeAsync(this Rest rest, object queryObject, bool invalidateGracePeriod = true)
+    public static Task<bool> ExpiremeAsync(this Rest rest, object queryObject, bool invalidateGracePeriod = true,
+        [CallerMemberName] string callerName = "")
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
         var json = queryObject.JsonSerialize();
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
-        var md5 = EncryptHelper.Md5Encrypt(queryObject.JsonSerialize());
-
+        var md5 = EncryptHelper.Md5Encrypt($"{callerName}:{json}");
         return rest.ExpiremeAsync(md5, invalidateGracePeriod);
     }
 }

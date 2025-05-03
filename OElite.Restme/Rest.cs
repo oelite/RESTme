@@ -7,10 +7,6 @@ using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using RabbitMQ.Client;
-using StackExchange.Redis;
 
 namespace OElite
 {
@@ -21,9 +17,10 @@ namespace OElite
         internal object? ObjAsParam;
         public RestConfig Configuration { get; private set; }
 
-        public Uri BaseUri { get; set; }
+        public Uri? BaseUri { get; set; }
         public string? ConnectionString { get; }
         public string? RequestUrlPath { get; set; }
+        public bool Initialized { get; private set; }
 
 
         public Rest(Uri? baseUri = null,
@@ -49,7 +46,6 @@ namespace OElite
             else
                 ConnectionString = endPointOrConnectionString;
             Logger = logger;
-            BaseUri = new Uri("");
             Configuration = configuration!;
             this.PrepareRestMode();
         }
@@ -523,7 +519,7 @@ namespace OElite
                             nvc.Add(item.Key, HttpUtility.UrlEncode(item.Value));
                         }
 
-                        //respect existing parameters so ignore the value from object
+                        //respect existing parameters so ignore the value from an object
                     }
                 }
             }

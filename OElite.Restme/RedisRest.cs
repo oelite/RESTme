@@ -81,10 +81,9 @@ namespace OElite
                 LogError(ex.Message, ex);
                 throw new OEliteDbException("failed to initialize Redis connection:\n" + ex.Message, ex);
             }
-
             if (RedisConnection?.IsConnected == true)
-            {
-            }
+                Initialized = true;
+
         }
 
         bool IsIpAddress(string host)

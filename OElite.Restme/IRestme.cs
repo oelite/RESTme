@@ -7,7 +7,7 @@ namespace OElite
 {
     public interface IRestme
     {
-        Uri BaseUri { get; set; }
+        Uri? BaseUri { get; set; }
         string? RequestUrlPath { get; set; }
 
         void Add(string key, string value);

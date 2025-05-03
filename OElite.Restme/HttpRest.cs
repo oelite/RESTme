@@ -8,6 +8,7 @@ namespace OElite
     {
         private void PrepareHttpRestme()
         {
+            Initialized = true;
         }
 
         public HttpResponseMessage<T?>? HttpRequestFull<T>(HttpMethod method, string? keyOrRelativePath = null,
@@ -17,7 +18,8 @@ namespace OElite
             return RestmeHttpExtensions.HttpRequestFull<T>(this, method, keyOrRelativePath);
         }
 
-        public Task<HttpResponseMessage<T?>?> HttpRequestFullAsync<T>(HttpMethod method, string? keyOrRelativePath = null,
+        public Task<HttpResponseMessage<T?>?> HttpRequestFullAsync<T>(HttpMethod method,
+            string? keyOrRelativePath = null,
             object? dataObject = null)
         {
             ObjAsParam = dataObject;
