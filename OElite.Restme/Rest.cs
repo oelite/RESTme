@@ -214,12 +214,14 @@ namespace OElite
 
         #region PUT
 
-        public T Put<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
+        public T Put<T>(string keyOrRelativeUrlPath = null, object dataObject = null, TimeSpan? expiryInMinutes = null)
         {
-            return PostAsync<T>(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+            return PostAsync<T>(keyOrRelativeUrlPath, dataObject, expiryInMinutes)
+                .WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public Task<T> PutAsync<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
+        public Task<T> PutAsync<T>(string keyOrRelativeUrlPath = null, object dataObject = null,
+            TimeSpan? expiryInMinutes = null)
         {
             if (dataObject != null)
                 _objAsParam = dataObject;
@@ -254,7 +256,7 @@ namespace OElite
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.RedisCacheClient:
                         if (dataObject != null)
-                            return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                            return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject, expiryInMinutes)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         if (_objAsParam == null)
                         {
@@ -271,7 +273,7 @@ namespace OElite
                                 "A object parameter is detected, however it is not same generic type as the return type for the current call.");
                         }
 
-                        return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                        return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject, expiryInMinutes)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.S3Client:
                         if (dataObject != null)
@@ -302,14 +304,17 @@ namespace OElite
             return task;
         }
 
-        public Task<string> PutAsync(string keyOrRelativeUrlPath = null, object dataObject = null)
+        public Task<string> PutAsync(string keyOrRelativeUrlPath = null, object dataObject = null,
+            TimeSpan? expiryInMinutes = null)
         {
-            return PutAsync<string>(keyOrRelativeUrlPath, dataObject);
+            return PutAsync<string>(keyOrRelativeUrlPath, dataObject, expiryInMinutes);
         }
 
-        public string Put(string keyOrRelativeUrlPath = null, object dataObject = null)
+        public string Put(string keyOrRelativeUrlPath = null, object dataObject = null,
+            TimeSpan? expiryInMinutes = null)
         {
-            return PutAsync(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+            return PutAsync(keyOrRelativeUrlPath, dataObject, expiryInMinutes)
+                .WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
         #endregion
@@ -363,12 +368,23 @@ namespace OElite
 
         #region POST
 
-        public T Post<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
+        public T Post<T>(string keyOrRelativeUrlPath = null, object dataObject = null, TimeSpan? expiryInMinutes = null)
         {
-            return PostAsync<T>(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+            return PostAsync<T>(keyOrRelativeUrlPath, dataObject, expiryInMinutes)
+                .WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
-        public Task<T> PostAsync<T>(string keyOrRelativeUrlPath = null, object dataObject = null)
+        /// <summary>
+        /// ExpiryInMinutes only works with backend that supports it (such as Redis)
+        /// </summary>
+        /// <param name="keyOrRelativeUrlPath"></param>
+        /// <param name="dataObject"></param>
+        /// <param name="expiryInMinutes"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        /// <exception cref="NotSupportedException"></exception>
+        public Task<T> PostAsync<T>(string keyOrRelativeUrlPath = null, object dataObject = null,
+            TimeSpan? expiryInMinutes = null)
         {
             var task = Task.Run<T>(() =>
             {
@@ -403,7 +419,7 @@ namespace OElite
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.RedisCacheClient:
                         if (dataObject != null)
-                            return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                            return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject, expiryInMinutes)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         if (_objAsParam == null)
                         {
@@ -420,7 +436,7 @@ namespace OElite
                                 "A object parameter is detected, however it is not same generic type as the return type for the current call.");
                         }
 
-                        return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject)
+                        return this.RedisPostAsync<T>(keyOrRelativeUrlPath, dataObject, expiryInMinutes)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                     case RestMode.S3Client:
                         if (dataObject != null)
@@ -451,14 +467,17 @@ namespace OElite
             return task;
         }
 
-        public Task<string> PostAsync(string keyOrRelativeUrlPath = null, string dataObject = null)
+        public Task<string> PostAsync(string keyOrRelativeUrlPath = null, string dataObject = null,
+            TimeSpan? expiryInMinutes = null)
         {
-            return PostAsync<string>(keyOrRelativeUrlPath, dataObject);
+            return PostAsync<string>(keyOrRelativeUrlPath, dataObject, expiryInMinutes);
         }
 
-        public string Post(string keyOrRelativeUrlPath = null, string dataObject = null)
+        public string Post(string keyOrRelativeUrlPath = null, string dataObject = null,
+            TimeSpan? expiryInMinutes = null)
         {
-            return PostAsync(keyOrRelativeUrlPath, dataObject).WaitAndGetResult(Configuration.DefaultTimeout);
+            return PostAsync(keyOrRelativeUrlPath, dataObject, expiryInMinutes)
+                .WaitAndGetResult(Configuration.DefaultTimeout);
         }
 
         #endregion

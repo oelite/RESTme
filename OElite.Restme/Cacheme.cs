@@ -48,20 +48,21 @@ public static class RestmeCacheExtensions
     {
         if (rest?.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
-        var result = default(ResponseMessage);
-        if (rest == null || !uid.IsNotNullOrEmpty()) return result;
+        if (!uid.IsNotNullOrEmpty()) return null;
 
         var expiry = expiryInSeconds > 0
             ? DateTime.UtcNow.AddSeconds(expiryInSeconds)
             : DateTime.UtcNow.AddSeconds(DefaultCacheExpiryInSeconds);
         var grace = graceInSeconds > 0 ? expiry.AddSeconds(graceInSeconds) : expiry;
+        var graceInMinutes = (grace - DateTime.UtcNow).Minutes;
 
         var responseMessage = new ResponseMessage(data)
         {
             ExpiryOnUtc = expiry,
             GraceTillUtc = grace
         };
-        result = await rest?.PostAsync<ResponseMessage>(uid, responseMessage);
+        var result = await rest?.PostAsync<ResponseMessage>(uid, responseMessage,
+            graceInMinutes > 0 ? TimeSpan.FromMinutes(graceInMinutes) : null);
 
         return result;
     }
@@ -75,7 +76,7 @@ public static class RestmeCacheExtensions
         if (rest?.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
         var obj = rest?.Get<ResponseMessage>(uid);
-        if (obj is {Data: { }})
+        if (obj is { Data: { } })
         {
             var result = obj.GetOriginalData<T>();
 

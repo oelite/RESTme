@@ -32,16 +32,26 @@ namespace OElite
         string Get(string keyOrRelativePath = null, object dataObject = null);
         Task<string> GetAsync(string keyOrRelativePath = null, object dataObject = null);
 
-        T Put<T>(string keyOrRelativePath = null, object dataObject = null);
-        Task<T> PutAsync<T>(string keyOrRelativePath = null, object dataObject = null);
-        string Put(string keyOrRelativePath = null, object dataObject = null);
-        Task<string> PutAsync(string keyOrRelativePath = null, object dataObject = null);
+        T Put<T>(string keyOrRelativePath = null, object dataObject = null, TimeSpan? expiryInMinutes = null);
+
+        Task<T> PutAsync<T>(string keyOrRelativePath = null, object dataObject = null,
+            TimeSpan? expiryInMinutes = null);
+
+        string Put(string keyOrRelativePath = null, object dataObject = null, TimeSpan? expiryInMinutes = null);
+
+        Task<string> PutAsync(string keyOrRelativePath = null, object dataObject = null,
+            TimeSpan? expiryInMinutes = null);
 
 
-        T Post<T>(string keyOrRelativePath = null, object dataObject = null);
-        Task<T> PostAsync<T>(string keyOrRelativePath = null, object dataObject = null);
-        string Post(string keyOrRelativePath = null, string dataValue = null);
-        Task<string> PostAsync(string keyOrRelativePath = null, string dataValue = null);
+        T Post<T>(string keyOrRelativePath = null, object dataObject = null, TimeSpan? expiryInMinutes = null);
+
+        Task<T> PostAsync<T>(string keyOrRelativePath = null, object dataObject = null,
+            TimeSpan? expiryInMinutes = null);
+
+        string Post(string keyOrRelativePath = null, string dataValue = null, TimeSpan? expiryInMinutes = null);
+
+        Task<string> PostAsync(string keyOrRelativePath = null, string dataValue = null,
+            TimeSpan? expiryInMinutes = null);
 
         T Delete<T>(string keyOrRelativePath = null, object dataObject = null);
         Task<T> DeleteAsync<T>(string keyOrRelativePath = null, object dataObject = null);

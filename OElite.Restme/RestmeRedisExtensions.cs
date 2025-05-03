@@ -24,7 +24,8 @@ namespace OElite
             return stringValue.JsonDeserialize<T>(restme.Configuration.UseRestConvertForCollectionSerialization);
         }
 
-        public static async Task<T> RedisPostAsync<T>(this Rest restme, string redisKey, object dataObject)
+        public static async Task<T> RedisPostAsync<T>(this Rest restme, string redisKey, object dataObject,
+            TimeSpan? expiryInMinutes = null)
         {
             MustBeRedisMode(restme);
             if (redisKey.IsNotNullOrEmpty())
@@ -39,7 +40,7 @@ namespace OElite
                         $" RestmeRedis - Empty object identified in Redis Set whilst the object is type of {dataObject.GetType().Name}.  {redisKey}");
                 }
 
-                if (await restme.redisDatabase.StringSetAsync(redisKey, objectInString))
+                if (await restme.redisDatabase.StringSetAsync(redisKey, objectInString, expiryInMinutes))
                     return (T)dataObject;
             }
             else
