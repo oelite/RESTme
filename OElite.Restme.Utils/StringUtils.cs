@@ -78,7 +78,7 @@ namespace OElite
             return GetStringFromStream(stream, Encoding.UTF8);
         }
 
-        public static string GetStringFromStream(Stream stream, Encoding encoding)
+        public static string GetStringFromStream(Stream stream, Encoding? encoding)
         {
             if (encoding == null)
                 encoding = Encoding.UTF8;
@@ -107,7 +107,7 @@ namespace OElite
             return stream;
         }
 
-        public static string GetStringValueOrEmpty(object objectValue, bool trim = true)
+        public static string GetStringValueOrEmpty(object? objectValue, bool trim = true)
         {
             if (objectValue == null) return string.Empty;
             try
@@ -134,7 +134,7 @@ namespace OElite
             return StringContains(values, stringsToAttempt, minimumIncludes);
         }
 
-        public static bool StringContains(string[] strings, IEnumerable<string> stringsToAttempt, int minimumIncludes)
+        public static bool StringContains(string[]? strings, IEnumerable<string> stringsToAttempt, int minimumIncludes)
         {
             var counter = 0;
             if (strings == null || strings.Length <= 0) return false;
@@ -247,8 +247,8 @@ namespace OElite
 
         #endregion
 
-        public static string JsonSerialize(object value,
-            JsonSerializerSettings serializerSettings = null)
+        public static string JsonSerialize(object? value,
+            JsonSerializerSettings? serializerSettings = null)
         {
             if (value == null)
                 return string.Empty;
@@ -275,7 +275,7 @@ namespace OElite
         }
 
         public static T JsonDeserialize<T>(string value,
-            JsonSerializerSettings jsonSerializerSettings = null)
+            JsonSerializerSettings? jsonSerializerSettings = null)
         {
             try
             {
@@ -315,7 +315,7 @@ namespace OElite
         }
 
         public static object JsonDeserialize(Type type, string value,
-            JsonSerializerSettings jsonSerializerSettings = null)
+            JsonSerializerSettings? jsonSerializerSettings = null)
         {
             try
             {
@@ -362,12 +362,12 @@ namespace OElite
         /// <returns>A byte array</returns>
         public static byte[] HEXStringToBytes(string strInput)
         {
-            int numBytes = (strInput.Length / 2);
+            int numBytes = strInput.Length / 2;
             byte[] bytes = new byte[numBytes];
 
             for (int x = 0; x <= numBytes - 1; x++)
             {
-                bytes[x] = System.Convert.ToByte(strInput.Substring(x * 2, 2), 16);
+                bytes[x] = Convert.ToByte(strInput.Substring(x * 2, 2), 16);
             }
 
             return bytes;
@@ -436,7 +436,7 @@ namespace OElite
             }
 
             public static string XPath(Comparison compareBy, string attribute, string attributeValue = "",
-                string node = null)
+                string? node = null)
             {
                 switch (compareBy)
                 {
@@ -460,7 +460,7 @@ namespace OElite
                 }
             }
 
-            private static string XpathFunction(string node, string func, string attr, string name)
+            private static string XpathFunction(string? node, string func, string attr, string name)
             {
                 return string.Format(@"//{0}[{1}(@{2}=""{3}"")]", node ?? AnyNode, func, attr, name);
             }

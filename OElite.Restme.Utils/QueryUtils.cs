@@ -5,7 +5,7 @@ namespace OElite
 {
     public static class QueryUtils
     {
-        public static Dictionary<string, string> IdentifyQueryParams(this string value, bool noQuestionMark = false)
+        public static Dictionary<string, string> IdentifyQueryParams(this string? value, bool noQuestionMark = false)
         {
             Dictionary<string, string> result = new Dictionary<string, string>();
             if (!noQuestionMark)
@@ -30,7 +30,7 @@ namespace OElite
             return result;
         }
 
-        public static string ParseIntoQueryString(this Dictionary<string, string> values,
+        public static string ParseIntoQueryString(this Dictionary<string, string>? values,
             bool includeQuestionMark = true, bool encode = true)
         {
             string result = null;

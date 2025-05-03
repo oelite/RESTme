@@ -23,7 +23,7 @@ namespace OElite
                 des.Key = sKey;
                 des.IV = sKey;
                 byte[] returnValue = null;
-                using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
+                using (MemoryStream ms = new MemoryStream())
                 {
                     using (CryptoStream cs = new CryptoStream(ms, des.CreateDecryptor(), CryptoStreamMode.Write))
                     {
@@ -50,8 +50,8 @@ namespace OElite
             var ivStringBytes = cipherTextBytesWithSaltAndIv.Skip(CryptoHelper.DefaultKeySize / 8)
                 .Take(CryptoHelper.DefaultKeySize / 8).ToArray();
             // Get the actual cipher text bytes by removing the first 64 bytes from the cipherText string.
-            var cipherTextBytes = cipherTextBytesWithSaltAndIv.Skip((CryptoHelper.DefaultKeySize / 8) * 2)
-                .Take(cipherTextBytesWithSaltAndIv.Length - ((CryptoHelper.DefaultKeySize / 8) * 2)).ToArray();
+            var cipherTextBytes = cipherTextBytesWithSaltAndIv.Skip(CryptoHelper.DefaultKeySize / 8 * 2)
+                .Take(cipherTextBytesWithSaltAndIv.Length - CryptoHelper.DefaultKeySize / 8 * 2).ToArray();
 
             using var password =
                 new Rfc2898DeriveBytes(passPhrase, saltStringBytes, CryptoHelper.DefaultDerivationIterations);

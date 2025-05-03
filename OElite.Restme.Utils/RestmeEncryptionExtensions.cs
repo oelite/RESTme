@@ -4,7 +4,7 @@
     {
         public static string MD5(string value)
         {
-            return value.MD5Encrypt();
+            return value.Md5Encrypt();
         }
     }
 }

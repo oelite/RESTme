@@ -15,7 +15,7 @@ namespace OElite
             return result;
         }
 
-        public static DateTime GetDateTimeFromObjectValue(object objectValue)
+        public static DateTime GetDateTimeFromObjectValue(object? objectValue)
         {
             if (objectValue == null) return DateTime.MinValue;
             try

@@ -1,7 +1,5 @@
 using System;
-using System.Dynamic;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -12,8 +10,8 @@ public static class RestmeMessageQueueExtensions
 {
     public static bool Queueme(this Rest rest,
         object message,
-        string queueName = default, string key = default,
-        string exchangeName = default,
+        string? queueName = null, string? key = null,
+        string? exchangeName = default,
         bool isDurable = true,
         bool isExclusive = false,
         bool autoDelete = true, string exchangeType = "direct", bool isMessagePersistent = true)
@@ -41,7 +39,8 @@ public static class RestmeMessageQueueExtensions
             var objBytes = message.JsonSerialize().ToStream().ToBytes();
             if (isMessagePersistent)
             {
-                var props = rest.RabbitMqChannel.CreateBasicProperties();
+                var props = rest.RabbitMqChannel?.CreateBasicProperties();
+                if (props == null) return true;
                 props.DeliveryMode = 2; // persistent
                 rest.RabbitMqChannel.BasicPublish(exchangeName, key,
                     basicProperties: props,
@@ -55,20 +54,18 @@ public static class RestmeMessageQueueExtensions
 
             return true;
         }
-        catch (Exception ex)
+        catch (Exception? ex)
         {
-            rest.LogError(ex?.Message, ex);
+            rest.LogError(ex.Message, ex);
             return false;
         }
-
-        return false;
     }
 
     public static void Dome<T>(this Rest rest,
-        Func<T, Task<bool>> queueTask,
-        Func<Task<bool>> deliverCompleteCondition,
-        string exchangeName = default,
-        string queueName = default, string key = default,
+        Func<T, Task<bool>>? queueTask,
+        Func<Task<bool>>? deliverCompleteCondition,
+        string? exchangeName = null,
+        string? queueName = null, string? key = null,
         ushort prefetchCount = 1,
         bool isDurable = true,
         bool isExclusive = false,
@@ -98,21 +95,21 @@ public static class RestmeMessageQueueExtensions
                 rest.RabbitMqChannel.QueueBind(queueName, exchangeName, key);
 
             var consumer = new EventingBasicConsumer(rest.RabbitMqChannel);
-            consumer.Received += async (chn, args) =>
+            consumer.Received += async (_, args) =>
             {
                 var result = StringUtils.GetStringFromStream(new MemoryStream(args.Body.ToArray()))
                     .JsonDeserialize<T>();
-                if (queueTask == null || (await queueTask(result)))
+                if (queueTask == null || await queueTask(result))
                 {
-                    rest.RabbitMqChannel.BasicAck(args.DeliveryTag, false);
+                    rest.RabbitMqChannel?.BasicAck(args.DeliveryTag, false);
                 }
                 else
                 {
-                    rest.RabbitMqChannel.BasicNack(args.DeliveryTag, false, true);
+                    rest.RabbitMqChannel?.BasicNack(args.DeliveryTag, false, true);
                 }
             };
             // prefetchCount = 1  ---> accept only one unack-ed message at a time
-            rest.RabbitMqChannel.BasicQos(0, prefetchCount, false);
+            rest.RabbitMqChannel?.BasicQos(0, prefetchCount, false);
             rest.RabbitMqChannel.BasicConsume(queueName, false, consumer);
 
             if (deliverCompleteCondition == null) return;
@@ -123,17 +120,17 @@ public static class RestmeMessageQueueExtensions
                 //no nothing, keep the loop await
             }
         }
-        catch (Exception ex)
+        catch (Exception? ex)
         {
-            rest.LogError(ex?.Message, ex);
+            rest.LogError(ex.Message, ex);
         }
     }
 
     public static void Dome<T>(this Rest rest,
-        Func<T, bool> queueTask,
-        Func<bool> deliverCompleteCondition,
-        string exchangeName = default,
-        string queueName = default, string key = default,
+        Func<T, bool>? queueTask,
+        Func<bool>? deliverCompleteCondition,
+        string? exchangeName = null,
+        string? queueName = null, string? key = null,
         ushort prefetchCount = 1,
         bool isDurable = true,
         bool isExclusive = false,
@@ -163,21 +160,21 @@ public static class RestmeMessageQueueExtensions
                 rest.RabbitMqChannel.QueueBind(queueName, exchangeName, key);
 
             var consumer = new EventingBasicConsumer(rest.RabbitMqChannel);
-            consumer.Received += (chn, args) =>
+            consumer.Received += (_, args) =>
             {
                 var result = StringUtils.GetStringFromStream(new MemoryStream(args.Body.ToArray()))
                     .JsonDeserialize<T>();
                 if (queueTask == null || queueTask(result))
                 {
-                    rest.RabbitMqChannel.BasicAck(args.DeliveryTag, false);
+                    rest.RabbitMqChannel?.BasicAck(args.DeliveryTag, false);
                 }
                 else
                 {
-                    rest.RabbitMqChannel.BasicNack(args.DeliveryTag, false, true);
+                    rest.RabbitMqChannel?.BasicNack(args.DeliveryTag, false, true);
                 }
             };
             // prefetchCount = 1  ---> accept only one unack-ed message at a time
-            rest.RabbitMqChannel.BasicQos(0, prefetchCount, false);
+            rest.RabbitMqChannel?.BasicQos(0, prefetchCount, false);
             rest.RabbitMqChannel.BasicConsume(queueName, false, consumer);
 
             if (deliverCompleteCondition == null) return;
@@ -188,9 +185,9 @@ public static class RestmeMessageQueueExtensions
                 //no nothing, keep the loop await
             }
         }
-        catch (Exception ex)
+        catch (Exception? ex)
         {
-            rest.LogError(ex?.Message, ex);
+            rest.LogError(ex.Message, ex);
         }
     }
 }

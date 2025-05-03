@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Xml.XPath;
 
 namespace OElite
 {
@@ -10,7 +9,7 @@ namespace OElite
     {
         private static readonly string[] imageExtensions = {"jpg", "bmp", "gif", "png", "jpeg"}; //  etc
 
-        public static byte[] ReadStreamToEnd(System.IO.Stream stream)
+        public static byte[] ReadStreamToEnd(Stream stream)
         {
             long originalPosition = stream.Position;
             stream.Position = 0;
@@ -55,7 +54,7 @@ namespace OElite
             }
         }
 
-        public static string GetFileExtensionName(string fileName)
+        public static string GetFileExtensionName(string? fileName)
         {
             return Path.GetExtension(fileName);
         }

@@ -13,7 +13,7 @@ namespace OElite.Restme.Utils
         public HttpStatusCode StatusCode { get; set; }
         public DateTime ReceivedOnUtc { get; set; }
 
-        public Exception ErrorMessage { get; set; }
+        public Exception? ErrorMessage { get; set; }
         public string DataInString { get; set; }
     }
 }

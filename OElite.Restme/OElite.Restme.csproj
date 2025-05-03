@@ -3,7 +3,7 @@
         <Description>RESTme (Restme) is a set of useful toolkits, including RESTful HTTP client, Azure Blob Storage
             Client, Redis Client as well as many Convertors &amp; Extensions implemented in .NET Core
         </Description>
-        <TargetFrameworks>net8.0;net7.0;net6.0</TargetFrameworks>
+        <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
         <AssemblyVersion>2.0.5</AssemblyVersion>
         <VersionPrefix>2.0.5</VersionPrefix>
         <AssemblyName>OElite.Restme</AssemblyName>
@@ -18,6 +18,7 @@
         <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
         <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
         <Title>OElite.Restme</Title>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="RabbitMQ.Client" Version="6.2.4" />

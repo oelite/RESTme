@@ -7,7 +7,7 @@ namespace OElite
 {
     public static class NumericUtils
     {
-        public static int GetIntegerValueFromObject(object objectValue)
+        public static int GetIntegerValueFromObject(object? objectValue)
         {
             if (objectValue != null)
             {
@@ -34,7 +34,7 @@ namespace OElite
             else return 0;
         }
 
-        public static long GetLongIntegerValueFromObject(object objectValue)
+        public static long GetLongIntegerValueFromObject(object? objectValue)
         {
             if (objectValue != null)
             {
@@ -53,7 +53,7 @@ namespace OElite
             else return 0;
         }
 
-        public static decimal GetDecimalValueFromObject(object objectValue)
+        public static decimal GetDecimalValueFromObject(object? objectValue)
         {
             if (objectValue != null)
             {
@@ -97,7 +97,7 @@ namespace OElite
             }
         }
 
-        public static int[] GetIntegerArrayFromString(string stringToConvert, string[] splitters)
+        public static int[] GetIntegerArrayFromString(string stringToConvert, string[]? splitters)
         {
             var result = new List<int>();
             if (string.IsNullOrEmpty(stringToConvert) || splitters == null) return result.ToArray();
@@ -108,7 +108,7 @@ namespace OElite
             return result.ToArray();
         }
 
-        public static long[] GetLongIntArrayFromString(string stringToConvert, string[] splitters)
+        public static long[] GetLongIntArrayFromString(string stringToConvert, string[]? splitters)
         {
             var result = new List<long>();
             if (string.IsNullOrEmpty(stringToConvert) || splitters == null) return result.ToArray();
@@ -119,7 +119,7 @@ namespace OElite
             return result.ToArray();
         }
 
-        public static bool ArrayContainsAny(int[] valuesToValidate, IEnumerable<int> valuesToContain, int minimumCounts)
+        public static bool ArrayContainsAny(int[]? valuesToValidate, IEnumerable<int> valuesToContain, int minimumCounts)
         {
             var counter = 0;
             if (valuesToValidate == null || valuesToValidate.Length < minimumCounts) return false;

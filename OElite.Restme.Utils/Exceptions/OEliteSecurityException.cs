@@ -12,8 +12,8 @@ namespace OElite
         public OEliteSecurityException(int errorCode, string errorName) : base("permission denied.", errorCode, errorName) { }
         public OEliteSecurityException(string msg) : base(msg, ERROR_CODE, ERROR_NAME) { }
         public OEliteSecurityException(string msg, int errorCode, string errorName) : base(msg, errorCode, errorName) { }
-        public OEliteSecurityException(string msg, Exception innerException) : base(msg, innerException, ERROR_CODE, ERROR_NAME) { }
-        public OEliteSecurityException(string msg, Exception innerException, int errorCode, string errorName) : base(msg, innerException, errorCode, errorName) { }
+        public OEliteSecurityException(string msg, Exception? innerException) : base(msg, innerException, ERROR_CODE, ERROR_NAME) { }
+        public OEliteSecurityException(string msg, Exception? innerException, int errorCode, string errorName) : base(msg, innerException, errorCode, errorName) { }
 
     }
 }

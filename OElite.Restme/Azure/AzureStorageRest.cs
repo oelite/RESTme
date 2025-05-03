@@ -6,12 +6,12 @@ namespace OElite
 {
     public partial class Rest
     {
-        private CloudStorageAccount azureStorageAccount;
-        private CloudBlobClient azureBlobClient;
+        private CloudStorageAccount? azureStorageAccount;
+        private CloudBlobClient? azureBlobClient;
 
-        public AccessCondition DefaultAzureBlobAccessCondition { get; set; }
-        public BlobRequestOptions DefaultAzureBlobRequestOptions { get; set; }
-        public OperationContext DefaultAzureBlobOperationContext { get; set; }
+        public AccessCondition? DefaultAzureBlobAccessCondition { get; set; }
+        public BlobRequestOptions? DefaultAzureBlobRequestOptions { get; set; }
+        public OperationContext? DefaultAzureBlobOperationContext { get; set; }
 
 
         public bool CreateAzureBlobContainerIfNotExists { get; set; }
@@ -24,10 +24,9 @@ namespace OElite
 
             azureStorageAccount = CloudStorageAccount.Parse(ConnectionString);
             azureBlobClient = azureStorageAccount.CreateCloudBlobClient();
-            Initialized = true;
         }
 
-        internal async Task<CloudBlobContainer> GetAzureBlobContainerAsync(string relativePath)
+        internal async Task<CloudBlobContainer> GetAzureBlobContainerAsync(string? relativePath)
         {
             var containerName = IdentifyBlobContainerName(relativePath);
             var container = azureBlobClient.GetContainerReference(containerName);
@@ -41,7 +40,7 @@ namespace OElite
             return container;
         }
 
-        internal string IdentifyBlobContainerName(string relativePath)
+        internal string IdentifyBlobContainerName(string? relativePath)
         {
             relativePath = relativePath?.Replace('\\', '/')?.Replace("//", "/").Trim('/');
             var indexOfFirstSegmentEnd = relativePath?.IndexOf('/');
@@ -51,7 +50,7 @@ namespace OElite
                 throw new OEliteWebException("Unable to identify azure blob container name.");
         }
 
-        internal string IdentifyBlobItemPath(string relativePath)
+        internal string IdentifyBlobItemPath(string? relativePath)
         {
             return relativePath?.Replace('\\', '/')
                 ?

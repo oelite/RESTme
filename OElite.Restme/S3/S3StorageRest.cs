@@ -16,7 +16,7 @@ namespace OElite
                 //         
                 //     }
                 //     ConnectionString.SplitCamelCase());
-                if (Configuration.RestSSL)
+                if (Configuration.RestSsl)
                 {
                     // S3Client = S3Client.WithSSL();
                 }
@@ -25,8 +25,6 @@ namespace OElite
                 {
                     // S3Client = S3Client.WithTimeout(Configuration.DefaultTimeout);
                 }
-
-                Initialized = true;
             }
             else
             {

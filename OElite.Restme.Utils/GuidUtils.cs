@@ -5,7 +5,7 @@ namespace OElite
 {
     public static class GuidUtils
     {
-        public static Guid GetGuidOrEmpty(object value)
+        public static Guid GetGuidOrEmpty(object? value)
         {
             if (value == null) return Guid.Empty;
             try

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <Description>Restme.Utils (RESTme) is the common library for Restme</Description>
-        <TargetFrameworks>net8.0;net7.0;net6.0</TargetFrameworks>
+        <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
         <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
         <AssemblyVersion>2.0.5</AssemblyVersion>
         <VersionPrefix>2.0.5</VersionPrefix>
@@ -11,6 +11,7 @@
         <Authors>OElite Limited</Authors>
         <Copyright>OElite Limited</Copyright>
         <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="HtmlAgilityPack.NetCore" Version="1.5.0.1" />

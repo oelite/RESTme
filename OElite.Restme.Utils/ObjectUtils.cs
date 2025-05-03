@@ -1,11 +1,6 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Threading;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 namespace OElite
@@ -100,7 +95,7 @@ namespace OElite
             return propInfo == null ? null : propInfo.GetValue(obj, null);
         }
 
-        public static object GetPropertyValueEnhanced(this object obj, string propName)
+        public static object GetPropertyValueEnhanced(this object? obj, string propName)
         {
             if (propName.IsNullOrEmpty() || obj == null)
                 return null;

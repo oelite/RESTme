@@ -5,7 +5,7 @@ namespace OElite
 {
     public class BooleanUtils
     {
-        public static bool GetBooleanValueFromObject(object objectValue, bool boolReturnedIfFailed = false)
+        public static bool GetBooleanValueFromObject(object? objectValue, bool boolReturnedIfFailed = false)
         {
             if (objectValue != null)
             {

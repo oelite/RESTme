@@ -9,18 +9,18 @@ namespace OElite
 {
     public partial class Rest
     {
-        internal ConnectionMultiplexer redisConnection;
-        internal IDatabase redisDatabase;
+        internal ConnectionMultiplexer? RedisConnection;
+        internal IDatabase? RedisDatabase;
 
         private void PrepareRedisRestme()
         {
             try
             {
-                redisConnection = new Lazy<ConnectionMultiplexer>(() =>
+                RedisConnection = new Lazy<ConnectionMultiplexer?>(() =>
                 {
-                    ConnectionMultiplexer result = null;
+                    ConnectionMultiplexer? result = null;
                     var redisConfig =
-                        ConfigurationOptions.Parse(this.ConnectionString);
+                        ConfigurationOptions.Parse(ConnectionString);
                     if (Configuration.DefaultTimeout > 0)
                     {
                         redisConfig.ConnectTimeout = Configuration.DefaultTimeout;
@@ -28,13 +28,13 @@ namespace OElite
                         redisConfig.SyncTimeout = Configuration.DefaultTimeout;
                     }
 
-                    var success = false;
+                    bool success;
                     try
                     {
                         result = ConnectionMultiplexer.Connect(redisConfig);
                         success = result.IsConnected;
                     }
-                    catch (Exception ex)
+                    catch (Exception? ex)
                     {
                         LogError(ex.Message, ex);
                         success = false;
@@ -43,22 +43,25 @@ namespace OElite
                     if (!success)
                     {
                         var endPoints = redisConfig.EndPoints;
-                        foreach (DnsEndPoint endpoint in endPoints)
+                        foreach (var endpoint in endPoints.Cast<DnsEndPoint?>())
                         {
                             try
                             {
-                                var port = endpoint.Port;
-                                if (!IsIpAddress(endpoint.Host))
+                                if (endpoint != null)
                                 {
-                                    IPHostEntry ip = Dns.GetHostEntryAsync(endpoint.Host)
-                                        .WaitAndGetResult(Configuration.DefaultTimeout);
-                                    redisConfig.EndPoints.Remove(endpoint);
-                                    redisConfig.EndPoints.Add(ip.AddressList.First(), port);
+                                    var port = endpoint.Port;
+                                    if (!IsIpAddress(endpoint.Host))
+                                    {
+                                        var ip = Dns.GetHostEntryAsync(endpoint.Host)!
+                                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                                        redisConfig.EndPoints.Remove(endpoint);
+                                        redisConfig.EndPoints.Add(ip?.AddressList.First(), port);
+                                    }
                                 }
 
                                 result = ConnectionMultiplexer.Connect(redisConfig);
                             }
-                            catch (Exception innerEx)
+                            catch (Exception? innerEx)
                             {
                                 LogError(innerEx.Message, innerEx);
                                 continue;
@@ -71,16 +74,17 @@ namespace OElite
 
                     return result;
                 }).Value;
-                redisDatabase = redisConnection?.GetDatabase();
+                RedisDatabase = RedisConnection?.GetDatabase();
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 LogError(ex.Message, ex);
                 throw new OEliteDbException("failed to initialize Redis connection:\n" + ex.Message, ex);
             }
 
-            if (redisConnection?.IsConnected == true)
-                Initialized = true;
+            if (RedisConnection?.IsConnected == true)
+            {
+            }
         }
 
         bool IsIpAddress(string host)
@@ -93,15 +97,14 @@ namespace OElite
         {
             return Task.Run(() =>
             {
-                if (redisConnection != null)
+                if (RedisConnection == null) return;
+                try
                 {
-                    try
-                    {
-                        redisConnection.Dispose();
-                    }
-                    catch
-                    {
-                    }
+                    RedisConnection.Dispose();
+                }
+                catch
+                {
+                    // ignored
                 }
             });
         }

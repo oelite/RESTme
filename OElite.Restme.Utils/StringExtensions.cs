@@ -45,24 +45,24 @@ namespace OElite
             throw new FormatException("The specified segment does not contain any valid parameters.");
         }
 
-        public static bool IsASCII(this string s)
+        public static bool IsAscii(this string s)
         {
             return s.All(c => c < 127);
         }
 
-        public static bool IsNullOrEmpty(this string segment)
+        public static bool IsNullOrEmpty(this string? segment)
         {
             return string.IsNullOrEmpty(segment);
         }
 
-        public static bool IsNotNullOrEmpty(this string segment)
+        public static bool IsNotNullOrEmpty(this string? segment)
         {
             return !string.IsNullOrEmpty(segment);
         }
 
-        public static string MD5Encrypt(this string value)
+        public static string Md5Encrypt(this string value)
         {
-            return EncryptHelper.MD5Encrypt(value);
+            return EncryptHelper.Md5Encrypt(value);
         }
 
         /// <summary>
@@ -132,7 +132,7 @@ namespace OElite
         public static T JsonDeserialize<T>(this string value, bool attemptResponseMessageConvertIfListType = true,
             JsonSerializerSettings serializerSettings = null)
         {
-            if (!(typeof(IEnumerable).IsAssignableFrom(typeof(T))) || !attemptResponseMessageConvertIfListType)
+            if (!typeof(IEnumerable).IsAssignableFrom(typeof(T)) || !attemptResponseMessageConvertIfListType)
                 return StringUtils.JsonDeserialize<T>(value, serializerSettings);
 
             if (value?.ToLower()?.Contains("AssociatedTotalCountPropertyName".ToLower()) != true)
@@ -147,7 +147,7 @@ namespace OElite
             bool attemptResponseMessageConvertIfListType = true,
             JsonSerializerSettings serializerSettings = null)
         {
-            if (!(typeof(IEnumerable).IsAssignableFrom(type)) || !attemptResponseMessageConvertIfListType)
+            if (!typeof(IEnumerable).IsAssignableFrom(type) || !attemptResponseMessageConvertIfListType)
                 return StringUtils.JsonDeserialize(type, value, serializerSettings);
 
             if (value?.ToLower()?.Contains("AssociatedTotalCountPropertyName".ToLower()) != true)

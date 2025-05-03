@@ -74,7 +74,7 @@ namespace OElite.Data
             "s3-fips.dualstack.us-gov-west-1.amazonaws.com"
         };
 
-        public static List<string> AddAmazonEndpoints(this List<string> list)
+        public static List<string> AddAmazonEndpoints(this List<string>? list)
         {
             if (!(list?.Count >= 0))
             {

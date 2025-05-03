@@ -8,20 +8,19 @@ namespace OElite
     {
         private void PrepareHttpRestme()
         {
-            Initialized = true;
         }
 
-        public HttpResponseMessage<T> HttpRequestFull<T>(HttpMethod method, string keyOrRelativePath = null,
-            object dataObject = null)
+        public HttpResponseMessage<T?>? HttpRequestFull<T>(HttpMethod method, string? keyOrRelativePath = null,
+            object? dataObject = null)
         {
-            _objAsParam = dataObject;
+            ObjAsParam = dataObject;
             return RestmeHttpExtensions.HttpRequestFull<T>(this, method, keyOrRelativePath);
         }
 
-        public Task<HttpResponseMessage<T>> HttpRequestFullAsync<T>(HttpMethod method, string keyOrRelativePath = null,
-            object dataObject = null)
+        public Task<HttpResponseMessage<T?>?> HttpRequestFullAsync<T>(HttpMethod method, string? keyOrRelativePath = null,
+            object? dataObject = null)
         {
-            _objAsParam = dataObject;
+            ObjAsParam = dataObject;
             return RestmeHttpExtensions.HttpRequestFullAsync<T>(this, method, keyOrRelativePath);
         }
     }

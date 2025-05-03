@@ -5,9 +5,9 @@ namespace OElite
 {
     public partial class Rest
     {
-        private ILogger Logger { get; set; }
+        private ILogger? Logger { get; set; }
 
-        public void LogError(string errorMessage, Exception ex = null, int eventId = 0)
+        public void LogError(string? errorMessage, Exception? ex = null, int eventId = 0)
         {
             try
             {
@@ -15,10 +15,11 @@ namespace OElite
             }
             catch
             {
+                // ignored
             }
         }
 
-        public void LogWarning(string errorMessage, Exception ex = null, int eventId = 0)
+        public void LogWarning(string? errorMessage, Exception? ex = null, int eventId = 0)
         {
             try
             {
@@ -26,10 +27,11 @@ namespace OElite
             }
             catch
             {
+                // ignored
             }
         }
 
-        public void LogInfo(string info, Exception ex = null, int eventId = 0)
+        public void LogInfo(string? info, Exception? ex = null, int eventId = 0)
         {
             try
             {
@@ -37,10 +39,11 @@ namespace OElite
             }
             catch
             {
+                // ignored
             }
         }
 
-        public void LogDebug(string debugInfo, Exception ex = null, int eventId = 0)
+        public void LogDebug(string? debugInfo, Exception? ex = null, int eventId = 0)
         {
             try
             {
@@ -48,10 +51,11 @@ namespace OElite
             }
             catch
             {
+                // ignored
             }
         }
 
-        public void LogFatal(string fatalInfo, Exception ex = null, int eventId = 0)
+        public void LogFatal(string? fatalInfo, Exception? ex = null, int eventId = 0)
         {
             try
             {
@@ -59,6 +63,7 @@ namespace OElite
             }
             catch
             {
+                // ignored
             }
         }
     }

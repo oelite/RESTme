@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Diagnostics;
 
 namespace OElite
 {
@@ -13,28 +12,27 @@ namespace OElite
         {
             restme.CurrentMode = restme.Configuration.OperationMode;
 
-            if (restme.ConnectionString.IsNotNullOrEmpty())
+            if (!restme.ConnectionString.IsNotNullOrEmpty()) return;
+            Debug.Assert(restme.ConnectionString != null, "restme.ConnectionString != null");
+            var connectionString = restme.ConnectionString.ToLower();
+            if ((connectionString.Contains("defaultendpointsprotocol") &&
+                 connectionString.Contains("accountname") &&
+                 connectionString.Contains("accountkey")) ||
+                (connectionString.Contains("usedevelopmentstorage") &&
+                 connectionString.Contains("true")
+                ))
             {
-                var connectionString = restme.ConnectionString.ToLower();
-                if ((connectionString.Contains("defaultendpointsprotocol") &&
-                     connectionString.Contains("accountname") &&
-                     connectionString.Contains("accountkey")) ||
-                    (connectionString.Contains("usedevelopmentstorage") &&
-                     connectionString.Contains("true")
-                    ))
-                {
-                    restme.CurrentMode = RestMode.AzureStorageClient;
-                }
-                else if (restme.ConnectionString.ToLower().Contains("redis.cache.windows.net") ||
-                         restme.ConnectionString.ToLower().Contains(":6379") ||
-                         restme.ConnectionString.ToLower().Contains(":6380"))
-                {
-                    restme.CurrentMode = RestMode.RedisCacheClient;
-                }
-                else if (connectionString.IsS3Provider())
-                {
-                    restme.CurrentMode = RestMode.S3Client;
-                }
+                restme.CurrentMode = RestMode.AzureStorageClient;
+            }
+            else if (restme.ConnectionString.ToLower().Contains("redis.cache.windows.net") ||
+                     restme.ConnectionString.ToLower().Contains(":6379") ||
+                     restme.ConnectionString.ToLower().Contains(":6380"))
+            {
+                restme.CurrentMode = RestMode.RedisCacheClient;
+            }
+            else if (connectionString.IsS3Provider())
+            {
+                restme.CurrentMode = RestMode.S3Client;
             }
         }
     }

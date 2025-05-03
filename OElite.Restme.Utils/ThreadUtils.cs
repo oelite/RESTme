@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.Tracing;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,116 +16,95 @@ namespace OElite
             Task.Run(action).RunInBackgroundAndForget();
         }
 
-        public static T WaitAndGetResult<T>(this Task<T> task, int timeoutMiliseconds = -1,
+        public static T? WaitAndGetResult<T>(this Task<T?>? task, int timeoutMilliseconds = -1,
             CancellationToken token = default)
         {
-            if (task == null) return default(T);
+            if (task == null) return default;
 
 
-            if (timeoutMiliseconds > 0)
+            if (timeoutMilliseconds > 0)
             {
                 return Task.Run(async () =>
                 {
                     using var timeoutCancellationTokenSource = new CancellationTokenSource();
                     var completedTask = await Task
                         .WhenAny(task,
-                            Task.Delay(timeoutMiliseconds,
-                                token == default ? timeoutCancellationTokenSource.Token : token));
-                    if (completedTask == task)
-                    {
-                        timeoutCancellationTokenSource.Cancel();
-                        return await task;
-                    }
-
-                    return task.Result;
-                }).Result;
+                            Task.Delay(timeoutMilliseconds,
+                                token == CancellationToken.None ? timeoutCancellationTokenSource.Token : token));
+                    if (completedTask != task) return task.Result;
+                    // ReSharper disable once MethodHasAsyncOverload
+                    timeoutCancellationTokenSource.Cancel();
+                    return await task;
+                }, token).Result;
             }
 
-            task.Wait();
+            task.Wait(token);
 
             return task.Result;
         }
 
-        public static void WaitTillAvailableToProcess<TA>(this SimpleRestmeQueue<TA> queue, TA newObject)
+        public static void WaitTillAvailableToProcess<TA>(this SimpleRestmeQueue<TA>? queue, TA newObject)
         {
-            if (queue != null)
+            if (queue == null) return;
+
+            #region This code can be better improved using message queue mechanism
+
+            if (queue.ExecutionWaitRequired)
             {
-                #region This code can be better improved using message queue mechanism
-
-                if (queue.ExecutionWaitRequired)
+                while (queue.ExecutionWaitRequired)
                 {
-                    while (queue.ExecutionWaitRequired)
+                    lock (queue)
                     {
-                        lock (queue)
+                        if (queue.ExecutionWaitRequired)
+                            Thread.Sleep(1);
+                        else
                         {
-                            if (queue.QueueItems == null)
-                            {
-                                queue.QueueItems = new List<TA>();
-                            }
-
-                            if (queue.ExecutionWaitRequired)
-                                Thread.Sleep(1);
-                            else
-                            {
-                                queue.QueueItems.Add(newObject);
-                                break;
-                            }
-
-                            if (queue.ExecutionWaitRequired)
-                                Thread.Sleep(100);
+                            queue.QueueItems.Add(newObject);
+                            break;
                         }
+
+                        if (queue.ExecutionWaitRequired)
+                            Thread.Sleep(100);
                     }
                 }
-                else
-                {
-                    if (queue.QueueItems == null)
-                    {
-                        queue.QueueItems = new List<TA>();
-                    }
-
-                    queue.QueueItems.Add(newObject);
-                }
-
-                #endregion
             }
+            else
+            {
+                queue.QueueItems.Add(newObject);
+            }
+
+            #endregion
         }
 
-        public static void ClearProcessingObject<TA>(this SimpleRestmeQueue<TA> queue,
-            TA singleObjectToRemove = default,
+        public static void ClearProcessingObject<TA>(this SimpleRestmeQueue<TA?>? queue,
+            TA? singleObjectToRemove = default,
             bool throwExceptionIfObjectNotFound = true, bool updateWaitRequired = true)
         {
-            if (queue != null)
+            if (queue == null) return;
+            lock (queue)
             {
-                lock (queue)
+                if (singleObjectToRemove != null)
                 {
-                    if (singleObjectToRemove != null)
+                    var indexOfObject = queue.QueueItems.IndexOf(singleObjectToRemove);
+                    if (indexOfObject >= 0)
                     {
-                        if (queue.QueueItems == null)
-                        {
-                            queue.QueueItems = new List<TA>();
-                        }
-
-                        var indexOfObject = queue.QueueItems.IndexOf(singleObjectToRemove);
-                        if (indexOfObject >= 0)
-                        {
-                            queue.QueueItems.Remove(singleObjectToRemove);
-                            if (updateWaitRequired)
-                            {
-                                queue.ExecutionWaitRequired = false;
-                            }
-                        }
-                        else if (throwExceptionIfObjectNotFound)
-                        {
-                            throw new OEliteException("Object to remove is no longer in the processing queue");
-                        }
-                    }
-                    else
-                    {
-                        queue.QueueItems.Clear();
+                        queue.QueueItems.Remove(singleObjectToRemove);
                         if (updateWaitRequired)
                         {
                             queue.ExecutionWaitRequired = false;
                         }
+                    }
+                    else if (throwExceptionIfObjectNotFound)
+                    {
+                        throw new OEliteException("Object to remove is no longer in the processing queue");
+                    }
+                }
+                else
+                {
+                    queue.QueueItems.Clear();
+                    if (updateWaitRequired)
+                    {
+                        queue.ExecutionWaitRequired = false;
                     }
                 }
             }

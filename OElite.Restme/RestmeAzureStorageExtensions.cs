@@ -7,7 +7,7 @@ namespace OElite
 {
     public static class RestmeAzureStorageExtensions
     {
-        public static async Task<T> AzureStorageGetAsync<T>(this Rest restme, string storageRelativePath)
+        public static async Task<T?> AzureStorageGetAsync<T>(this Rest restme, string? storageRelativePath)
         {
             MustBeStorageMode(restme);
             var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
@@ -15,46 +15,45 @@ namespace OElite
             if (blobItemPath.IsNullOrEmpty())
                 throw new OEliteWebException("Invalid blob item name.");
             var blockBlob = container.GetBlockBlobReference(blobItemPath);
-            using (var stream = new MemoryStream())
+            using var stream = new MemoryStream();
+            try
             {
-                try
-                {
-                    if (!await blockBlob.ExistsAsync()) return default(T);
+                if (!await blockBlob.ExistsAsync()) return default;
 
-                    if (typeof(Stream).IsAssignableFrom(typeof(T)))
+                if (typeof(Stream).IsAssignableFrom(typeof(T)))
+                {
+                    await blockBlob.DownloadToStreamAsync(stream);
+                    var bytes = FileUtils.ReadStreamToEnd(stream);
+                    T? result;
+                    if (typeof(T).GetTypeInfo().IsAbstract)
                     {
-                        await blockBlob.DownloadToStreamAsync(stream);
-                        var bytes = FileUtils.ReadStreamToEnd(stream);
-                        T result;
-                        if (typeof(T).GetTypeInfo().IsAbstract)
-                        {
-                            result = (T) Activator.CreateInstance(typeof(MemoryStream), bytes);
-                        }
-                        else
-                            result = (T) Activator.CreateInstance(typeof(T), bytes);
-
-                        return result;
+                        result = (T)Activator.CreateInstance(typeof(MemoryStream), bytes)!;
                     }
+                    else
+                        result = (T)Activator.CreateInstance(typeof(T), bytes)!;
 
-
-                    var jsonStringValue = await blockBlob.DownloadTextAsync();
-                    if (!jsonStringValue.IsNotNullOrEmpty()) return default(T);
-
-                    if (typeof(T) == typeof(string))
-                        return (T) Convert.ChangeType(jsonStringValue, typeof(T));
-
-                    return jsonStringValue.JsonDeserialize<T>();
+                    return result;
                 }
-                catch (Exception ex)
-                {
-                    restme.LogDebug(
-                        $"Unable to fetch requested blob: {storageRelativePath}\n {ex.Message} \n {ex.StackTrace}", ex);
-                    return default(T);
-                }
+
+
+                var jsonStringValue = await blockBlob.DownloadTextAsync();
+                if (!jsonStringValue.IsNotNullOrEmpty()) return default(T);
+
+                if (typeof(T) == typeof(string))
+                    return (T)Convert.ChangeType(jsonStringValue, typeof(T));
+
+                return jsonStringValue.JsonDeserialize<T>();
+            }
+            catch (Exception? ex)
+            {
+                restme.LogDebug(
+                    $"Unable to fetch requested blob: {storageRelativePath}\n {ex.Message} \n {ex.StackTrace}", ex);
+                return default(T);
             }
         }
 
-        public static async Task<T> AzureStoragePostAsync<T>(this Rest restme, string storageRelativePath, object dataObject)
+        public static async Task<T?> AzureStoragePostAsync<T>(this Rest restme, string? storageRelativePath,
+            object? dataObject)
         {
             MustBeStorageMode(restme);
             if (dataObject == null)
@@ -66,42 +65,38 @@ namespace OElite
             if (blobItemPath.IsNullOrEmpty())
                 throw new OEliteWebException("Invalid blob item name.");
             var blockBlob = container.GetBlockBlobReference(blobItemPath);
-            Stream stream = null;
-            using (stream = new MemoryStream())
+            try
             {
-                try
+                var extension = FileUtils.GetFileExtensionName(storageRelativePath);
+                if (extension.IsNotNullOrEmpty())
+                    blockBlob.Properties.ContentType = FileUtils.GetMimeType(extension);
+                if (typeof(Stream).IsAssignableFrom(typeof(T)))
                 {
-                    var extension = FileUtils.GetFileExtensionName(storageRelativePath);
-                    if (extension.IsNotNullOrEmpty())
-                        blockBlob.Properties.ContentType = FileUtils.GetMimeType(extension);
-                    if (typeof(Stream).IsAssignableFrom(typeof(T)))
-                    {
-                        stream = dataObject as Stream;
-                        stream.Position = 0;
-                        await blockBlob.UploadFromStreamAsync(stream);
-                    }
-                    else
-                    {
-                        var jsonValue =
-                            dataObject.JsonSerialize(restme.Configuration.UseRestConvertForCollectionSerialization,
-                                restme.Configuration.SerializerSettings);
-                        await
-                            blockBlob.UploadTextAsync(jsonValue, restme.Configuration.DefaultEncoding,
-                                restme.DefaultAzureBlobAccessCondition, restme.DefaultAzureBlobRequestOptions,
-                                restme.DefaultAzureBlobOperationContext);
-                    }
+                    if (dataObject is not Stream stream) return (T)dataObject;
+                    stream.Position = 0;
+                    await blockBlob.UploadFromStreamAsync(stream);
+                }
+                else
+                {
+                    var jsonValue =
+                        dataObject.JsonSerialize(restme.Configuration.UseRestConvertForCollectionSerialization,
+                            restme.Configuration.SerializerSettings);
+                    await
+                        blockBlob.UploadTextAsync(jsonValue, restme.Configuration.DefaultEncoding,
+                            restme.DefaultAzureBlobAccessCondition, restme.DefaultAzureBlobRequestOptions,
+                            restme.DefaultAzureBlobOperationContext);
+                }
 
-                    return (T) dataObject;
-                }
-                catch (Exception ex)
-                {
-                    restme.LogDebug("Unable to upload requested data:\n" + ex.Message, ex);
-                    return default(T);
-                }
+                return (T)dataObject;
+            }
+            catch (Exception? ex)
+            {
+                restme.LogDebug("Unable to upload requested data:\n" + ex.Message, ex);
+                return default(T);
             }
         }
 
-        public static async Task<T> AzureStorageDeleteAsync<T>(this Rest restme, string storageRelativePath)
+        public static async Task<T?> AzureStorageDeleteAsync<T>(this Rest restme, string? storageRelativePath)
         {
             MustBeStorageMode(restme);
             var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
@@ -113,21 +108,21 @@ namespace OElite
             {
                 await blockBlob.DeleteIfExistsAsync();
                 if (typeof(T) == typeof(bool))
-                    return (T) Convert.ChangeType(true, typeof(T));
+                    return (T)Convert.ChangeType(true, typeof(T));
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 restme.LogDebug("Unable to delete requested data:\n" + ex.Message, ex);
             }
 
-            return default(T);
+            return default;
         }
 
         #region Private Methods
 
         private static void MustBeStorageMode(Rest restme)
         {
-            if (restme?.CurrentMode != RestMode.AzureStorageClient)
+            if (restme.CurrentMode != RestMode.AzureStorageClient)
                 throw new InvalidOperationException(
                     $"current request is not valid operation, you are under RestMode: {restme.CurrentMode.ToString()}");
         }

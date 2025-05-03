@@ -32,7 +32,7 @@ namespace OElite
                 : associatedTotalCountPropertyName;
         }
 
-        public ResponseMessage(object data, string message = "", bool success = true,
+        public ResponseMessage(object? data, string message = "", bool success = true,
             string associatedTotalCountPropertyName = "TotalRecordsCount")
         {
             if (data == null)
@@ -67,12 +67,12 @@ namespace OElite
 
     public static class ResponseMessageExtensions
     {
-        public static T GetOriginalData<T>(this ResponseMessage msg)
+        public static T GetOriginalData<T>(this ResponseMessage? msg)
         {
             if (msg == null) return default(T);
             T result = default(T);
             if ((msg.Data is string && typeof(T) != typeof(string)) ||
-                (msg.Data is Newtonsoft.Json.Linq.JObject) ||
+                msg.Data is Newtonsoft.Json.Linq.JObject ||
                 (msg.Data is Newtonsoft.Json.Linq.JArray && typeof(T) != typeof(Newtonsoft.Json.Linq.JArray)))
             {
                 result = msg.Data.ToString().JsonDeserialize<T>(false);
@@ -88,12 +88,12 @@ namespace OElite
             return result;
         }
 
-        public static object GetOriginalData(this ResponseMessage msg, Type type)
+        public static object GetOriginalData(this ResponseMessage? msg, Type type)
         {
             object result = default;
             if (msg == null) return result;
             if ((msg.Data is string && type != typeof(string)) ||
-                (msg.Data is Newtonsoft.Json.Linq.JObject) ||
+                msg.Data is Newtonsoft.Json.Linq.JObject ||
                 (msg.Data is Newtonsoft.Json.Linq.JArray && type != typeof(Newtonsoft.Json.Linq.JArray)))
             {
                 result = msg.Data.ToString().JsonDeserialize(type, false);

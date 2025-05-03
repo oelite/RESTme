@@ -1,6 +1,4 @@
-﻿using System.Security.Cryptography;
-
-namespace OElite
+﻿namespace OElite
 {
     public enum CryptFormat
     {

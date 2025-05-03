@@ -40,7 +40,7 @@ namespace OElite
             //if (createlog)
             //    logger.Error(innerException, msg);
         }
-        public OEliteException(string msg, Exception innerException, int errorCode, string errorName, bool createlog = false) : base(msg, innerException)
+        public OEliteException(string msg, Exception? innerException, int errorCode, string errorName, bool createlog = false) : base(msg, innerException)
         {
             OEliteErrorCode = errorCode; OEliteErrorName = errorName;
             //if (createlog)

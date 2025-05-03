@@ -7,14 +7,14 @@ namespace OElite
 {
     public class OEliteRestfulHttpContent : ByteArrayContent
     {
-        public OEliteRestfulHttpContent(IEnumerable<KeyValuePair<string, string>> nameValueCollection)
+        public OEliteRestfulHttpContent(IEnumerable<KeyValuePair<string, string>>? nameValueCollection)
             : base(GetContentByteArray(nameValueCollection))
         {
             Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
         }
 
-        private static byte[] GetContentByteArray(IEnumerable<KeyValuePair<string, string>> nameValueCollection,
-            Encoding encoding = null)
+        private static byte[] GetContentByteArray(IEnumerable<KeyValuePair<string, string>>? nameValueCollection,
+            Encoding? encoding = null)
         {
             if (nameValueCollection == null)
             {

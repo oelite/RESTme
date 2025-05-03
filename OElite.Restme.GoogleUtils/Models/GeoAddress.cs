@@ -6,72 +6,72 @@ namespace OElite.Restme.GoogleUtils.Models
     public class GeoAddress
     {
         [JsonProperty(PropertyName = "address_components")]
-        public GeoAddressComponent[] AddressComponents { get; set; }
+        public GeoAddressComponent[]? AddressComponents { get; set; }
 
         [JsonProperty(PropertyName = "formatted_address")]
-        public string FormattedAddress { get; set; }
+        public string? FormattedAddress { get; set; }
 
 
         /// <summary>
         /// In UK it is county (such as Lancashire), in US it is the next level under State
         /// </summary>
-        public GeoAddressComponent CountyProvince => AddressComponents?.FirstOrDefault(item =>
+        public GeoAddressComponent? CountyProvince => AddressComponents?.FirstOrDefault(item =>
             item.Types?.Contains(GeoTypes.AdministrativeAreaLevel2) == true);
 
-        public string CountyProvinceName => CountyProvince?.ShortName;
-        public string CountyProvinceFullName => CountyProvince?.LongName;
+        public string? CountyProvinceName => CountyProvince?.ShortName;
+        public string? CountyProvinceFullName => CountyProvince?.LongName;
 
         /// <summary>
         /// In UK it is region (such as England, Scotland etc), in US it is the State
         /// </summary>
-        public GeoAddressComponent RegionState => AddressComponents?.FirstOrDefault(item =>
+        public GeoAddressComponent? RegionState => AddressComponents?.FirstOrDefault(item =>
             item.Types?.Contains(GeoTypes.AdministrativeAreaLevel1) == true);
 
-        public string RegionStateName => RegionState?.ShortName;
-        public string RegionStateFullName => RegionState?.LongName;
+        public string? RegionStateName => RegionState?.ShortName;
+        public string? RegionStateFullName => RegionState?.LongName;
 
         /// <summary>
         /// District
         /// </summary>
-        public GeoAddressComponent District => AddressComponents?.FirstOrDefault(item =>
+        public GeoAddressComponent? District => AddressComponents?.FirstOrDefault(item =>
             item.Types?.Contains(GeoTypes.AdministrativeAreaLevel3) == true);
 
-        public string DistrictName => District?.ShortName;
-        public string DistrictFullName => District?.LongName;
+        public string? DistrictName => District?.ShortName;
+        public string? DistrictFullName => District?.LongName;
 
 
-        public GeoAddressComponent Country => AddressComponents?.FirstOrDefault(item =>
-            item.Types?.Contains(GeoTypes.Country) == true);
+        public GeoAddressComponent? Country => AddressComponents?.FirstOrDefault(item =>
+            item.Types.Contains(GeoTypes.Country) == true);
 
-        public string CountryName => Country?.ShortName;
-        public string CountryFullName => Country?.LongName;
+        public string? CountryName => Country?.ShortName;
+        public string? CountryFullName => Country?.LongName;
 
 
-        public GeoAddressComponent TownCity =>
-            AddressComponents?.FirstOrDefault(item => item.Types?.Contains(GeoTypes.PostalTown) == true)
-            ?? AddressComponents?.FirstOrDefault(item => item.Types?.Contains(GeoTypes.Locality) == true);
+        public GeoAddressComponent? TownCity =>
+            AddressComponents?.FirstOrDefault(item => item.Types.Contains(GeoTypes.PostalTown))
+            ?? AddressComponents?.FirstOrDefault(item => item.Types.Contains(GeoTypes.Locality));
 
-        public string TownCityName => TownCity?.ShortName;
-        public string TownCityFullName => TownCity?.LongName;
+        public string? TownCityName => TownCity?.ShortName;
+        public string? TownCityFullName => TownCity?.LongName;
 
-        public GeoAddressComponent StreetRoad =>
-            AddressComponents?.FirstOrDefault(item => item.Types?.Contains(GeoTypes.StreetAddress) == true)
-            ?? AddressComponents?.FirstOrDefault(item => item.Types?.Contains(GeoTypes.Route) == true);
+        public GeoAddressComponent? StreetRoad =>
+            AddressComponents?.FirstOrDefault(item => item.Types.Contains(GeoTypes.StreetAddress))
+            ?? AddressComponents?.FirstOrDefault(item => item.Types.Contains(GeoTypes.Route));
 
-        public string StreetRoadName => StreetRoad?.ShortName;
-        public string StreetRoadFullName => StreetRoad?.LongName;
+        public string? StreetRoadName => StreetRoad?.ShortName;
+        public string? StreetRoadFullName => StreetRoad?.LongName;
     }
 
 
     public class GeoAddressComponent
     {
         [JsonProperty(PropertyName = "long_name")]
-        public string LongName { get; set; }
+        public string? LongName { get; set; }
 
         [JsonProperty(PropertyName = "short_name")]
-        public string ShortName { get; set; }
+        public string? ShortName { get; set; }
 
-        [JsonProperty(PropertyName = "types")] public string[] Types { get; set; }
+        [JsonProperty(PropertyName = "types")] public string[]? Types { get; set; }
     }
 
 

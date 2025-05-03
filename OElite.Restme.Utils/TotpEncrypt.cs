@@ -1,6 +1,5 @@
 using System;
 using System.Security.Cryptography;
-using System.Web;
 
 namespace OElite.Restme.Utils
 {
