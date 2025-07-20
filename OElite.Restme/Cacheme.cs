@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
@@ -41,11 +42,15 @@ public static class RestmeCacheExtensions
 
     public static async Task<ResponseMessage?> CachemeAsync(this Rest? rest, string? uid, object data,
         int expiryInSeconds = -1,
-        int graceInSeconds = -1, [CallerMemberName] string callerName = "")
+        int graceInSeconds = -1)
     {
         if (rest?.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
-        if (!uid.IsNotNullOrEmpty()) return null;
+        if (!uid.IsNotNullOrEmpty())
+        {
+            rest?.LogInfo($"[CACHE-Cacheme]: Invalid uid provided");
+            return null;
+        }
 
         var expiry = expiryInSeconds > 0
             ? DateTime.UtcNow.AddSeconds(expiryInSeconds)
@@ -55,6 +60,8 @@ public static class RestmeCacheExtensions
 
         try
         {
+            rest.LogInfo(
+                $"[CACHE-Cacheme]: Caching data for [{(data.GetType().IsClass ? data.GetType().Name : data.ToString())}] {uid}");
             var responseMessage = new ResponseMessage(data)
             {
                 ExpiryOnUtc = expiry,
@@ -63,11 +70,17 @@ public static class RestmeCacheExtensions
             var result = await rest.PostAsync<ResponseMessage>(uid, responseMessage,
                 graceInMinutes > 0 ? TimeSpan.FromMinutes(graceInMinutes) : null);
 
+            rest.LogInfo(result != null
+                ? $"[CACHE-Cacheme]: Successfully cached data for  [{(data.GetType().IsClass ? data.GetType().Name : data.ToString())}] {uid}"
+                : $"[CACHE-Cacheme]: Failed to cache data for [{(data.GetType().IsClass ? data.GetType().Name : data.ToString())}] {uid}");
+
             return result;
         }
         catch (Exception? ex)
         {
-            rest.LogError(ex.Message, ex);
+            rest.LogError(
+                $"[CACHE-Cacheme]: Error caching data for [{(data.GetType().IsClass ? data.GetType().Name : data.ToString())}] {uid}: {ex.Message}",
+                ex);
             return null;
         }
     }
@@ -75,67 +88,92 @@ public static class RestmeCacheExtensions
     public static async Task<T?> FindmeAsync<T>(this Rest? rest, string? uid, bool returnExpired = false,
         bool returnInGrace = true,
         Func<T, Task<bool>>? additionalValidation = null,
-        Func<Task<T>>? refreshAction = null) where T : class
+        Func<Task<T>>? refreshAction = null) where T : class?
 
     {
         if (rest?.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
+        var sw = Stopwatch.StartNew();
         var obj = rest.Get<ResponseMessage>(uid);
-        if (obj is null) return refreshAction != null ? await refreshAction.Invoke() : null;
+        sw.Stop();
+        rest.LogInfo($"[CACHE-Findme]: Retrieved cache in {sw.ElapsedMilliseconds}ms for [{typeof(T).Name}] {uid}");
+        if (obj is null)
+        {
+            rest.LogInfo($"[CACHE-Findme]: Missed cache for [{typeof(T).Name}] {uid}");
+            if (refreshAction == null) return null;
+            rest.LogInfo($"[CACHE-Findme]: Refresh activated for [{typeof(T).Name}] {uid}");
+            return await refreshAction();
+        }
+
         var result = obj.GetOriginalData<T>();
 
         var customValidationResult = additionalValidation == null || await additionalValidation.Invoke(result);
 
-        if (!customValidationResult) return await refreshAction?.Invoke()!;
-        if (returnExpired) return result;
+        if (!customValidationResult)
+        {
+            rest.LogInfo($"[CACHE-Findme]: Validation failed for [{typeof(T).Name}] {uid}");
+            if (refreshAction == null) return null;
+            rest.LogInfo($"[CACHE-Findme]: Refresh activated for [{typeof(T).Name}] {uid}");
+            return await refreshAction();
+        }
+
+        if (returnExpired)
+        {
+            rest.LogInfo($"[CACHE-Findme]: Return expired cache for [{typeof(T).Name}] {uid}");
+            return result;
+        }
+
         if (returnInGrace && obj.GraceTillUtc >= DateTime.UtcNow)
         {
-            if (obj.ExpiryOnUtc <= DateTime.UtcNow)
+            if (obj.ExpiryOnUtc <= DateTime.UtcNow && refreshAction != null)
             {
-                refreshAction?.Invoke().RunInBackgroundAndForget();
+                rest.LogInfo($"[CACHE-Findme]: Refresh activated for [{typeof(T).Name}] {uid}");
+                refreshAction().RunInBackgroundAndForget();
             }
 
+            rest.LogInfo($"[CACHE-Findme]: Return expired but stale cache for [{typeof(T).Name}] {uid}");
             return result;
         }
 
         if (obj.ExpiryOnUtc >= DateTime.UtcNow) return result;
 
-        return refreshAction != null ? await refreshAction.Invoke() : null;
+        return refreshAction != null ? await refreshAction() : null;
     }
 
 
     public static Task<T?> FindmeAsync<T>(this Rest rest, object queryObject, bool returnExpired = false,
         bool returnInGrace = true,
         Func<T, Task<bool>>? additionalValidation = null,
-        Func<Task<T>>? refreshAction = null,
-        [CallerMemberName] string callerName = "") where T : class
+        Func<Task<T>>? refreshAction = null) where T : class?
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
-        var json = queryObject.JsonSerialize();
+        var sw = Stopwatch.StartNew();
+        var json = queryObject.JsonSerialize(serializeInResponseMessageWrapper: false);
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
-        var md5 = EncryptHelper.Md5Encrypt($"{callerName}:{json}");
+        var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
+        sw.Stop();
+        rest.LogInfo($"[CACHE-Findme]: MD5 cache key used {sw.ElapsedMilliseconds}ms for [{typeof(T).Name}] {md5}");
+
         return rest.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction);
     }
 
     public static Task<ResponseMessage?> CachemeAsync(this Rest rest, object queryObject, object data,
         int expiryInSeconds = -1,
-        int graceInSeconds = -1,
-        [CallerMemberName] string callerName = "")
+        int graceInSeconds = -1)
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
-        var json = queryObject.JsonSerialize();
+        var json = queryObject.JsonSerialize(serializeInResponseMessageWrapper: false);
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
-        var md5 = EncryptHelper.Md5Encrypt($"{callerName}:{json}");
+        var md5 = EncryptHelper.Md5Encrypt($"{data.GetType().Name}:{json}");
         return rest.CachemeAsync(md5, data, expiryInSeconds, graceInSeconds);
     }
 
-    public static Task<bool> ExpiremeAsync(this Rest rest, object queryObject, bool invalidateGracePeriod = true,
-        [CallerMemberName] string callerName = "")
+    public static Task<bool> ExpiremeAsync<T>(this Rest rest, object queryObject, bool invalidateGracePeriod = true)
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
         var json = queryObject.JsonSerialize();
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
-        var md5 = EncryptHelper.Md5Encrypt($"{callerName}:{json}");
+        var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
         return rest.ExpiremeAsync(md5, invalidateGracePeriod);
     }
 }

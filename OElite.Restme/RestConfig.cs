@@ -14,7 +14,7 @@ namespace OElite
         public string? RestKey { get; set; }
         public string? RestSecret { get; set; }
         public bool RestSsl { get; set; }
-        public JsonSerializerSettings SerializerSettings { get; set; }
+        public JsonSerializerSettings? SerializerSettings { get; set; }
         public bool UseRestConvertForCollectionSerialization { get; set; }
         public int DefaultTimeout { get; set; }
 

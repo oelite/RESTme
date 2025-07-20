@@ -8,14 +8,21 @@ namespace OElite
     public static class ObjectUtils
     {
         public static string JsonSerialize(this object objectValue, bool attemptResponseMessageConvertIfListType = true,
-            JsonSerializerSettings serializerSettings = null)
+            JsonSerializerSettings? serializerSettings = null, bool serializeInResponseMessageWrapper = true)
         {
             if (objectValue is not IEnumerable || !attemptResponseMessageConvertIfListType)
                 return StringUtils.JsonSerialize(objectValue,
                     serializerSettings);
 
-            var responseMessage = new ResponseMessage(objectValue);
-            return StringUtils.JsonSerialize(responseMessage, serializerSettings);
+            if (serializeInResponseMessageWrapper)
+            {
+                var responseMessage = new ResponseMessage(objectValue);
+                return StringUtils.JsonSerialize(responseMessage, serializerSettings);
+            }
+            else
+            {
+                return StringUtils.JsonSerialize(objectValue, serializerSettings);
+            }
         }
 
         public static T CreateObject<T>()
@@ -25,12 +32,12 @@ namespace OElite
 
         public static T ParseEnum<T>(this int enumValue)
         {
-            return (T) Enum.Parse(typeof(T), enumValue.ToString());
+            return (T)Enum.Parse(typeof(T), enumValue.ToString());
         }
 
         public static T ParseEnum<T>(this string enumValue)
         {
-            return (T) Enum.Parse(typeof(T), enumValue);
+            return (T)Enum.Parse(typeof(T), enumValue);
         }
 
         public static bool IsSubclassOfRawGeneric(this Type toCheck, Type generic)

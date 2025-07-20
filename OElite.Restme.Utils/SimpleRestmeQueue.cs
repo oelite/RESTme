@@ -6,6 +6,6 @@ namespace OElite
     {
         public bool ExecutionWaitRequired = false;
 
-        public List<TA> QueueItems;
+        public required List<TA> QueueItems;
     }
 }

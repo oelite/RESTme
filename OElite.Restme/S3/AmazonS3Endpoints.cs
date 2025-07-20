@@ -5,7 +5,7 @@ namespace OElite.Data
     public static class AmazonS3Endpoints
     {
         private static string[] amazonS3Endpoints =
-        {
+        [
             "s3.amazonaws.com",
             "s3.us-east-2.amazonaws.com",
             "s3-fips.us-east-2.amazonaws.com",
@@ -72,13 +72,13 @@ namespace OElite.Data
             "s3-fips.us-gov-west-1.amazonaws.com",
             "s3.dualstack.us-gov-west-1.amazonaws.com",
             "s3-fips.dualstack.us-gov-west-1.amazonaws.com"
-        };
+        ];
 
         public static List<string> AddAmazonEndpoints(this List<string>? list)
         {
             if (!(list?.Count >= 0))
             {
-                list = new List<string>();
+                list = [];
             }
 
             list.AddRange(amazonS3Endpoints);

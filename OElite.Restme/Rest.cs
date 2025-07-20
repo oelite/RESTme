@@ -113,10 +113,10 @@ namespace OElite
                 if (allowMultipleValues)
                     Headers[header].Add(value);
                 else
-                    Headers[header] = new List<string> { value };
+                    Headers[header] = [value];
             }
             else
-                Headers.Add(header, new List<string> { value });
+                Headers.Add(header, [value]);
         }
 
         public void AddAuthorizationHeader(string token, string authTypePrefix = "Bearer ")

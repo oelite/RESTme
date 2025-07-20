@@ -5,9 +5,9 @@ namespace OElite
 {
     public static class PrimitiveTypes
     {
-        public static readonly Type[] List = new[]
-                      {
-                              typeof (Enum),
+        public static readonly Type[] List =
+        [
+            typeof (Enum),
                               typeof (String),
                               typeof (Char),
 
@@ -28,7 +28,7 @@ namespace OElite
                               typeof (DateTime),
                               typeof (DateTimeOffset),
                               typeof (TimeSpan)
-                          };
+        ];
 
         public static bool IsPrimitiveType(this Type type)
         {

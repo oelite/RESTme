@@ -7,7 +7,7 @@ namespace OElite
 {
     public class FileUtils
     {
-        private static readonly string[] imageExtensions = {"jpg", "bmp", "gif", "png", "jpeg"}; //  etc
+        private static readonly string[] imageExtensions = ["jpg", "bmp", "gif", "png", "jpeg"]; //  etc
 
         public static byte[] ReadStreamToEnd(Stream stream)
         {
