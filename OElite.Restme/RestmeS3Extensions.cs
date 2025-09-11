@@ -5,6 +5,8 @@ using System.Reflection;
 using System.Threading.Tasks;
 using OElite.Data;
 using System.Linq;
+using Amazon.S3;
+using Amazon.S3.Model;
 
 namespace OElite
 {
@@ -38,47 +40,42 @@ namespace OElite
             return segments.Length > 0 ? segments[0] : null;
         }
 
-        private static string? S3FileName(this string storageRelativePath)
+        private static string? S3ObjectKey(this string storageRelativePath)
         {
             if (!storageRelativePath.IsNotNullOrEmpty()) return null;
             var segments = storageRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            return segments.Length > 1 ? segments[^1] : null;
+            if (segments.Length <= 1) return null;
+            
+            // Join all segments except the first one (bucket name) to form the object key
+            return string.Join("/", segments.Skip(1));
         }
-
-        internal static string? S3ObjectPath(this string storageRelativePath, bool fromFilePath = true)
-        {
-            if (!storageRelativePath.IsNotNullOrEmpty()) return null;
-            var result = storageRelativePath.Trim('/')
-                .Replace(storageRelativePath.S3BucketName()!, string.Empty)
-                .Trim('/');
-            if (fromFilePath)
-            {
-                result = result.Replace(storageRelativePath.S3FileName()!, string.Empty)
-                    .Trim('/');
-            }
-
-            return result;
-        }
-
 
         public static async Task<T?> S3GetAsync<T>(this Rest restme, string? storageRelativePath)
         {
-            // restme.S3Client.GetObjectAsync(storageRelativePath.S3BucketName(),storageRelativePath.S3ObjectPath())
+            MustBeS3Mode(restme);
+            
+            if (restme.S3Client == null)
+                throw new OEliteWebException("S3 client not initialized.");
+                
+            var bucketName = storageRelativePath.S3BucketName();
+            var objectKey = storageRelativePath.S3ObjectKey();
+            
+            if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
-            var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
-            var blobItemPath = restme.IdentifyBlobItemPath(storageRelativePath);
-            if (blobItemPath.IsNullOrEmpty())
-                throw new OEliteWebException("Invalid blob item name.");
-            var blockBlob = container.GetBlockBlobReference(blobItemPath);
-            using var stream = new MemoryStream();
             try
             {
-                if (!await blockBlob.ExistsAsync()) return default(T);
+                var request = new GetObjectRequest
+                {
+                    BucketName = bucketName,
+                    Key = objectKey
+                };
 
+                using var response = await restme.S3Client.GetObjectAsync(request);
+                
                 if (typeof(Stream).IsAssignableFrom(typeof(T)))
                 {
-                    await blockBlob.DownloadToStreamAsync(stream);
-                    var bytes = FileUtils.ReadStreamToEnd(stream);
+                    var bytes = FileUtils.ReadStreamToEnd(response.ResponseStream);
                     T? result;
                     if (typeof(T).GetTypeInfo().IsAbstract)
                     {
@@ -90,19 +87,24 @@ namespace OElite
                     return result;
                 }
 
-
-                var jsonStringValue = await blockBlob.DownloadTextAsync();
-                if (!jsonStringValue.IsNotNullOrEmpty()) return default(T);
+                using var reader = new StreamReader(response.ResponseStream);
+                var content = await reader.ReadToEndAsync();
+                
+                if (!content.IsNotNullOrEmpty()) return default(T);
 
                 if (typeof(T) == typeof(string))
-                    return (T)Convert.ChangeType(jsonStringValue, typeof(T));
+                    return (T)Convert.ChangeType(content, typeof(T));
 
-                return jsonStringValue.JsonDeserialize<T>();
+                return content.JsonDeserialize<T>();
+            }
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return default(T);
             }
             catch (Exception? ex)
             {
                 restme.LogDebug(
-                    $"Unable to fetch requested blob: {storageRelativePath}\n {ex.Message} \n {ex.StackTrace}", ex);
+                    $"Unable to fetch requested S3 object: {storageRelativePath}\n {ex.Message} \n {ex.StackTrace}", ex);
                 return default(T);
             }
         }
@@ -110,42 +112,53 @@ namespace OElite
         public static async Task<T?> S3PostAsync<T>(this Rest restme, string? storageRelativePath, object? dataObject)
         {
             MustBeS3Mode(restme);
+            
+            if (restme.S3Client == null)
+                throw new OEliteWebException("S3 client not initialized.");
+                
             if (dataObject == null)
                 throw new OEliteWebException(
-                    "Uploading null blob is not supported, use delete method if you intended to delete.");
+                    "Uploading null object is not supported, use delete method if you intended to delete.");
 
-            var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
-            var blobItemPath = restme.IdentifyBlobItemPath(storageRelativePath);
-            if (blobItemPath.IsNullOrEmpty())
-                throw new OEliteWebException("Invalid blob item name.");
-            var blockBlob = container.GetBlockBlobReference(blobItemPath);
+            var bucketName = storageRelativePath.S3BucketName();
+            var objectKey = storageRelativePath.S3ObjectKey();
+            
+            if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+
             try
             {
+                var request = new PutObjectRequest
+                {
+                    BucketName = bucketName,
+                    Key = objectKey
+                };
+
+                // Set content type based on file extension
                 var extension = FileUtils.GetFileExtensionName(storageRelativePath);
                 if (extension.IsNotNullOrEmpty())
-                    blockBlob.Properties.ContentType = FileUtils.GetMimeType(extension);
+                    request.ContentType = FileUtils.GetMimeType(extension);
+
                 if (typeof(Stream).IsAssignableFrom(typeof(T)))
                 {
                     if (dataObject is not Stream stream) return (T)dataObject;
                     stream.Position = 0;
-                    await blockBlob.UploadFromStreamAsync(stream);
+                    request.InputStream = stream;
                 }
                 else
                 {
-                    var jsonValue =
-                        dataObject.JsonSerialize(restme.Configuration.UseRestConvertForCollectionSerialization,
-                            restme.Configuration.SerializerSettings);
-                    await
-                        blockBlob.UploadTextAsync(jsonValue, restme.Configuration.DefaultEncoding,
-                            restme.DefaultAzureBlobAccessCondition, restme.DefaultAzureBlobRequestOptions,
-                            restme.DefaultAzureBlobOperationContext);
+                    var jsonValue = dataObject.JsonSerialize(restme.Configuration.UseRestConvertForCollectionSerialization,
+                        restme.Configuration.SerializerSettings);
+                    request.ContentBody = jsonValue;
+                    request.ContentType = "application/json";
                 }
 
+                await restme.S3Client.PutObjectAsync(request);
                 return (T)dataObject;
             }
             catch (Exception? ex)
             {
-                restme.LogDebug("Unable to upload requested data:\n" + ex.Message, ex);
+                restme.LogDebug("Unable to upload requested data to S3:\n" + ex.Message, ex);
                 return default(T);
             }
         }
@@ -153,20 +166,32 @@ namespace OElite
         public static async Task<T?> S3DeleteAsync<T>(this Rest restme, string? storageRelativePath)
         {
             MustBeS3Mode(restme);
-            var container = await restme.GetAzureBlobContainerAsync(storageRelativePath);
-            var blobItemPath = restme.IdentifyBlobItemPath(storageRelativePath);
-            if (blobItemPath.IsNullOrEmpty())
-                throw new OEliteWebException("Invalid blob item name.");
-            var blockBlob = container.GetBlockBlobReference(blobItemPath);
+            
+            if (restme.S3Client == null)
+                throw new OEliteWebException("S3 client not initialized.");
+                
+            var bucketName = storageRelativePath.S3BucketName();
+            var objectKey = storageRelativePath.S3ObjectKey();
+            
+            if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+
             try
             {
-                await blockBlob.DeleteIfExistsAsync();
+                var request = new DeleteObjectRequest
+                {
+                    BucketName = bucketName,
+                    Key = objectKey
+                };
+
+                await restme.S3Client.DeleteObjectAsync(request);
+                
                 if (typeof(T) == typeof(bool))
                     return (T)Convert.ChangeType(true, typeof(T));
             }
             catch (Exception? ex)
             {
-                restme.LogDebug("Unable to delete requested data:\n" + ex.Message, ex);
+                restme.LogDebug("Unable to delete requested S3 object:\n" + ex.Message, ex);
             }
 
             return default;
