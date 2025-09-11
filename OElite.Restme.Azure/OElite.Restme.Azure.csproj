@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Description>OElite.Restme Azure Blob Storage provider implementation</Description>
+        <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
+        <AssemblyVersion>2.0.5</AssemblyVersion>
+        <VersionPrefix>2.0.5</VersionPrefix>
+        <AssemblyName>OElite.Restme.Azure</AssemblyName>
+        <PackageTags>OElite;Restme;Azure;Blob;Storage</PackageTags>
+        <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
+        <Authors>OElite Limited</Authors>
+        <Copyright>OElite Limited</Copyright>
+        <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
+        <Title>OElite.Restme.Azure</Title>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="WindowsAzure.Storage" Version="9.3.3" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
+    </ItemGroup>
+</Project>

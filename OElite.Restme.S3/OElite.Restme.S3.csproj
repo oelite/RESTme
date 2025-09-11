@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Description>OElite.Restme S3 provider implementation</Description>
+        <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
+        <AssemblyVersion>2.0.5</AssemblyVersion>
+        <VersionPrefix>2.0.5</VersionPrefix>
+        <AssemblyName>OElite.Restme.S3</AssemblyName>
+        <PackageTags>OElite;Restme;S3;AWS;Storage</PackageTags>
+        <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
+        <Authors>OElite Limited</Authors>
+        <Copyright>OElite Limited</Copyright>
+        <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
+        <Title>OElite.Restme.S3</Title>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="AWSSDK.S3" Version="3.7.400.25" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
+    </ItemGroup>
+</Project>
