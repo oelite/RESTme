@@ -18,7 +18,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest-full
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
