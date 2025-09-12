@@ -31,6 +31,10 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: Set NuGet environment variables
+        run: |
+          echo "DOTNET_NUGET_SIGNATURE_VERIFICATION=false" >> $GITHUB_ENV
+
       - name: Restore dependencies
         run: dotnet restore
 
