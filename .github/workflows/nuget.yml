@@ -34,6 +34,10 @@ jobs:
       - name: Set NuGet environment variables
         run: |
           echo "DOTNET_NUGET_SIGNATURE_VERIFICATION=false" >> $GITHUB_ENV
+          echo "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0" >> $GITHUB_ENV
+          echo "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1" >> $GITHUB_ENV
+          echo "DOTNET_RUNNING_IN_CONTAINER=true" >> $GITHUB_ENV
+          echo "DOTNET_CLI_DISABLE_PROJECT_EVAL=true" >> $GITHUB_ENV
 
       - name: Restore dependencies
         run: dotnet restore
