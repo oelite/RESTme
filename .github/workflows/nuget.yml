@@ -1,32 +1,223 @@
-name: dotnet package
-# run only when it is under branch develop and uat
+name: Build and Deploy Packages
+
 on:
   push:
     branches:
       - develop
-      - uat
-  workflow_dispatch:    
+      - main
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'develop'
+        type: choice
+        options:
+          - develop
+          - main
+
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup dotnet
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      # github.run_number is a number of the pipeline run. It is increased automatically.
-      # That's why we can use it to increase the version of the nuget package.
-      # Here we replace the last number in the version with github.run_number.
-      - name: Set version
-        run: |
-          echo "Buid version is ${{github.run_number}}"
-      # package project nuget artifacts and push with the run_number and current branch name together as suffix to the version
-      - name: Build and push nuget package
-        run: |
-          echo current version suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}
-          dotnet pack OElite.Restme/OElite.Restme.csproj -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}}; 
-          dotnet pack OElite.Restme.GoogleUtils/OElite.Restme.GoogleUtils.csproj -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}};
-          dotnet pack OElite.Restme.Utils/OElite.Restme.Utils.csproj -c Release -o oelite-pack --version-suffix ${{github.head_ref || github.ref_name}}.${{github.run_number}};
-          dotnet nuget push oelite-pack/*.nupkg -s https://packages.services.phanes.technology/v3/index.json -k ${{ secrets.NUGET_TOKEN }} --skip-duplicate oelite-pack
 
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+      - name: Set environment variables
+        run: |
+          echo "BUILD_VERSION=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "BRANCH_NAME=${{ github.head_ref || github.ref_name }}" >> $GITHUB_ENV
+          echo "VERSION_SUFFIX=${{ github.head_ref || github.ref_name }}.${{ github.run_number }}" >> $GITHUB_ENV
+          
+          # Set deployment target based on branch
+          if [ "${{ github.head_ref || github.ref_name }}" = "main" ]; then
+            echo "DEPLOY_TARGET=nuget.org" >> $GITHUB_ENV
+            echo "NUGET_SOURCE=https://api.nuget.org/v3/index.json" >> $GITHUB_ENV
+            echo "NUGET_TOKEN=${{ secrets.NUGET_ORG_TOKEN }}" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_TARGET=phanes.dev" >> $GITHUB_ENV
+            echo "NUGET_SOURCE=https://packages.services.phanes.technology/v3/index.json" >> $GITHUB_ENV
+            echo "NUGET_TOKEN=${{ secrets.NUGET_TOKEN }}" >> $GITHUB_ENV
+          fi
+
+      - name: Pack core package
+        run: |
+          echo "Packing OElite.Restme (Core)"
+          dotnet pack OElite.Restme/OElite.Restme.csproj \
+            --configuration Release \
+            --no-build \
+            --output ./packages \
+            --version-suffix ${{ env.VERSION_SUFFIX }}
+
+      - name: Pack Redis package
+        run: |
+          echo "Packing OElite.Restme.Redis"
+          dotnet pack OElite.Restme.Redis/OElite.Restme.Redis.csproj \
+            --configuration Release \
+            --no-build \
+            --output ./packages \
+            --version-suffix ${{ env.VERSION_SUFFIX }}
+
+      - name: Pack RabbitMQ package
+        run: |
+          echo "Packing OElite.Restme.RabbitMQ"
+          dotnet pack OElite.Restme.RabbitMQ/OElite.Restme.RabbitMQ.csproj \
+            --configuration Release \
+            --no-build \
+            --output ./packages \
+            --version-suffix ${{ env.VERSION_SUFFIX }}
+
+      - name: Pack Azure package
+        run: |
+          echo "Packing OElite.Restme.Azure"
+          dotnet pack OElite.Restme.Azure/OElite.Restme.Azure.csproj \
+            --configuration Release \
+            --no-build \
+            --output ./packages \
+            --version-suffix ${{ env.VERSION_SUFFIX }}
+
+      - name: Pack S3 package
+        run: |
+          echo "Packing OElite.Restme.S3"
+          dotnet pack OElite.Restme.S3/OElite.Restme.S3.csproj \
+            --configuration Release \
+            --no-build \
+            --output ./packages \
+            --version-suffix ${{ env.VERSION_SUFFIX }}
+
+      - name: Pack Utils package
+        run: |
+          echo "Packing OElite.Restme.Utils"
+          dotnet pack OElite.Restme.Utils/OElite.Restme.Utils.csproj \
+            --configuration Release \
+            --no-build \
+            --output ./packages \
+            --version-suffix ${{ env.VERSION_SUFFIX }}
+
+      - name: List packages
+        run: |
+          echo "Generated packages:"
+          ls -la ./packages/*.nupkg
+
+      - name: Deploy to NuGet
+        run: |
+          echo "Deploying to ${{ env.DEPLOY_TARGET }}"
+          echo "Source: ${{ env.NUGET_SOURCE }}"
+          
+          # Push all packages
+          dotnet nuget push ./packages/*.nupkg \
+            --source ${{ env.NUGET_SOURCE }} \
+            --api-key ${{ env.NUGET_TOKEN }} \
+            --skip-duplicate
+
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ env.BRANCH_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number:** \`${{ env.BUILD_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version Suffix:** \`${{ env.VERSION_SUFFIX }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Target:** \`${{ env.DEPLOY_TARGET }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Deployed Packages:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- \`OElite.Restme\` (Core)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`OElite.Restme.Redis\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`OElite.Restme.RabbitMQ\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`OElite.Restme.Azure\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`OElite.Restme.S3\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`OElite.Restme.Utils\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Package Source:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ env.DEPLOY_TARGET }}" = "nuget.org" ]; then
+            echo "Packages are available on [NuGet.org](https://www.nuget.org/packages/OElite.Restme/)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Packages are available on [Phanes Dev Feed](https://packages.services.phanes.technology/v3/index.json)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload packages as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages-${{ env.BRANCH_NAME }}-${{ env.BUILD_VERSION }}
+          path: ./packages/*.nupkg
+          retention-days: 30
+
+  # Separate job for main branch to create GitHub release
+  create-release:
+    if: github.ref == 'refs/heads/main'
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages-main-${{ github.run_number }}
+          path: ./packages
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+            ## 🚀 OElite.Restme v${{ github.run_number }}
+            
+            ### 📦 Packages Released
+            - **OElite.Restme** (Core) - Unified REST client with modular architecture
+            - **OElite.Restme.Redis** - Redis caching and queuing provider
+            - **OElite.Restme.RabbitMQ** - RabbitMQ message queuing provider
+            - **OElite.Restme.Azure** - Azure Blob Storage provider with caching
+            - **OElite.Restme.S3** - S3-compatible storage provider (AWS, Backblaze, MinIO, etc.)
+            - **OElite.Restme.Utils** - Utility extensions and helpers
+            
+            ### 🆕 Features
+            - Modular architecture with dynamic provider loading
+            - S3-compatible provider support (Backblaze B2, MinIO, DigitalOcean Spaces, etc.)
+            - Cache providers for Azure Blob Storage and S3 (CDN-ready)
+            - Enhanced connection string parsing
+            - Improved error handling and logging
+            
+            ### 📥 Installation
+            ```bash
+            # Core package
+            Install-Package OElite.Restme
+            
+            # Backend providers (optional)
+            Install-Package OElite.Restme.Redis
+            Install-Package OElite.Restme.RabbitMQ
+            Install-Package OElite.Restme.Azure
+            Install-Package OElite.Restme.S3
+            ```
+            
+            ### 🔗 Links
+            - [NuGet Package](https://www.nuget.org/packages/OElite.Restme/)
+            - [Documentation](https://github.com/${{ github.repository }}/blob/main/readme.md)
+          files: ./packages/*.nupkg
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
