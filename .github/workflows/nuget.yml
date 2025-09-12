@@ -21,6 +21,13 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Force MTU 1380 on primary NIC
+        run: |
+          IFACE="$(ip route show default | awk '/default/ {print $5; exit}')"
+          echo "Interface: $IFACE"
+          sudo ip link set dev "$IFACE" mtu 1380
+          ip link show dev "$IFACE"
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
