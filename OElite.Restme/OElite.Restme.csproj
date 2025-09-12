@@ -23,10 +23,6 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
-        <PackageReference Include="RabbitMQ.Client" Version="6.2.4" />
-        <PackageReference Include="StackExchange.Redis" Version="2.2.88" />
-        <PackageReference Include="WindowsAzure.Storage" Version="9.3.3" />
-        <PackageReference Include="AWSSDK.S3" Version="3.7.400.25" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />

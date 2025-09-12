@@ -8,6 +8,11 @@ namespace OElite.Providers
     /// </summary>
     public class RedisServiceFactory : IServiceFactory
     {
+        static RedisServiceFactory()
+        {
+            // Auto-register this factory when the assembly is loaded
+            ServiceLocator.RegisterFactory("redis", new RedisServiceFactory());
+        }
         public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
         {
             return new RedisCacheProvider(connectionString, config);

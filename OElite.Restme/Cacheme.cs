@@ -20,11 +20,16 @@ public static class RestmeCacheExtensions
     {
         if (rest.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
-        var obj = rest.Get<ResponseMessage>(uid);
+        
+        if (rest.CacheProvider == null)
+            throw new OEliteException("Cache provider not initialized");
+            
+        var obj = await rest.CacheProvider.GetAsync<ResponseMessage>(uid);
         if (obj is not { Data: not null }) return false;
+        
         if (invalidateGracePeriod)
         {
-            await rest.DeleteAsync<ResponseMessage>(uid);
+            await rest.CacheProvider.RemoveAsync(uid);
         }
         else
         {
@@ -34,7 +39,7 @@ public static class RestmeCacheExtensions
                 obj.GraceTillUtc = obj.ExpiryOnUtc;
             }
 
-            await rest.PostAsync<ResponseMessage>(uid, obj);
+            await rest.CacheProvider.SetAsync(uid, obj);
         }
 
         return true;
@@ -46,6 +51,10 @@ public static class RestmeCacheExtensions
     {
         if (rest?.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
+        
+        if (rest.CacheProvider == null)
+            throw new OEliteException("Cache provider not initialized");
+            
         if (!uid.IsNotNullOrEmpty())
         {
             rest?.LogInfo($"[CACHE-Cacheme]: Invalid uid provided");
@@ -67,8 +76,10 @@ public static class RestmeCacheExtensions
                 ExpiryOnUtc = expiry,
                 GraceTillUtc = grace
             };
-            var result = await rest.PostAsync<ResponseMessage>(uid, responseMessage,
-                graceInMinutes > 0 ? TimeSpan.FromMinutes(graceInMinutes) : null);
+            
+            var expiryTimeSpan = graceInMinutes > 0 ? (TimeSpan?)TimeSpan.FromMinutes(graceInMinutes) : null;
+            var success = await rest.CacheProvider.SetAsync(uid, responseMessage, expiryTimeSpan);
+            var result = success ? responseMessage : null;
 
             rest.LogInfo(result != null
                 ? $"[CACHE-Cacheme]: Successfully cached data for  [{(data.GetType().IsClass ? data.GetType().Name : data.ToString())}] {uid}"
@@ -93,8 +104,12 @@ public static class RestmeCacheExtensions
     {
         if (rest?.CurrentMode != RestMode.RedisCacheClient)
             throw new OEliteException("Cacheme currently only support Redis mode");
+        
+        if (rest.CacheProvider == null)
+            throw new OEliteException("Cache provider not initialized");
+            
         var sw = Stopwatch.StartNew();
-        var obj = rest.Get<ResponseMessage>(uid);
+        var obj = await rest.CacheProvider.GetAsync<ResponseMessage>(uid);
         sw.Stop();
         rest.LogInfo($"[CACHE-Findme]: Retrieved cache in {sw.ElapsedMilliseconds}ms for [{typeof(T).Name}] {uid}");
         if (obj is null)
@@ -105,7 +120,7 @@ public static class RestmeCacheExtensions
             return await refreshAction();
         }
 
-        var result = obj.GetOriginalData<T>();
+        var result = rest.CacheProvider.GetOriginalData<T>(obj);
 
         var customValidationResult = additionalValidation == null || await additionalValidation.Invoke(result);
 

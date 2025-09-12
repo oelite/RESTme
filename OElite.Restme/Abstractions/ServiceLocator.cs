@@ -10,6 +10,7 @@ namespace OElite.Abstractions
     public static class ServiceLocator
     {
         private static readonly Dictionary<Type, IServiceFactory> _factories = new();
+        private static readonly Dictionary<string, IServiceFactory> _namedFactories = new();
         private static readonly object _lock = new object();
 
         /// <summary>
@@ -20,6 +21,17 @@ namespace OElite.Abstractions
             lock (_lock)
             {
                 _factories[typeof(T)] = factory;
+            }
+        }
+
+        /// <summary>
+        /// Register a service factory by name
+        /// </summary>
+        public static void RegisterFactory(string name, IServiceFactory factory)
+        {
+            lock (_lock)
+            {
+                _namedFactories[name.ToLowerInvariant()] = factory;
             }
         }
 
@@ -36,6 +48,18 @@ namespace OElite.Abstractions
         }
 
         /// <summary>
+        /// Get a service factory by name
+        /// </summary>
+        public static IServiceFactory? GetFactory(string name)
+        {
+            lock (_lock)
+            {
+                _namedFactories.TryGetValue(name.ToLowerInvariant(), out var factory);
+                return factory;
+            }
+        }
+
+        /// <summary>
         /// Clear all registered factories
         /// </summary>
         public static void Clear()
@@ -43,6 +67,7 @@ namespace OElite.Abstractions
             lock (_lock)
             {
                 _factories.Clear();
+                _namedFactories.Clear();
             }
         }
 

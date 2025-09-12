@@ -5,7 +5,7 @@ namespace OElite.Abstractions
     /// <summary>
     /// Interface for logging operations
     /// </summary>
-    public interface ILogProvider
+    public interface ILogProvider : IDisposable
     {
         /// <summary>
         /// Log error message

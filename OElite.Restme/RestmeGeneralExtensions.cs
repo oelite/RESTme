@@ -36,4 +36,20 @@ namespace OElite
             }
         }
     }
+
+    public static class StringExtensions
+    {
+        /// <summary>
+        /// Check if connection string is for S3 provider
+        /// </summary>
+        public static bool IsS3Provider(this string connectionString)
+        {
+            if (string.IsNullOrEmpty(connectionString)) return false;
+            
+            var lower = connectionString.ToLower();
+            return lower.Contains("amazonaws.com") || 
+                   lower.Contains("s3://") || 
+                   lower.Contains("accesskeyid") && lower.Contains("secretaccesskey");
+        }
+    }
 }

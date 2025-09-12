@@ -8,6 +8,11 @@ namespace OElite.Providers
     /// </summary>
     public class RabbitMQServiceFactory : IServiceFactory
     {
+        static RabbitMQServiceFactory()
+        {
+            // Auto-register this factory when the assembly is loaded
+            ServiceLocator.RegisterFactory("rabbitmq", new RabbitMQServiceFactory());
+        }
         public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
         {
             throw new NotImplementedException("Cache operations not supported by RabbitMQ provider. Use Redis provider instead.");

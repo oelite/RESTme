@@ -1,8 +1,6 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
 
 namespace OElite;
 
@@ -18,41 +16,17 @@ public static class RestmeMessageQueueExtensions
     {
         try
         {
-            if (exchangeName.IsNotNullOrEmpty())
+            if (rest.QueueProvider == null)
             {
-                rest.RabbitMqChannel.ExchangeDeclare(exchangeName, exchangeType, isDurable, autoDelete);
-            }
-            else exchangeName = string.Empty;
-
-            if (queueName.IsNotNullOrEmpty())
-            {
-                rest.RabbitMqChannel.QueueDeclare(queueName, isDurable, isExclusive, autoDelete);
-                if (key.IsNullOrEmpty()) key = queueName;
+                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
+                return false;
             }
 
-            if (key.IsNullOrEmpty()) key = string.Empty;
-
-            if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty() && key.IsNotNullOrEmpty())
-                rest.RabbitMqChannel.QueueBind(queueName, exchangeName, key);
-
-
-            var objBytes = message.JsonSerialize().ToStream().ToBytes();
-            if (isMessagePersistent)
-            {
-                var props = rest.RabbitMqChannel?.CreateBasicProperties();
-                if (props == null) return true;
-                props.DeliveryMode = 2; // persistent
-                rest.RabbitMqChannel.BasicPublish(exchangeName, key,
-                    basicProperties: props,
-                    body: objBytes);
-            }
-            else
-            {
-                rest.RabbitMqChannel.BasicPublish(exchangeName, key,
-                    body: objBytes);
-            }
-
-            return true;
+            // Use the new provider system
+            var result = rest.QueueProvider.PublishAsync(message, queueName, key, exchangeName, 
+                isDurable, isExclusive, autoDelete, exchangeType, isMessagePersistent).Result;
+            
+            return result;
         }
         catch (Exception? ex)
         {
@@ -70,55 +44,19 @@ public static class RestmeMessageQueueExtensions
         bool isDurable = true,
         bool isExclusive = false,
         bool autoDelete = true,
-        string exchangeType = "direct")
+        string exchangeType = "direct") where T : class
     {
         try
         {
-            if (exchangeName.IsNotNullOrEmpty())
+            if (rest.QueueProvider == null)
             {
-                rest.RabbitMqChannel.ExchangeDeclare(exchangeName, exchangeType, isDurable, autoDelete);
-            }
-            else exchangeName = string.Empty;
-
-            if (queueName.IsNotNullOrEmpty())
-            {
-                rest.RabbitMqChannel.QueueDeclare(queueName, isDurable, isExclusive, autoDelete);
-            }
-            else
-            {
-                queueName = rest.RabbitMqChannel.QueueDeclare().QueueName;
+                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
+                return;
             }
 
-            if (key.IsNullOrEmpty()) key = queueName;
-
-            if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty() && key.IsNotNullOrEmpty())
-                rest.RabbitMqChannel.QueueBind(queueName, exchangeName, key);
-
-            var consumer = new EventingBasicConsumer(rest.RabbitMqChannel);
-            consumer.Received += async (_, args) =>
-            {
-                var result = StringUtils.GetStringFromStream(new MemoryStream(args.Body.ToArray()))
-                    .JsonDeserialize<T>();
-                if (queueTask == null || await queueTask(result))
-                {
-                    rest.RabbitMqChannel?.BasicAck(args.DeliveryTag, false);
-                }
-                else
-                {
-                    rest.RabbitMqChannel?.BasicNack(args.DeliveryTag, false, true);
-                }
-            };
-            // prefetchCount = 1  ---> accept only one unack-ed message at a time
-            rest.RabbitMqChannel?.BasicQos(0, prefetchCount, false);
-            rest.RabbitMqChannel.BasicConsume(queueName, false, consumer);
-
-            if (deliverCompleteCondition == null) return;
-            var isComplete = false;
-            while (!isComplete)
-            {
-                isComplete = deliverCompleteCondition.Invoke().WaitAndGetResult();
-                //no nothing, keep the loop await
-            }
+            // Use the new provider system for consuming
+            rest.QueueProvider.StartConsumingAsync<T>(queueTask, deliverCompleteCondition, 
+                exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType).Wait();
         }
         catch (Exception? ex)
         {
@@ -135,55 +73,23 @@ public static class RestmeMessageQueueExtensions
         bool isDurable = true,
         bool isExclusive = false,
         bool autoDelete = true,
-        string exchangeType = "direct")
+        string exchangeType = "direct") where T : class
     {
         try
         {
-            if (exchangeName.IsNotNullOrEmpty())
+            if (rest.QueueProvider == null)
             {
-                rest.RabbitMqChannel.ExchangeDeclare(exchangeName, exchangeType, isDurable, autoDelete);
-            }
-            else exchangeName = string.Empty;
-
-            if (queueName.IsNotNullOrEmpty())
-            {
-                rest.RabbitMqChannel.QueueDeclare(queueName, isDurable, isExclusive, autoDelete);
-            }
-            else
-            {
-                queueName = rest.RabbitMqChannel.QueueDeclare().QueueName;
+                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
+                return;
             }
 
-            if (key.IsNullOrEmpty()) key = queueName;
+            // Convert synchronous delegates to async for the provider
+            Func<T, Task<bool>>? asyncQueueTask = queueTask != null ? (t) => Task.FromResult(queueTask(t)) : null;
+            Func<Task<bool>>? asyncDeliverCompleteCondition = deliverCompleteCondition != null ? () => Task.FromResult(deliverCompleteCondition()) : null;
 
-            if (queueName.IsNotNullOrEmpty() && exchangeName.IsNotNullOrEmpty() && key.IsNotNullOrEmpty())
-                rest.RabbitMqChannel.QueueBind(queueName, exchangeName, key);
-
-            var consumer = new EventingBasicConsumer(rest.RabbitMqChannel);
-            consumer.Received += (_, args) =>
-            {
-                var result = StringUtils.GetStringFromStream(new MemoryStream(args.Body.ToArray()))
-                    .JsonDeserialize<T>();
-                if (queueTask == null || queueTask(result))
-                {
-                    rest.RabbitMqChannel?.BasicAck(args.DeliveryTag, false);
-                }
-                else
-                {
-                    rest.RabbitMqChannel?.BasicNack(args.DeliveryTag, false, true);
-                }
-            };
-            // prefetchCount = 1  ---> accept only one unack-ed message at a time
-            rest.RabbitMqChannel?.BasicQos(0, prefetchCount, false);
-            rest.RabbitMqChannel.BasicConsume(queueName, false, consumer);
-
-            if (deliverCompleteCondition == null) return;
-            var isComplete = false;
-            while (!isComplete)
-            {
-                isComplete = deliverCompleteCondition.Invoke();
-                //no nothing, keep the loop await
-            }
+            // Use the new provider system for consuming
+            rest.QueueProvider.StartConsumingAsync<T>(asyncQueueTask, asyncDeliverCompleteCondition, 
+                exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType).Wait();
         }
         catch (Exception? ex)
         {

@@ -21,14 +21,28 @@ namespace OElite.Providers
         {
             _config = config;
             
-            var s3Config = new AmazonS3Config
+            // Parse connection string to extract S3 configuration
+            var s3Config = ParseConnectionString(connectionString);
+            
+            // Create S3 client configuration
+            var clientConfig = new AmazonS3Config
             {
-                ServiceURL = connectionString,
-                ForcePathStyle = true, // Required for S3-compatible services
-                UseHttp = !config.RestSsl
+                ServiceURL = s3Config.ServiceUrl,
+                ForcePathStyle = s3Config.ForcePathStyle,
+                UseHttp = s3Config.UseHttp
             };
-
-            _s3Client = new AmazonS3Client(config.RestKey, config.RestSecret, s3Config);
+            
+            // Set region if provided and no custom service URL
+            if (string.IsNullOrEmpty(s3Config.ServiceUrl) && s3Config.Region != null)
+            {
+                clientConfig.RegionEndpoint = s3Config.Region;
+            }
+            
+            // Use credentials from config or parsed connection string
+            var accessKey = !string.IsNullOrEmpty(s3Config.AccessKeyId) ? s3Config.AccessKeyId : config.RestKey;
+            var secretKey = !string.IsNullOrEmpty(s3Config.SecretAccessKey) ? s3Config.SecretAccessKey : config.RestSecret;
+            
+            _s3Client = new AmazonS3Client(accessKey, secretKey, clientConfig);
         }
 
         public async Task<T?> GetAsync<T>(string key) where T : class
@@ -354,6 +368,53 @@ namespace OElite.Providers
             return string.Join("/", segments, 1, segments.Length - 1);
         }
 
+        private S3Config ParseConnectionString(string connectionString)
+        {
+            var config = new S3Config();
+            var parts = connectionString.Split(';');
+            
+            foreach (var part in parts)
+            {
+                var keyValue = part.Split('=');
+                if (keyValue.Length != 2) continue;
+                
+                var key = keyValue[0].Trim().ToLowerInvariant();
+                var value = keyValue[1].Trim();
+                
+                switch (key)
+                {
+                    case "accesskeyid":
+                        config.AccessKeyId = value;
+                        break;
+                    case "secretaccesskey":
+                        config.SecretAccessKey = value;
+                        break;
+                    case "region":
+                        config.Region = Amazon.RegionEndpoint.GetBySystemName(value);
+                        break;
+                    case "bucketname":
+                        config.BucketName = value;
+                        break;
+                    case "serviceurl":
+                    case "endpoint":
+                        config.ServiceUrl = value;
+                        break;
+                    case "forcepathstyle":
+                        config.ForcePathStyle = bool.Parse(value);
+                        break;
+                    case "usehttp":
+                        config.UseHttp = bool.Parse(value);
+                        break;
+                }
+            }
+            
+            // Set defaults for S3-compatible providers
+            if (config.Region == null && string.IsNullOrEmpty(config.ServiceUrl))
+                config.Region = Amazon.RegionEndpoint.USEast1;
+                
+            return config;
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -361,6 +422,17 @@ namespace OElite.Providers
                 _s3Client?.Dispose();
                 _disposed = true;
             }
+        }
+
+        private class S3Config
+        {
+            public string AccessKeyId { get; set; } = string.Empty;
+            public string SecretAccessKey { get; set; } = string.Empty;
+            public Amazon.RegionEndpoint? Region { get; set; }
+            public string? BucketName { get; set; }
+            public string? ServiceUrl { get; set; }
+            public bool ForcePathStyle { get; set; } = false;
+            public bool UseHttp { get; set; } = false;
         }
     }
 }

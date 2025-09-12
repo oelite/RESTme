@@ -8,9 +8,14 @@ namespace OElite.Providers
     /// </summary>
     public class AzureServiceFactory : IServiceFactory
     {
+        static AzureServiceFactory()
+        {
+            // Auto-register this factory when the assembly is loaded
+            ServiceLocator.RegisterFactory("azure", new AzureServiceFactory());
+        }
         public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
         {
-            throw new NotImplementedException("Cache operations not supported by Azure provider. Use Redis provider instead.");
+            return new AzureCacheProvider(connectionString, config);
         }
 
         public IQueueProvider CreateQueueProvider(string connectionString, RestConfig config)
