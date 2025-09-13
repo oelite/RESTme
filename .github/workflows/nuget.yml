@@ -99,9 +99,11 @@ jobs:
           echo ""
           echo "Testing with different MTU sizes:"
           echo "Testing with current MTU..."
-          ping -c 3 -M do -s 1472 8.8.8.8 || echo "Large packet failed"
+          ping -c 3 -M do -s 1380 8.8.8.8 || echo "Large packet failed"
           echo "Testing with smaller MTU..."
           ping -c 3 -M do -s 1372 8.8.8.8 || echo "Smaller packet failed"
+          echo "Testing with smaller MTU..."
+          ping -c 3 -M do -s 1280 8.8.8.8 || echo "Smaller packet failed"
 
 #      - name: Set NuGet environment variables
 #        run: |
