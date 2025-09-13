@@ -34,7 +34,69 @@ jobs:
       - name: Install network tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y iproute2 iputils-ping net-tools
+          sudo apt-get install -y iproute2 iputils-ping net-tools dnsutils
+
+      - name: Configure network environment
+        run: |
+          echo "=== Network Environment Setup ==="
+          # Set environment variables to help with SSL/TLS issues
+          echo "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0" >> $GITHUB_ENV
+          echo "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1" >> $GITHUB_ENV
+          echo "DOTNET_RUNNING_IN_CONTAINER=true" >> $GITHUB_ENV
+          echo "CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" >> $GITHUB_ENV
+          
+          # Check proxy settings
+          echo "Proxy environment variables:"
+          env | grep -i proxy || echo "No proxy variables set"
+
+      - name: Fix MTU issues
+        run: |
+          echo "=== MTU Discovery and Fix ==="
+          
+          # Get current interface and MTU
+          IFACE="$(ip route show default 2>/dev/null | awk '/default/ {print $5; exit}' || echo 'eth0')"
+          CURRENT_MTU="$(ip link show dev "$IFACE" 2>/dev/null | grep -o 'mtu [0-9]*' | cut -d' ' -f2 || echo '1500')"
+          echo "Current interface: $IFACE, Current MTU: $CURRENT_MTU"
+          
+          # Test path MTU to common endpoints
+          echo "Testing path MTU to various endpoints:"
+          
+          # Function to test MTU
+          test_mtu() {
+            local host=$1
+            local size=$2
+            ping -c 1 -M do -s $size $host >/dev/null 2>&1
+            return $?
+          }
+          
+          # Test different MTU sizes to api.nuget.org
+          echo "Testing MTU path to api.nuget.org..."
+          OPTIMAL_MTU=1500
+          for test_size in 1472 1450 1430 1400 1380 1350 1300 1280 1250; do
+            if test_mtu api.nuget.org $test_size; then
+              OPTIMAL_MTU=$((test_size + 28))  # Add IP+ICMP headers
+              echo "✓ MTU $OPTIMAL_MTU works (payload $test_size)"
+              break
+            else
+              echo "✗ MTU $((test_size + 28)) failed (payload $test_size)"
+            fi
+          done
+          
+          # If we found a smaller optimal MTU, apply it
+          if [ "$OPTIMAL_MTU" -lt "$CURRENT_MTU" ]; then
+            echo "Adjusting MTU from $CURRENT_MTU to $OPTIMAL_MTU"
+            sudo ip link set dev "$IFACE" mtu "$OPTIMAL_MTU" || echo "Failed to set MTU (might not have permissions)"
+            
+            # Verify the change
+            NEW_MTU="$(ip link show dev "$IFACE" 2>/dev/null | grep -o 'mtu [0-9]*' | cut -d' ' -f2)"
+            echo "New MTU: $NEW_MTU"
+          else
+            echo "Current MTU $CURRENT_MTU is optimal"
+          fi
+          
+          # Test basic SSL connectivity after MTU fix
+          echo "Testing SSL connectivity to google.com after MTU adjustment:"
+          openssl s_client -connect google.com:443 -servername google.com </dev/null 2>&1 | head -10 || echo "SSL test failed"
 
       - name: Debug - Network connectivity
         run: |
@@ -48,15 +110,34 @@ jobs:
           echo "DNS configuration:"
           cat /etc/resolv.conf
           echo ""
-          echo "Testing connectivity to NuGet sources:"
-          echo "Testing nuget.org..."
-          curl -I --connect-timeout 10 --max-time 30 https://api.nuget.org/v3/index.json || echo "Failed to reach nuget.org"
+          echo "DNS resolution test:"
+          nslookup api.nuget.org || echo "DNS resolution failed for api.nuget.org"
+          nslookup packages.services.phanes.technology || echo "DNS resolution failed for phanes.dev"
+          echo ""
+          echo "Testing connectivity to NuGet sources (after MTU fix):"
+          echo "Testing nuget.org with basic connectivity..."
+          curl -v --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 2 \
+            --user-agent "GitHubActions/1.0" \
+            --location --fail-with-body \
+            --http1.1 \
+            https://api.nuget.org/v3/index.json > /dev/null 2>&1 && echo "✓ nuget.org reachable" || echo "✗ Failed to reach nuget.org"
           echo ""
           echo "Testing phanes.dev..."
-          curl -I --connect-timeout 10 --max-time 30 https://packages.services.phanes.technology/v3/index.json || echo "Failed to reach phanes.dev"
+          curl -v --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 2 \
+            --user-agent "GitHubActions/1.0" \
+            --location --fail-with-body \
+            --http1.1 \
+            https://packages.services.phanes.technology/v3/index.json > /dev/null 2>&1 && echo "✓ phanes.dev reachable" || echo "✗ Failed to reach phanes.dev"
           echo ""
           echo "Testing GitHub packages..."
-          curl -I --connect-timeout 10 --max-time 30 https://nuget.pkg.github.com/index.json || echo "Failed to reach GitHub packages"
+          curl -v --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 2 \
+            --user-agent "GitHubActions/1.0" \
+            --location --fail-with-body \
+            --http1.1 \
+            https://nuget.pkg.github.com/index.json > /dev/null 2>&1 && echo "✓ GitHub packages reachable" || echo "✗ Failed to reach GitHub packages"
+          echo ""
+          echo "Testing basic internet connectivity:"
+          curl -v --connect-timeout 10 --max-time 20 --http1.1 https://httpbin.org/ip || echo "Basic internet connectivity failed"
 
       - name: Debug - .NET environment
         run: |
@@ -116,21 +197,41 @@ jobs:
 #          echo "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0" >> $GITHUB_ENV
 #          echo "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1" >> $GITHUB_ENV
 #          echo "DOTNET_RUNNING_IN_CONTAINER=true" >> $GITHUB_ENV
-#          echo "DOTNET_CLI_DISABLE_PROJECT_EVAL=true" >> $GITHUB_ENV
-#          echo "DOTNET_CLI_TELEMETRY_OPTOUT=0" >> $GITHUB_ENV
 #          echo "DOTNET_EnableWriteXorExecute=0" >> $GITHUB_ENV
 
       - name: Restore dependencies
         run: |
-          echo "Starting dotnet restore with verbose logging..."
-          timeout 300 dotnet restore --configfile NuGet.config --disable-parallel --verbosity detailed || {
-            echo "Restore timed out or failed after 5 minutes"
-            echo "Checking for any partial restore artifacts:"
-            find ~/.nuget -name "*.tmp" -o -name "*.lock" 2>/dev/null | head -10
-            echo "Checking running processes:"
-            ps aux | grep -E "(dotnet|nuget)" | grep -v grep
-            exit 1
-          }
+          echo "Starting dotnet restore with network-friendly settings..."
+          
+          # # Clear any existing NuGet caches that might be corrupted
+          # dotnet nuget locals all --clear
+          
+          # Try restore with retries and network-friendly settings
+          for attempt in 1 2 3; do
+            echo "Restore attempt $attempt/3..."
+            if timeout 300 dotnet restore --configfile NuGet.config \
+              --disable-parallel \
+              --verbosity detailed \
+              --runtime ubuntu.20.04-x64 \
+              --no-cache; then
+              echo "✓ Restore successful on attempt $attempt"
+              break
+            else
+              echo "✗ Restore attempt $attempt failed"
+              if [ $attempt -eq 3 ]; then
+                echo "All restore attempts failed. Checking diagnostics..."
+                echo "Checking for any partial restore artifacts:"
+                find ~/.nuget -name "*.tmp" -o -name "*.lock" 2>/dev/null | head -10
+                echo "Checking running processes:"
+                ps aux | grep -E "(dotnet|nuget)" | grep -v grep
+                echo "NuGet cache contents:"
+                ls -la ~/.nuget/packages/ | head -20 || echo "No packages cache found"
+                exit 1
+              fi
+              echo "Waiting 30 seconds before retry..."
+              sleep 30
+            fi
+          done
 
       - name: Build solution
         run: dotnet build --configuration Release --no-restore
