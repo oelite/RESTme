@@ -31,6 +31,78 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: Debug - Network connectivity
+        run: |
+          echo "=== Network Diagnostics ==="
+          echo "Current network interfaces:"
+          ip addr show
+          echo ""
+          echo "Default route:"
+          ip route show default
+          echo ""
+          echo "DNS configuration:"
+          cat /etc/resolv.conf
+          echo ""
+          echo "Testing connectivity to NuGet sources:"
+          echo "Testing nuget.org..."
+          curl -I --connect-timeout 10 --max-time 30 https://api.nuget.org/v3/index.json || echo "Failed to reach nuget.org"
+          echo ""
+          echo "Testing phanes.dev..."
+          curl -I --connect-timeout 10 --max-time 30 https://packages.services.phanes.technology/v3/index.json || echo "Failed to reach phanes.dev"
+          echo ""
+          echo "Testing GitHub packages..."
+          curl -I --connect-timeout 10 --max-time 30 https://nuget.pkg.github.com/index.json || echo "Failed to reach GitHub packages"
+
+      - name: Debug - .NET environment
+        run: |
+          echo "=== .NET Environment ==="
+          echo "Dotnet version:"
+          dotnet --version
+          echo ""
+          echo "Dotnet info:"
+          dotnet --info
+          echo ""
+          echo "NuGet configuration:"
+          dotnet nuget list source
+          echo ""
+          echo "Environment variables:"
+          env | grep -E "(DOTNET|NUGET|HTTP)" | sort
+
+      - name: Debug - File system and permissions
+        run: |
+          echo "=== File System Diagnostics ==="
+          echo "Current directory:"
+          pwd
+          echo ""
+          echo "Directory contents:"
+          ls -la
+          echo ""
+          echo "NuGet.config contents:"
+          cat NuGet.config || echo "NuGet.config not found"
+          echo ""
+          echo "Project files:"
+          find . -name "*.csproj" -type f | head -10
+          echo ""
+          echo "Disk space:"
+          df -h
+          echo ""
+          echo "Memory usage:"
+          free -h
+
+      - name: Debug - MTU and network settings
+        run: |
+          echo "=== Network MTU Diagnostics ==="
+          echo "Primary interface MTU:"
+          IFACE="$(ip route show default | awk '/default/ {print $5; exit}')"
+          echo "Interface: $IFACE"
+          ip link show dev "$IFACE"
+          echo ""
+          echo "Testing with different MTU sizes:"
+          echo "Testing with current MTU..."
+          ping -c 3 -M do -s 1472 8.8.8.8 || echo "Large packet failed"
+          echo "Testing with smaller MTU..."
+          ping -c 3 -M do -s 1372 8.8.8.8 || echo "Smaller packet failed"
+
 #      - name: Set NuGet environment variables
 #        run: |
 #          echo "DOTNET_NUGET_SIGNATURE_VERIFICATION=false" >> $GITHUB_ENV
@@ -42,7 +114,16 @@ jobs:
 #          echo "DOTNET_EnableWriteXorExecute=0" >> $GITHUB_ENV
 
       - name: Restore dependencies
-        run: dotnet restore --configfile NuGet.config --disable-parallel
+        run: |
+          echo "Starting dotnet restore with verbose logging..."
+          timeout 300 dotnet restore --configfile NuGet.config --disable-parallel --verbosity detailed || {
+            echo "Restore timed out or failed after 5 minutes"
+            echo "Checking for any partial restore artifacts:"
+            find ~/.nuget -name "*.tmp" -o -name "*.lock" 2>/dev/null | head -10
+            echo "Checking running processes:"
+            ps aux | grep -E "(dotnet|nuget)" | grep -v grep
+            exit 1
+          }
 
       - name: Build solution
         run: dotnet build --configuration Release --no-restore
