@@ -200,38 +200,7 @@ jobs:
 #          echo "DOTNET_EnableWriteXorExecute=0" >> $GITHUB_ENV
 
       - name: Restore dependencies
-        run: |
-          echo "Starting dotnet restore with network-friendly settings..."
-          
-          # # Clear any existing NuGet caches that might be corrupted
-          # dotnet nuget locals all --clear
-          
-          # Try restore with retries and network-friendly settings
-          for attempt in 1 2 3; do
-            echo "Restore attempt $attempt/3..."
-            if timeout 300 dotnet restore --configfile NuGet.config \
-              --disable-parallel \
-              --verbosity detailed \
-              --runtime ubuntu.20.04-x64 \
-              --no-cache; then
-              echo "✓ Restore successful on attempt $attempt"
-              break
-            else
-              echo "✗ Restore attempt $attempt failed"
-              if [ $attempt -eq 3 ]; then
-                echo "All restore attempts failed. Checking diagnostics..."
-                echo "Checking for any partial restore artifacts:"
-                find ~/.nuget -name "*.tmp" -o -name "*.lock" 2>/dev/null | head -10
-                echo "Checking running processes:"
-                ps aux | grep -E "(dotnet|nuget)" | grep -v grep
-                echo "NuGet cache contents:"
-                ls -la ~/.nuget/packages/ | head -20 || echo "No packages cache found"
-                exit 1
-              fi
-              echo "Waiting 30 seconds before retry..."
-              sleep 30
-            fi
-          done
+        run:  dotnet restore --configfile NuGet.config
 
       - name: Build solution
         run: dotnet build --configuration Release --no-restore
