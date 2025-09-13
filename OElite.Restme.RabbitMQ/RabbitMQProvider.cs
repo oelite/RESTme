@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using OElite.Abstractions;
 using RabbitMQ.Client;
@@ -13,7 +14,7 @@ namespace OElite.Providers
     public class RabbitMQProvider : IQueueProvider
     {
         private readonly IConnection _connection;
-        private readonly IModel _channel;
+        private readonly IChannel _channel;
         private readonly RestConfig _config;
         private bool _disposed = false;
 
@@ -37,8 +38,8 @@ namespace OElite.Providers
                 }
             }
 
-            _connection = factory.CreateConnection();
-            _channel = _connection.CreateModel();
+            _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
+            _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
         }
 
         public async Task<bool> PublishAsync<T>(T message, string? queueName = null, string? routingKey = null, 
@@ -51,7 +52,7 @@ namespace OElite.Providers
                     exchangeName = "";
 
                 if (string.IsNullOrEmpty(queueName))
-                    queueName = DeclareQueueAsync().Result;
+                    queueName = await DeclareQueueAsync();
 
                 if (string.IsNullOrEmpty(routingKey))
                     routingKey = queueName;
@@ -74,10 +75,12 @@ namespace OElite.Providers
                 var jsonMessage = message.JsonSerialize(_config.UseRestConvertForCollectionSerialization, _config.SerializerSettings);
                 var body = Encoding.UTF8.GetBytes(jsonMessage);
 
-                var properties = _channel.CreateBasicProperties();
-                properties.Persistent = isMessagePersistent;
+                var properties = new BasicProperties
+                {
+                    Persistent = isMessagePersistent
+                };
 
-                _channel.BasicPublish(exchange: exchangeName, routingKey: routingKey, basicProperties: properties, body: body);
+                await _channel.BasicPublishAsync(exchange: exchangeName, routingKey: routingKey, mandatory: false, basicProperties: properties, body: body);
                 
                 return true;
             }
@@ -108,10 +111,10 @@ namespace OElite.Providers
                     await BindQueueAsync(queueName, exchangeName, routingKey);
                 }
 
-                _channel.BasicQos(0, prefetchCount, false);
+                await _channel.BasicQosAsync(0, prefetchCount, false);
 
-                var consumer = new EventingBasicConsumer(_channel);
-                consumer.Received += async (model, ea) =>
+                var consumer = new AsyncEventingBasicConsumer(_channel);
+                consumer.ReceivedAsync += async (model, ea) =>
                 {
                     try
                     {
@@ -123,27 +126,27 @@ namespace OElite.Providers
                         
                         if (success)
                         {
-                            _channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
+                            await _channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
                         }
                         else
                         {
-                            _channel.BasicNack(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true);
+                            await _channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true);
                         }
 
                         // Check completion condition
                         if (completionCondition != null && await completionCondition())
                         {
-                            _channel.BasicCancel(ea.ConsumerTag);
+                            await _channel.BasicCancelAsync(ea.ConsumerTag);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _channel.BasicNack(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true);
+                        await _channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true);
                         throw new OEliteWebException($"Error processing message: {ex.Message}", ex);
                     }
                 };
 
-                _channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
+                await _channel.BasicConsumeAsync(queue: queueName, autoAck: false, consumer: consumer);
             }
             catch (Exception ex)
             {
@@ -157,10 +160,10 @@ namespace OElite.Providers
             {
                 // Close the channel and connection
                 if (_channel.IsOpen)
-                    _channel.Close();
+                    await _channel.CloseAsync();
                 
                 if (_connection.IsOpen)
-                    _connection.Close();
+                    await _connection.CloseAsync();
             }
             catch (Exception ex)
             {
@@ -176,7 +179,7 @@ namespace OElite.Providers
                 if (string.IsNullOrEmpty(queueName))
                     queueName = $"queue_{Guid.NewGuid():N}";
 
-                _channel.QueueDeclare(queue: queueName, durable: isDurable, exclusive: isExclusive, 
+                await _channel.QueueDeclareAsync(queue: queueName, durable: isDurable, exclusive: isExclusive, 
                     autoDelete: autoDelete, arguments: null);
                 
                 return queueName;
@@ -192,7 +195,7 @@ namespace OElite.Providers
         {
             try
             {
-                _channel.ExchangeDeclare(exchange: exchangeName, type: exchangeType, durable: isDurable, 
+                await _channel.ExchangeDeclareAsync(exchange: exchangeName, type: exchangeType, durable: isDurable, 
                     autoDelete: autoDelete, arguments: null);
             }
             catch (Exception ex)
@@ -205,7 +208,7 @@ namespace OElite.Providers
         {
             try
             {
-                _channel.QueueBind(queue: queueName, exchange: exchangeName, routingKey: routingKey);
+                await _channel.QueueBindAsync(queue: queueName, exchange: exchangeName, routingKey: routingKey);
             }
             catch (Exception ex)
             {
