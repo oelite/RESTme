@@ -31,14 +31,19 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: Install network tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iproute2 iputils-ping net-tools
+
       - name: Debug - Network connectivity
         run: |
           echo "=== Network Diagnostics ==="
           echo "Current network interfaces:"
-          ip addr show
+          ip addr show || ifconfig -a || echo "Network interface commands not available"
           echo ""
           echo "Default route:"
-          ip route show default
+          ip route show default || route -n || netstat -rn || echo "Route commands not available"
           echo ""
           echo "DNS configuration:"
           cat /etc/resolv.conf
@@ -93,9 +98,9 @@ jobs:
         run: |
           echo "=== Network MTU Diagnostics ==="
           echo "Primary interface MTU:"
-          IFACE="$(ip route show default | awk '/default/ {print $5; exit}')"
+          IFACE="$(ip route show default 2>/dev/null | awk '/default/ {print $5; exit}' || route -n 2>/dev/null | awk '/^0.0.0.0/ {print $8; exit}' || echo 'eth0')"
           echo "Interface: $IFACE"
-          ip link show dev "$IFACE"
+          ip link show dev "$IFACE" 2>/dev/null || ifconfig "$IFACE" 2>/dev/null || echo "Cannot determine MTU for interface $IFACE"
           echo ""
           echo "Testing with different MTU sizes:"
           echo "Testing with current MTU..."
