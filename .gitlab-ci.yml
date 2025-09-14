@@ -57,9 +57,6 @@ set_environment:
         echo "NUGET_API_KEY=$NUGET_TOKEN" >> deploy.env
       fi
   script:
-    # Ensure packages are restored
-    - dotnet restore --configfile NuGet.config
-    
     # Pack core package
     - echo "Packing OElite.Restme (Core)"
     - dotnet pack OElite.Restme/OElite.Restme.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
