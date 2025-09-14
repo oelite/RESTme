@@ -56,6 +56,9 @@ set_environment:
     # Debug: List available environment variables for troubleshooting
     - echo "Available CI/CD variables:"
     - env | grep -E "^(CI_|NUGET|TOKEN)" | sort
+    - echo ""
+    - echo "All environment variables containing 'token', 'key', or 'api' (case insensitive):"
+    - env | grep -iE "(token|key|api)" | sort
     
     # Set deployment target based on branch
     - |
@@ -69,7 +72,7 @@ set_environment:
         echo "DEPLOY_TARGET=phanes.dev" >> deploy.env
         echo "NUGET_SOURCE=https://packages.services.phanes.technology/v3/index.json" >> deploy.env
         # Try different possible variable names for Phanes token
-        API_KEY="${NUGET_TOKEN:-${NUGET_API_KEY:-${PHANES_TOKEN:-${PHANES_API_KEY:-${PHANES_NUGET_TOKEN}}}}}"
+        API_KEY="${NUGET_TOKEN:-${NUGET_API_KEY:-${PHANES_TOKEN:-${PHANES_API_KEY:-${PHANES_NUGET_TOKEN:-${CI_JOB_TOKEN:-${GITLAB_TOKEN:-${ACCESS_TOKEN:-${API_TOKEN:-${DEPLOY_TOKEN}}}}}}}}}}"
         echo "NUGET_API_KEY=$API_KEY" >> deploy.env
       fi
     
@@ -127,8 +130,18 @@ deploy_packages:
     - |
       if [ -z "$NUGET_API_KEY" ]; then
         echo "ERROR: NUGET_API_KEY is empty or not set"
-        echo "Available environment variables starting with NUGET:"
-        env | grep -i nuget || echo "No NUGET variables found"
+        echo ""
+        echo "SOLUTION: You need to configure a GitLab CI/CD variable for the NuGet feed authentication."
+        echo "Please add one of these variables in GitLab Project Settings > CI/CD > Variables:"
+        echo "  - NUGET_TOKEN (recommended)"
+        echo "  - PHANES_TOKEN"
+        echo "  - PHANES_API_KEY"
+        echo "  - API_TOKEN"
+        echo ""
+        echo "The variable should contain the API key for: $NUGET_SOURCE"
+        echo ""
+        echo "Current available NUGET-related variables:"
+        env | grep -i nuget || echo "  (none found)"
         exit 1
       else
         echo "NUGET_API_KEY is set (length: ${#NUGET_API_KEY})"
