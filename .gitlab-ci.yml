@@ -21,7 +21,15 @@ build_solution:
   stage: build
   image: mcr.microsoft.com/dotnet/sdk:9.0
   script:
+    - dotnet restore --configfile NuGet.config
     - dotnet build --configuration Release --configfile NuGet.config
+    # Ensure all projects that will be packed are built
+    - dotnet build OElite.Restme/OElite.Restme.csproj --configuration Release --no-restore
+    - dotnet build OElite.Restme.Redis/OElite.Restme.Redis.csproj --configuration Release --no-restore
+    - dotnet build OElite.Restme.RabbitMQ/OElite.Restme.RabbitMQ.csproj --configuration Release --no-restore
+    - dotnet build OElite.Restme.Azure/OElite.Restme.Azure.csproj --configuration Release --no-restore
+    - dotnet build OElite.Restme.S3/OElite.Restme.S3.csproj --configuration Release --no-restore
+    - dotnet build OElite.Restme.Utils/OElite.Restme.Utils.csproj --configuration Release --no-restore
   artifacts:
     paths:
       - "**/bin/"
@@ -57,6 +65,9 @@ set_environment:
         echo "NUGET_API_KEY=$NUGET_TOKEN" >> deploy.env
       fi
   script:
+    # Ensure packages are restored
+    - dotnet restore --configfile NuGet.config
+    
     # Pack core package
     - echo "Packing OElite.Restme (Core)"
     - dotnet pack OElite.Restme/OElite.Restme.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX

@@ -13,10 +13,6 @@
         <Copyright>OElite Limited</Copyright>
         <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
         <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
-        <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
-        <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
-        <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
-        <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
         <Title>OElite.Restme</Title>
         <Nullable>enable</Nullable>
     </PropertyGroup>
