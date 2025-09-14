@@ -14,12 +14,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
-        <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
+        <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2" />
+        <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2"/>
     </ItemGroup>
 
 </Project>
