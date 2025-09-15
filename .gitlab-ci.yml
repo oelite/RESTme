@@ -1,10 +1,16 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  BUILD_VERSION: $CI_PIPELINE_ID
-  BRANCH_NAME: $CI_COMMIT_REF_NAME
-  VERSION_SUFFIX: ${CI_COMMIT_REF_NAME}.${CI_PIPELINE_ID}
+  # Define projects as multi-line string (easier to manage than space-separated)
+  PROJECTS: |
+    OElite.Restme
+    OElite.Restme.Redis
+    OElite.Restme.RabbitMQ
+    OElite.Restme.Azure
+    OElite.Restme.S3
+    OElite.Restme.Utils
 
 stages:
+  - version
   - build
   - test
   - pack
@@ -17,11 +23,52 @@ workflow:
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_COMMIT_BRANCH == "main"
 
+determine_version:
+  stage: version
+  image: mcr.microsoft.com/dotnet/sdk:9.0
+  script:
+    - |
+      # Read current version from first project
+      CURRENT_VERSION=$(grep -o '<VersionPrefix>[^<]*' OElite.Restme/OElite.Restme.csproj | cut -d'>' -f2)
+      echo "Current version: $CURRENT_VERSION"
+      
+      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+        # Production release - use current version from project files
+        VERSION_NUMBER="$CURRENT_VERSION"
+        echo "Production release version: $VERSION_NUMBER"
+      else
+        # Pre-release version for develop/feature branches
+        VERSION_NUMBER="$CURRENT_VERSION"
+        VERSION_SUFFIX="${CI_COMMIT_REF_NAME}.${CI_PIPELINE_ID}"
+        echo "Pre-release version: $VERSION_NUMBER-$VERSION_SUFFIX"
+      fi
+      
+      # Export version info for other jobs
+      echo "VERSION_NUMBER=$VERSION_NUMBER" > version.env
+      echo "VERSION_SUFFIX=$VERSION_SUFFIX" >> version.env
+      echo "CURRENT_VERSION=$CURRENT_VERSION" >> version.env
+      
+      cat version.env
+  artifacts:
+    reports:
+      dotenv: version.env
+    expire_in: 1 hour
+
 build_solution:
   stage: build
   image: mcr.microsoft.com/dotnet/sdk:9.0
   script:
+    - dotnet restore --configfile NuGet.config
     - dotnet build --configuration Release --configfile NuGet.config
+    # Ensure all specified projects are built (solution build sometimes skips some)
+    - |
+      echo "Building specified projects:"
+      while IFS= read -r project || [ -n "$project" ]; do
+        if [ -n "$project" ]; then
+          echo "Building $project"
+          dotnet build $project/$project.csproj --configuration Release --no-restore
+        fi
+      done <<< "$PROJECTS"
   artifacts:
     paths:
       - "**/bin/"
@@ -39,47 +86,32 @@ run_tests:
     reports:
       junit: "**/TestResults/*.xml"
 
-set_environment:
+pack_packages:
   stage: pack
   image: mcr.microsoft.com/dotnet/sdk:9.0
   dependencies:
     - build_solution
-  before_script:
-    # Set deployment target based on branch
-    - |
-      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
-        echo "DEPLOY_TARGET=nuget.org" >> deploy.env
-        echo "NUGET_SOURCE=https://api.nuget.org/v3/index.json" >> deploy.env
-        echo "NUGET_API_KEY=$NUGET_ORG_TOKEN" >> deploy.env
-      else
-        echo "DEPLOY_TARGET=phanes.dev" >> deploy.env
-        echo "NUGET_SOURCE=https://packages.services.phanes.technology/v3/index.json" >> deploy.env
-        echo "NUGET_API_KEY=$NUGET_TOKEN" >> deploy.env
-      fi
+    - determine_version
   script:
-    # Pack core package
-    - echo "Packing OElite.Restme (Core)"
-    - dotnet pack OElite.Restme/OElite.Restme.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
-
-    # Pack Redis package
-    - echo "Packing OElite.Restme.Redis"
-    - dotnet pack OElite.Restme.Redis/OElite.Restme.Redis.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
-
-    # Pack RabbitMQ package
-    - echo "Packing OElite.Restme.RabbitMQ"
-    - dotnet pack OElite.Restme.RabbitMQ/OElite.Restme.RabbitMQ.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
-
-    # Pack Azure package
-    - echo "Packing OElite.Restme.Azure"
-    - dotnet pack OElite.Restme.Azure/OElite.Restme.Azure.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
-
-    # Pack S3 package
-    - echo "Packing OElite.Restme.S3"
-    - dotnet pack OElite.Restme.S3/OElite.Restme.S3.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
-
-    # Pack Utils package
-    - echo "Packing OElite.Restme.Utils"
-    - dotnet pack OElite.Restme.Utils/OElite.Restme.Utils.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
+    # Restore dependencies first
+    - dotnet restore --configfile NuGet.config
+    # Pack specified projects
+    - |
+      echo "Packing specified projects with version: $VERSION_NUMBER"
+      echo "Version suffix: $VERSION_SUFFIX"
+      
+      while IFS= read -r project || [ -n "$project" ]; do
+        if [ -n "$project" ]; then
+          echo "Packing $project"
+          if [ -n "$VERSION_SUFFIX" ]; then
+            # Pre-release version
+            dotnet pack $project/$project.csproj --configuration Release --output ./packages --version-suffix $VERSION_SUFFIX
+          else
+            # Production release - use version from project file
+            dotnet pack $project/$project.csproj --configuration Release --output ./packages
+          fi
+        fi
+      done <<< "$PROJECTS"
 
     # List generated packages
     - echo "Generated packages:"
@@ -87,30 +119,43 @@ set_environment:
   artifacts:
     paths:
       - ./packages/*.nupkg
-      - deploy.env
     expire_in: 1 hour
-    reports:
-      dotenv: deploy.env
 
 deploy_packages:
   stage: deploy
   image: mcr.microsoft.com/dotnet/sdk:9.0
   dependencies:
-    - set_environment
+    - pack_packages
+    - determine_version
   script:
-    - echo "Deploying to $DEPLOY_TARGET"
-    - echo "Source $NUGET_SOURCE"
-    - dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_API_KEY --skip-duplicate
+    # Set deployment configuration and deploy based on branch
+    - |
+      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+        DEPLOY_TARGET="nuget.org"
+        NUGET_SOURCE="https://api.nuget.org/v3/index.json"
+        echo "Deploying to $DEPLOY_TARGET"
+        echo "Source: $NUGET_SOURCE"
+        echo "Using NuGet.org authentication"
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_TOKEN --skip-duplicate
+      else
+        DEPLOY_TARGET="phanes.dev"
+        NUGET_SOURCE="https://packages.services.phanes.technology/v3/index.json"
+        echo "Deploying to $DEPLOY_TARGET"
+        echo "Source: $NUGET_SOURCE - $PHANES_API_TOKEN"
+        echo "Using Phanes NuGet feed authentication"
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key "$PHANES_API_TOKEN" --skip-duplicate
+      fi
     - echo "## 🚀 Deployment Summary"
-    - echo "**Branch:** $BRANCH_NAME"
-    - echo "**Build Number:** $BUILD_VERSION"
-    - echo "**Version Suffix:** $VERSION_SUFFIX"
+    - echo "**Branch:** $CI_COMMIT_REF_NAME"
+    - echo "**Build Number:** $CI_PIPELINE_ID"
+    - echo "**Version:** $VERSION_NUMBER$([ -n "$VERSION_SUFFIX" ] && echo "-$VERSION_SUFFIX")"
     - echo "**Deployment Target:** $DEPLOY_TARGET"
     - echo "### 📦 Deployed Packages:"
-    - echo "- OElite.Restme (Core)"
-    - echo "- OElite.Restme.Redis"
-    - echo "- OElite.Restme.RabbitMQ"
-    - echo "- OElite.Restme.Azure"
-    - echo "- OElite.Restme.S3"
-    - echo "- OElite.Restme.Utils"
+    - |
+      for package in ./packages/*.nupkg; do
+        if [ -f "$package" ]; then
+          package_name=$(basename "$package" .nupkg)
+          echo "- $package_name"
+        fi
+      done
 
