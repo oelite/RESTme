@@ -1,9 +1,14 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  BUILD_VERSION: $CI_PIPELINE_ID
-  BRANCH_NAME: $CI_COMMIT_REF_NAME
   VERSION_SUFFIX: ${CI_COMMIT_REF_NAME}.${CI_PIPELINE_ID}
-  PROJECTS: "OElite.Restme OElite.Restme.Redis OElite.Restme.RabbitMQ OElite.Restme.Azure OElite.Restme.S3 OElite.Restme.Utils OElite.Restme.GoogleUtils"
+  # Define projects as multi-line string (easier to manage than space-separated)
+  PROJECTS: |
+    OElite.Restme
+    OElite.Restme.Redis
+    OElite.Restme.RabbitMQ
+    OElite.Restme.Azure
+    OElite.Restme.S3
+    OElite.Restme.Utils
 
 stages:
   - build
@@ -11,6 +16,7 @@ stages:
   - pack
   - deploy
 
+# Manual trigger support (similar to workflow_dispatch)
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
@@ -23,6 +29,15 @@ build_solution:
   script:
     - dotnet restore --configfile NuGet.config
     - dotnet build --configuration Release --configfile NuGet.config
+    # Ensure all specified projects are built (solution build sometimes skips some)
+    - |
+      echo "Building specified projects:"
+      while IFS= read -r project || [ -n "$project" ]; do
+        if [ -n "$project" ]; then
+          echo "Building $project"
+          dotnet build $project/$project.csproj --configuration Release --no-restore
+        fi
+      done <<< "$PROJECTS"
   artifacts:
     paths:
       - "**/bin/"
@@ -46,10 +61,17 @@ pack_packages:
   dependencies:
     - build_solution
   script:
-    - 'for project in $PROJECTS; do'
-    - '  echo "Packing $project"'
-    - '  dotnet pack "$project/$project.csproj" --configuration Release --no-build --output ./packages --version-suffix "$VERSION_SUFFIX"'
-    - done
+    # Pack specified projects
+    - |
+      echo "Packing specified projects:"
+      while IFS= read -r project || [ -n "$project" ]; do
+        if [ -n "$project" ]; then
+          echo "Packing $project"
+          dotnet pack $project/$project.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
+        fi
+      done <<< "$PROJECTS"
+
+    # List generated packages
     - echo "Generated packages:"
     - ls -la ./packages/*.nupkg
   artifacts:
@@ -63,23 +85,35 @@ deploy_packages:
   dependencies:
     - pack_packages
   script:
-    - if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
-    - '  DEPLOY_TARGET="nuget.org"'
-    - '  NUGET_SOURCE="https://api.nuget.org/v3/index.json"'
-    - '  NUGET_KEY=$NUGET_TOKEN'
-    - else
-    - '  DEPLOY_TARGET="phanes.dev"'
-    - '  NUGET_SOURCE="https://packages.services.phanes.technology/v3/index.json"'
-    - '  NUGET_KEY=$PHANES_API_TOKEN'
-    - fi
-    - echo "Deploying to $DEPLOY_TARGET (Source: $NUGET_SOURCE)"
-    - dotnet nuget push "./packages/*.nupkg" --source "$NUGET_SOURCE" --api-key "$NUGET_KEY" --skip-duplicate
+    # Set deployment configuration and deploy based on branch
+    - |
+      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+        DEPLOY_TARGET="nuget.org"
+        NUGET_SOURCE="https://api.nuget.org/v3/index.json"
+        echo "Deploying to $DEPLOY_TARGET"
+        echo "Source: $NUGET_SOURCE"
+        echo "Using NuGet.org authentication"
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_TOKEN --skip-duplicate
+      else
+        DEPLOY_TARGET="phanes.dev"
+        NUGET_SOURCE="https://packages.services.phanes.technology/v3/index.json"
+        echo "Deploying to $DEPLOY_TARGET"
+        echo "Source: $NUGET_SOURCE - $PHANES_API_TOKEN"
+        echo "Using Phanes NuGet feed authentication"
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key "$PHANES_API_TOKEN" --skip-duplicate
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key "$NUGET_TOKEN" --skip-duplicate
+      fi
     - echo "## 🚀 Deployment Summary"
-    - echo "**Branch:** $BRANCH_NAME"
-    - echo "**Build Number:** $BUILD_VERSION"
+    - echo "**Branch:** $CI_COMMIT_REF_NAME"
+    - echo "**Build Number:** $CI_PIPELINE_ID"
     - echo "**Version Suffix:** $VERSION_SUFFIX"
     - echo "**Deployment Target:** $DEPLOY_TARGET"
     - echo "### 📦 Deployed Packages:"
-    - 'for project in $PROJECTS; do'
-    - '  echo "- $project"'
-    - done
+    - |
+      for package in ./packages/*.nupkg; do
+        if [ -f "$package" ]; then
+          package_name=$(basename "$package" .nupkg)
+          echo "- $package_name"
+        fi
+      done
+
