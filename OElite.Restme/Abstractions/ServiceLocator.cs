@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Linq;
+using System.IO;
 using Microsoft.Extensions.Logging;
 
 namespace OElite.Abstractions
@@ -55,6 +58,14 @@ namespace OElite.Abstractions
             lock (_lock)
             {
                 _namedFactories.TryGetValue(name.ToLowerInvariant(), out var factory);
+                
+                // If not found, try to auto-discover providers
+                if (factory == null)
+                {
+                    DiscoverAndRegisterProviders();
+                    _namedFactories.TryGetValue(name.ToLowerInvariant(), out factory);
+                }
+                
                 return factory;
             }
         }
@@ -79,6 +90,113 @@ namespace OElite.Abstractions
             // For now, return the default factory
             // In a real implementation, this could check for registered factories
             return new DefaultServiceFactory(logger);
+        }
+
+        /// <summary>
+        /// Automatically discover and register provider assemblies
+        /// </summary>
+        private static void DiscoverAndRegisterProviders()
+        {
+            try
+            {
+                // Get all loaded assemblies that might contain providers
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(a => !a.IsDynamic && a.FullName != null)
+                    .Where(a => a.FullName.Contains("OElite.Restme") && 
+                               !a.FullName.Contains("OElite.Restme.Utils") &&
+                               !a.FullName.EndsWith("OElite.Restme"))
+                    .ToList();
+
+                // Also try to load assemblies from the current directory
+                var currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (currentDirectory != null)
+                {
+                    var providerFiles = Directory.GetFiles(currentDirectory, "OElite.Restme.*.dll", SearchOption.TopDirectoryOnly)
+                        .Where(f => !f.EndsWith("OElite.Restme.Utils.dll") && !f.EndsWith("OElite.Restme.dll"));
+
+                    foreach (var file in providerFiles)
+                    {
+                        try
+                        {
+                            var assembly = Assembly.LoadFrom(file);
+                            if (!assemblies.Contains(assembly))
+                            {
+                                assemblies.Add(assembly);
+                            }
+                        }
+                        catch
+                        {
+                            // Ignore failed assembly loads
+                        }
+                    }
+                }
+
+                // Scan assemblies for IServiceFactory implementations
+                foreach (var assembly in assemblies)
+                {
+                    try
+                    {
+                        var factoryTypes = assembly.GetTypes()
+                            .Where(t => typeof(IServiceFactory).IsAssignableFrom(t) && 
+                                       !t.IsInterface && !t.IsAbstract)
+                            .ToList();
+
+                        foreach (var factoryType in factoryTypes)
+                        {
+                            // Try to trigger static constructor if present
+                            try
+                            {
+                                System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(factoryType.TypeHandle);
+                            }
+                            catch
+                            {
+                                // If static constructor fails, try manual registration
+                                try
+                                {
+                                    var factory = Activator.CreateInstance(factoryType) as IServiceFactory;
+                                    if (factory != null)
+                                    {
+                                        // Try to determine provider name from type name
+                                        var providerName = ExtractProviderName(factoryType.Name);
+                                        if (!string.IsNullOrEmpty(providerName))
+                                        {
+                                            RegisterFactory(providerName, factory);
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    // Ignore registration failures
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore type scanning failures
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore discovery failures - fallback to default behavior
+            }
+        }
+
+        /// <summary>
+        /// Extract provider name from factory type name
+        /// </summary>
+        private static string ExtractProviderName(string typeName)
+        {
+            // RabbitMQServiceFactory -> rabbitmq
+            // AzureServiceFactory -> azure
+            // S3ServiceFactory -> s3
+            if (typeName.EndsWith("ServiceFactory"))
+            {
+                var providerName = typeName.Substring(0, typeName.Length - "ServiceFactory".Length);
+                return providerName.ToLowerInvariant();
+            }
+            return string.Empty;
         }
     }
 }
