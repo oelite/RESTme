@@ -61,13 +61,15 @@ pack_packages:
   dependencies:
     - build_solution
   script:
+    # Restore dependencies first
+    - dotnet restore --configfile NuGet.config
     # Pack specified projects
     - |
       echo "Packing specified projects:"
       while IFS= read -r project || [ -n "$project" ]; do
         if [ -n "$project" ]; then
           echo "Packing $project"
-          dotnet pack $project/$project.csproj --configuration Release --no-build --output ./packages --version-suffix $VERSION_SUFFIX
+          dotnet pack $project/$project.csproj --configuration Release --output ./packages --version-suffix $VERSION_SUFFIX
         fi
       done <<< "$PROJECTS"
 
