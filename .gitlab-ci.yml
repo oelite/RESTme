@@ -1,6 +1,5 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  VERSION_SUFFIX: ${CI_COMMIT_REF_NAME}.${CI_PIPELINE_ID}
   # Define projects as multi-line string (easier to manage than space-separated)
   PROJECTS: |
     OElite.Restme
@@ -11,6 +10,7 @@ variables:
     OElite.Restme.Utils
 
 stages:
+  - version
   - build
   - test
   - pack
@@ -22,6 +22,37 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "web"
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_COMMIT_BRANCH == "main"
+
+determine_version:
+  stage: version
+  image: mcr.microsoft.com/dotnet/sdk:9.0
+  script:
+    - |
+      # Read current version from first project
+      CURRENT_VERSION=$(grep -o '<VersionPrefix>[^<]*' OElite.Restme/OElite.Restme.csproj | cut -d'>' -f2)
+      echo "Current version: $CURRENT_VERSION"
+      
+      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+        # Production release - use current version from project files
+        VERSION_NUMBER="$CURRENT_VERSION"
+        echo "Production release version: $VERSION_NUMBER"
+      else
+        # Pre-release version for develop/feature branches
+        VERSION_NUMBER="$CURRENT_VERSION"
+        VERSION_SUFFIX="${CI_COMMIT_REF_NAME}.${CI_PIPELINE_ID}"
+        echo "Pre-release version: $VERSION_NUMBER-$VERSION_SUFFIX"
+      fi
+      
+      # Export version info for other jobs
+      echo "VERSION_NUMBER=$VERSION_NUMBER" > version.env
+      echo "VERSION_SUFFIX=$VERSION_SUFFIX" >> version.env
+      echo "CURRENT_VERSION=$CURRENT_VERSION" >> version.env
+      
+      cat version.env
+  artifacts:
+    reports:
+      dotenv: version.env
+    expire_in: 1 hour
 
 build_solution:
   stage: build
@@ -60,16 +91,25 @@ pack_packages:
   image: mcr.microsoft.com/dotnet/sdk:9.0
   dependencies:
     - build_solution
+    - determine_version
   script:
     # Restore dependencies first
     - dotnet restore --configfile NuGet.config
     # Pack specified projects
     - |
-      echo "Packing specified projects:"
+      echo "Packing specified projects with version: $VERSION_NUMBER"
+      echo "Version suffix: $VERSION_SUFFIX"
+      
       while IFS= read -r project || [ -n "$project" ]; do
         if [ -n "$project" ]; then
           echo "Packing $project"
-          dotnet pack $project/$project.csproj --configuration Release --output ./packages --version-suffix $VERSION_SUFFIX
+          if [ -n "$VERSION_SUFFIX" ]; then
+            # Pre-release version
+            dotnet pack $project/$project.csproj --configuration Release --output ./packages --version-suffix $VERSION_SUFFIX
+          else
+            # Production release - use version from project file
+            dotnet pack $project/$project.csproj --configuration Release --output ./packages
+          fi
         fi
       done <<< "$PROJECTS"
 
@@ -86,6 +126,7 @@ deploy_packages:
   image: mcr.microsoft.com/dotnet/sdk:9.0
   dependencies:
     - pack_packages
+    - determine_version
   script:
     # Set deployment configuration and deploy based on branch
     - |
@@ -107,7 +148,7 @@ deploy_packages:
     - echo "## 🚀 Deployment Summary"
     - echo "**Branch:** $CI_COMMIT_REF_NAME"
     - echo "**Build Number:** $CI_PIPELINE_ID"
-    - echo "**Version Suffix:** $VERSION_SUFFIX"
+    - echo "**Version:** $VERSION_NUMBER$([ -n "$VERSION_SUFFIX" ] && echo "-$VERSION_SUFFIX")"
     - echo "**Deployment Target:** $DEPLOY_TARGET"
     - echo "### 📦 Deployed Packages:"
     - |
