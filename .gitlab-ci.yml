@@ -78,7 +78,8 @@ set_environment:
     
     # Debug: Show what was written to deploy.env (without exposing sensitive values)
     - echo "Generated deploy.env contents:"
-    - sed 's/NUGET_API_KEY=.*/NUGET_API_KEY=***MASKED***/' deploy.env
+    - sed 's/NUGET_API_KEY=.*/NUGET_API_KEY=.*/' deploy.env
+    # - sed 's/NUGET_API_KEY=.*/NUGET_API_KEY=***MASKED***/' deploy.env
   script:
     # Ensure packages are restored
     - dotnet restore --configfile NuGet.config
