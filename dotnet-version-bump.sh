@@ -1,21 +1,21 @@
 #!/bin/bash
 
-# bump-version.sh - Bumps version numbers across all .NET projects
+# dotnet-version-bump.sh - Bumps version numbers across all .NET projects in helios/core
 #
 # SYNOPSIS
-#     ./bump-version.sh [major|minor|patch] [--dry-run]
-#     ./bump-version.sh --version <new-version> [--dry-run]
+#     ./dotnet-version-bump.sh [major|minor|patch] [--dry-run]
+#     ./dotnet-version-bump.sh --version <new-version> [--dry-run]
 #
 # DESCRIPTION
 #     This script helps manage version numbers for production releases.
-#     It can bump major, minor, or patch versions across all projects.
+#     It can bump major, minor, or patch versions across all projects in the helios/core directory.
 #
 # EXAMPLES
-#     ./bump-version.sh patch              # Bump patch version (2.0.5 → 2.0.6)
-#     ./bump-version.sh minor              # Bump minor version (2.0.5 → 2.1.0)
-#     ./bump-version.sh major              # Bump major version (2.0.5 → 3.0.0)
-#     ./bump-version.sh --version 2.2.0    # Set specific version
-#     ./bump-version.sh patch --dry-run    # Preview changes without applying
+#     ./dotnet-version-bump.sh patch              # Bump patch version (2.0.5 → 2.0.6)
+#     ./dotnet-version-bump.sh minor              # Bump minor version (2.0.5 → 2.1.0)
+#     ./dotnet-version-bump.sh major              # Bump major version (2.0.5 → 3.0.0)
+#     ./dotnet-version-bump.sh --version 2.2.0    # Set specific version
+#     ./dotnet-version-bump.sh patch --dry-run    # Preview changes without applying
 
 set -e  # Exit on any error
 
@@ -51,6 +51,8 @@ usage() {
     echo "  $0 major              # Bump major version (2.0.5 → 3.0.0)"
     echo "  $0 --version 2.2.0    # Set specific version"
     echo "  $0 patch --dry-run    # Preview changes without applying"
+    echo ""
+    echo "This script will update all .csproj files in the helios/core directory."
     exit 1
 }
 
@@ -93,11 +95,11 @@ if [[ -z "$VERSION_TYPE" && -z "$NEW_VERSION" ]]; then
     usage
 fi
 
-# Find all OElite.Restme project files
-PROJECT_FILES=($(find . -name "*.csproj" -path "*/OElite.Restme*" | sort))
+# Find all project files in helios/core directory
+PROJECT_FILES=($(find . -name "*.csproj" | sort))
 
 if [[ ${#PROJECT_FILES[@]} -eq 0 ]]; then
-    print_color $RED "Error: No OElite.Restme project files found!"
+    print_color $RED "Error: No project files found in helios/core directory!"
     exit 1
 fi
 
