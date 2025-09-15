@@ -53,13 +53,12 @@ pack_packages:
   dependencies:
     - build_solution
   script:
-    - |
-      while IFS= read -r project || [ -n "$project" ]; do
-        if [ -n "$project" ]; then
-          echo "Packing $project"
-          dotnet pack "$project/$project.csproj" --configuration Release --no-build --output ./packages --version-suffix "$VERSION_SUFFIX"
-        fi
-      done <<< "$PROJECTS"
+    - while IFS= read -r project || [ -n "$project" ]; do
+    - '  if [ -n "$project" ]; then'
+    - '    echo "Packing $project"'
+    - '    dotnet pack "$project/$project.csproj" --configuration Release --no-build --output ./packages --version-suffix "$VERSION_SUFFIX"'
+    - '  fi'
+    - done <<< "$PROJECTS"
     - echo "Generated packages:"
     - ls -la ./packages/*.nupkg
   artifacts:
@@ -73,28 +72,25 @@ deploy_packages:
   dependencies:
     - pack_packages
   script:
-    - |
-      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
-        DEPLOY_TARGET="nuget.org"
-        NUGET_SOURCE="https://api.nuget.org/v3/index.json"
-        NUGET_KEY=$NUGET_TOKEN
-      else
-        DEPLOY_TARGET="phanes.dev"
-        NUGET_SOURCE="https://packages.services.phanes.technology/v3/index.json"
-        NUGET_KEY=$PHANES_API_TOKEN
-      fi
+    - if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+    - '  DEPLOY_TARGET="nuget.org"'
+    - '  NUGET_SOURCE="https://api.nuget.org/v3/index.json"'
+    - '  NUGET_KEY=$NUGET_TOKEN'
+    - else
+    - '  DEPLOY_TARGET="phanes.dev"'
+    - '  NUGET_SOURCE="https://packages.services.phanes.technology/v3/index.json"'
+    - '  NUGET_KEY=$PHANES_API_TOKEN'
+    - fi
     - echo "Deploying to $DEPLOY_TARGET (Source: $NUGET_SOURCE)"
     - dotnet nuget push "./packages/*.nupkg" --source "$NUGET_SOURCE" --api-key "$NUGET_KEY" --skip-duplicate
-    - |
-      echo "## 🚀 Deployment Summary"
-      echo "**Branch:** $BRANCH_NAME"
-      echo "**Build Number:** $BUILD_VERSION"
-      echo "**Version Suffix:** $VERSION_SUFFIX"
-      echo "**Deployment Target:** $DEPLOY_TARGET"
-      echo "### 📦 Deployed Packages:"
-    - |
-      while IFS= read -r project || [ -n "$project" ]; do
-        if [ -n "$project" ]; then
-          echo "- $project"
-        fi
-      done <<< "$PROJECTS"
+    - echo "## 🚀 Deployment Summary"
+    - echo "**Branch:** $BRANCH_NAME"
+    - echo "**Build Number:** $BUILD_VERSION"
+    - echo "**Version Suffix:** $VERSION_SUFFIX"
+    - echo "**Deployment Target:** $DEPLOY_TARGET"
+    - echo "### 📦 Deployed Packages:"
+    - while IFS= read -r project || [ -n "$project" ]; do
+    - '  if [ -n "$project" ]; then'
+    - '    echo "- $project"'
+    - '  fi'
+    - done <<< "$PROJECTS"
