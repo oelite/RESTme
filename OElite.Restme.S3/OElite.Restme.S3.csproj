@@ -2,8 +2,8 @@
     <PropertyGroup>
         <Description>OElite.Restme S3 provider implementation</Description>
         <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
-        <AssemblyVersion>2.0.6</AssemblyVersion>
-        <VersionPrefix>2.0.6</VersionPrefix>
+        <AssemblyVersion>2.0.7</AssemblyVersion>
+        <VersionPrefix>2.0.7</VersionPrefix>
         <AssemblyName>OElite.Restme.S3</AssemblyName>
         <PackageTags>OElite;Restme;S3;AWS;Storage</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
