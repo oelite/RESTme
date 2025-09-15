@@ -50,15 +50,15 @@ run_tests:
 pack_packages:
   stage: pack
   image: mcr.microsoft.com/dotnet/sdk:9.0
-  dependencies:
-    - build_solution
   script:
-    - while IFS= read -r project || [ -n "$project" ]; do
-    - '  if [ -n "$project" ]; then'
-    - '    echo "Packing $project"'
-    - '    dotnet pack "$project/$project.csproj" --configuration Release --no-build --output ./packages --version-suffix "$VERSION_SUFFIX"'
-    - '  fi'
-    - done <<< "$PROJECTS"
+    - dotnet restore --configfile NuGet.config
+    - |
+      while IFS= read -r project || [ -n "$project" ]; do
+        if [ -n "$project" ]; then
+          echo "Packing $project"
+          dotnet pack "$project/$project.csproj" --configuration Release --output ./packages --version-suffix "$VERSION_SUFFIX"
+        fi
+      done <<< "$PROJECTS"
     - echo "Generated packages:"
     - ls -la ./packages/*.nupkg
   artifacts:
