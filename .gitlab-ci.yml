@@ -96,8 +96,8 @@ deploy_packages:
         echo "Deploying to $DEPLOY_TARGET"
         echo "Source: $NUGET_SOURCE - $PHANES_API_TOKEN"
         echo "Using Phanes NuGet feed authentication"
-        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $PHANES_API_TOKEN --skip-duplicate
-        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_TOKEN --skip-duplicate
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key "$PHANES_API_TOKEN" --skip-duplicate
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key "$NUGET_TOKEN" --skip-duplicate
       fi
     - echo "## 🚀 Deployment Summary"
     - echo "**Branch:** $CI_COMMIT_REF_NAME"
