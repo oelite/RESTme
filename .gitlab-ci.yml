@@ -47,39 +47,11 @@ run_tests:
     reports:
       junit: "**/TestResults/*.xml"
 
-set_environment:
+pack_packages:
   stage: pack
   image: mcr.microsoft.com/dotnet/sdk:9.0
   dependencies:
     - build_solution
-  before_script:
-    # Debug: List available environment variables for troubleshooting
-    - echo "Available CI/CD variables:"
-    - env | grep -E "^(CI_|NUGET|TOKEN)" | sort
-    - echo ""
-    - echo "All environment variables containing 'token', 'key', or 'api' (case insensitive):"
-    - env | grep -iE "(token|key|api)" | sort
-    
-    # Set deployment target based on branch
-    - |
-      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
-        echo "DEPLOY_TARGET=nuget.org" >> deploy.env
-        echo "NUGET_SOURCE=https://api.nuget.org/v3/index.json" >> deploy.env
-        # Try different possible variable names for NuGet.org token
-        API_KEY="${NUGET_TOKEN}"
-        echo "NUGET_API_KEY=$API_KEY" >> deploy.env
-      else
-        echo "DEPLOY_TARGET=phanes.dev" >> deploy.env
-        echo "NUGET_SOURCE=https://packages.services.phanes.technology/v3/index.json" >> deploy.env
-        # Try different possible variable names for Phanes token
-        API_KEY="${PHANES_API_TOKEN}"
-        echo "NUGET_API_KEY=$API_KEY" >> deploy.env
-      fi
-    
-    # Debug: Show what was written to deploy.env (without exposing sensitive values)
-    - echo "Generated deploy.env contents:"
-    - sed 's/NUGET_API_KEY=.*/NUGET_API_KEY=.*/' deploy.env
-    # - sed 's/NUGET_API_KEY=.*/NUGET_API_KEY=***MASKED***/' deploy.env
   script:
     # Ensure packages are restored
     - dotnet restore --configfile NuGet.config
@@ -114,21 +86,31 @@ set_environment:
   artifacts:
     paths:
       - ./packages/*.nupkg
-      - deploy.env
     expire_in: 1 hour
-    reports:
-      dotenv: deploy.env
 
 deploy_packages:
   stage: deploy
   image: mcr.microsoft.com/dotnet/sdk:9.0
   dependencies:
-    - set_environment
+    - pack_packages
   script:
-    - echo "Deploying to $DEPLOY_TARGET"
-    - echo "Source $NUGET_SOURCE"
-    - echo "Source $NUGET_API_KEY"
-    - dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_API_KEY --skip-duplicate
+    # Set deployment configuration and deploy based on branch
+    - |
+      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+        DEPLOY_TARGET="nuget.org"
+        NUGET_SOURCE="https://api.nuget.org/v3/index.json"
+        echo "Deploying to $DEPLOY_TARGET"
+        echo "Source: $NUGET_SOURCE"
+        echo "Using NuGet.org authentication"
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_TOKEN --skip-duplicate
+      else
+        DEPLOY_TARGET="phanes.dev"
+        NUGET_SOURCE="https://packages.services.phanes.technology/v3/index.json"
+        echo "Deploying to $DEPLOY_TARGET"
+        echo "Source: $NUGET_SOURCE"
+        echo "Using Phanes NuGet feed authentication"
+        dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $PHANES_API_TOKEN --skip-duplicate
+      fi
     - echo "## 🚀 Deployment Summary"
     - echo "**Branch:** $BRANCH_NAME"
     - echo "**Build Number:** $BUILD_VERSION"
