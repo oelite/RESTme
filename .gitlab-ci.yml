@@ -66,13 +66,13 @@ set_environment:
         echo "DEPLOY_TARGET=nuget.org" >> deploy.env
         echo "NUGET_SOURCE=https://api.nuget.org/v3/index.json" >> deploy.env
         # Try different possible variable names for NuGet.org token
-        API_KEY="${NUGET_ORG_TOKEN:-${NUGET_ORG_API_KEY:-${NUGETORG_TOKEN:-${NUGETORG_API_KEY}}}}"
+        API_KEY="${NUGET_TOKEN}"
         echo "NUGET_API_KEY=$API_KEY" >> deploy.env
       else
         echo "DEPLOY_TARGET=phanes.dev" >> deploy.env
         echo "NUGET_SOURCE=https://packages.services.phanes.technology/v3/index.json" >> deploy.env
         # Try different possible variable names for Phanes token
-        API_KEY="${NUGET_TOKEN:-${NUGET_API_KEY:-${PHANES_TOKEN:-${PHANES_API_KEY:-${PHANES_NUGET_TOKEN:-${CI_JOB_TOKEN:-${GITLAB_TOKEN:-${ACCESS_TOKEN:-${API_TOKEN:-${DEPLOY_TOKEN}}}}}}}}}}"
+        API_KEY="${PHANES_API_TOKEN}"
         echo "NUGET_API_KEY=$API_KEY" >> deploy.env
       fi
     
@@ -126,26 +126,7 @@ deploy_packages:
   script:
     - echo "Deploying to $DEPLOY_TARGET"
     - echo "Source $NUGET_SOURCE"
-    # Debug: Check if API key is available (mask sensitive value)
-    - |
-      if [ -z "$NUGET_API_KEY" ]; then
-        echo "ERROR: NUGET_API_KEY is empty or not set"
-        echo ""
-        echo "SOLUTION: You need to configure a GitLab CI/CD variable for the NuGet feed authentication."
-        echo "Please add one of these variables in GitLab Project Settings > CI/CD > Variables:"
-        echo "  - NUGET_TOKEN (recommended)"
-        echo "  - PHANES_TOKEN"
-        echo "  - PHANES_API_KEY"
-        echo "  - API_TOKEN"
-        echo ""
-        echo "The variable should contain the API key for: $NUGET_SOURCE"
-        echo ""
-        echo "Current available NUGET-related variables:"
-        env | grep -i nuget || echo "  (none found)"
-        exit 1
-      else
-        echo "NUGET_API_KEY is set (length: ${#NUGET_API_KEY})"
-      fi
+    - echo "Source $NUGET_API_KEY"
     - dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_API_KEY --skip-duplicate
     - echo "## 🚀 Deployment Summary"
     - echo "**Branch:** $BRANCH_NAME"
