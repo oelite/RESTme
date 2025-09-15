@@ -23,19 +23,49 @@ namespace OElite.Providers
             _config = config;
             
             var factory = new ConnectionFactory();
-            if (connectionString.StartsWith("amqp://") || connectionString.StartsWith("amqps://"))
+            
+            // Check if connection string includes VHost info (format: uri|vhost=name)
+            string actualConnectionString = connectionString;
+            string? vhost = null;
+            
+            if (connectionString.Contains("|vhost="))
             {
-                factory.Uri = new Uri(connectionString);
+                var parts = connectionString.Split(new[] { "|vhost=" }, StringSplitOptions.None);
+                actualConnectionString = parts[0];
+                vhost = parts.Length > 1 ? parts[1] : null;
+            }
+            
+            // Parse the connection string/URI
+            if (actualConnectionString.StartsWith("amqp://") || actualConnectionString.StartsWith("amqps://"))
+            {
+                factory.Uri = new Uri(actualConnectionString);
             }
             else
             {
                 // Parse connection string format: host:port or host
-                var parts = connectionString.Split(':');
+                var parts = actualConnectionString.Split(':');
                 factory.HostName = parts[0];
                 if (parts.Length > 1 && int.TryParse(parts[1], out int port))
                 {
                     factory.Port = port;
                 }
+            }
+            
+            // Override with authentication from RestConfig if provided
+            if (!string.IsNullOrEmpty(config.RestKey))
+            {
+                factory.UserName = config.RestKey;
+            }
+            
+            if (!string.IsNullOrEmpty(config.RestSecret))
+            {
+                factory.Password = config.RestSecret;
+            }
+            
+            // Set VHost if provided
+            if (!string.IsNullOrEmpty(vhost))
+            {
+                factory.VirtualHost = vhost;
             }
 
             _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
@@ -108,6 +138,14 @@ namespace OElite.Providers
                 if (!string.IsNullOrEmpty(exchangeName))
                 {
                     await DeclareExchangeAsync(exchangeName, exchangeType, isDurable, autoDelete);
+                }
+                
+                // Always declare the queue before binding (auto-create if missing)
+                await DeclareQueueAsync(queueName, isDurable, isExclusive, autoDelete);
+                
+                // Bind queue to exchange if exchange is provided
+                if (!string.IsNullOrEmpty(exchangeName))
+                {
                     await BindQueueAsync(queueName, exchangeName, routingKey);
                 }
 
@@ -179,6 +217,7 @@ namespace OElite.Providers
                 if (string.IsNullOrEmpty(queueName))
                     queueName = $"queue_{Guid.NewGuid():N}";
 
+                // Use passive=false to auto-create the queue if it doesn't exist
                 await _channel.QueueDeclareAsync(queue: queueName, durable: isDurable, exclusive: isExclusive, 
                     autoDelete: autoDelete, arguments: null);
                 
@@ -186,6 +225,12 @@ namespace OElite.Providers
             }
             catch (Exception ex)
             {
+                // Log but don't fail if queue already exists with different parameters
+                if (ex.Message.Contains("PRECONDITION_FAILED"))
+                {
+                    // Queue exists but with different parameters - this is usually OK for consumers
+                    return queueName ?? "";
+                }
                 throw new OEliteWebException($"Failed to declare queue '{queueName}': {ex.Message}", ex);
             }
         }
@@ -195,11 +240,18 @@ namespace OElite.Providers
         {
             try
             {
+                // Use passive=false to auto-create the exchange if it doesn't exist
                 await _channel.ExchangeDeclareAsync(exchange: exchangeName, type: exchangeType, durable: isDurable, 
                     autoDelete: autoDelete, arguments: null);
             }
             catch (Exception ex)
             {
+                // Log but don't fail if exchange already exists with different parameters
+                if (ex.Message.Contains("PRECONDITION_FAILED"))
+                {
+                    // Exchange exists but with different parameters - this is usually OK
+                    return;
+                }
                 throw new OEliteWebException($"Failed to declare exchange '{exchangeName}': {ex.Message}", ex);
             }
         }

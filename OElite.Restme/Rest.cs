@@ -214,7 +214,15 @@ namespace OElite
                 var factory = ServiceLocator.GetFactory("rabbitmq");
                 if (factory != null)
                 {
-                    QueueProvider = factory.CreateQueueProvider(ConnectionString ?? "", Configuration);
+                    // For RabbitMQ, include VHost in connection string if provided
+                    var connectionStringWithVHost = ConnectionString ?? "";
+                    if (!string.IsNullOrEmpty(RequestUrlPath))
+                    {
+                        // Append VHost info to connection string for RabbitMQ
+                        connectionStringWithVHost += $"|vhost={RequestUrlPath}";
+                    }
+                    
+                    QueueProvider = factory.CreateQueueProvider(connectionStringWithVHost, Configuration);
                 }
                 else
                 {
