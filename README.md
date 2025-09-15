@@ -99,11 +99,11 @@ await rest.RemovemeAsync("user:123");
 
 ```csharp
 // Add OElite.Restme.Azure package
-var connectionString = "DefaultEndpointsProtocol=https;AccountName=...";
+var connectionString = "DefaultEndpointsProtocol=https;AccountName=...;RootPath=my-app/uploads";
 var rest = new Rest(connectionString, RestMode.AzureStorageClient);
 
-// Store data
-await rest.StoremAsync("documents/report.pdf", fileData);
+// Store data (rootPath is automatically prefixed)
+await rest.StoremAsync("documents/report.pdf", fileData); // Stored as "my-app/uploads/documents/report.pdf"
 
 // Retrieve data
 var fileData = await rest.RetrievemeAsync<byte[]>("documents/report.pdf");
@@ -120,15 +120,15 @@ await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(1));
 // Amazon S3
 var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;Region=us-west-2", RestMode.S3Client);
 
-// Backblaze B2
-var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true", RestMode.S3Client);
+// Backblaze B2 with root path
+var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true;RootPath=my-app/uploads", RestMode.S3Client);
 
-// MinIO (local development)
-var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true", RestMode.S3Client);
+// MinIO (local development) with root path
+var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true;RootPath=dev/cache", RestMode.S3Client);
 
-// Store and cache operations
-await rest.StoremAsync("files/document.pdf", fileData);
-await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(2));
+// Store and cache operations (rootPath is automatically prefixed)
+await rest.StoremAsync("files/document.pdf", fileData); // Stored as "my-app/uploads/files/document.pdf"
+await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(2)); // Cached as "dev/cache/cache:key"
 ```
 
 ### 5. RabbitMQ Message Queuing
@@ -168,12 +168,12 @@ redis://user:password@localhost:6379
 
 #### Azure Blob Storage
 ```
-DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net
+DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net;RootPath=my-app/uploads
 ```
 
 #### S3-Compatible Providers
 ```
-AccessKeyId=your_key;SecretAccessKey=your_secret;ServiceUrl=https://your-endpoint.com;BucketName=your-bucket;ForcePathStyle=true
+AccessKeyId=your_key;SecretAccessKey=your_secret;ServiceUrl=https://your-endpoint.com;BucketName=your-bucket;ForcePathStyle=true;RootPath=my-app/uploads
 ```
 
 #### RabbitMQ
@@ -263,7 +263,35 @@ await rest.DomeAsync<User>("user.created",
 
 ## 🌐 S3-Compatible Providers
 
-OElite.Restme.S3 supports numerous S3-compatible providers:
+OElite.Restme.S3 supports numerous S3-compatible providers with advanced path management:
+
+### RootPath Feature
+
+The `RootPath` parameter allows you to organize your storage with logical path prefixes. When specified, all operations will automatically prefix the provided path to your object keys.
+
+**Benefits:**
+- **Environment Separation**: Use different root paths for dev/staging/production
+- **Application Isolation**: Separate different applications in the same bucket
+- **Logical Organization**: Group related files under common prefixes
+- **Easy Migration**: Change root paths without code changes
+
+**Example:**
+```csharp
+// Connection string with rootPath
+var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;RootPath=my-app/uploads", RestMode.S3Client);
+
+// Operations automatically use the root path
+await rest.StoremAsync("documents/file.pdf", data); // Stored as "my-app/uploads/documents/file.pdf"
+await rest.CachemeAsync("user:123", userData); // Cached as "my-app/uploads/user:123"
+
+// Root path is applied to all operations (GET, PUT, DELETE, EXISTS)
+var file = await rest.RetrievemeAsync<byte[]>("documents/file.pdf"); // Retrieves from "my-app/uploads/documents/file.pdf"
+```
+
+**Connection String Parameters:**
+- `RootPath=path/to/prefix` - Sets the root path prefix for all operations
+- Paths are automatically normalized (trailing/leading slashes handled)
+- Empty or null rootPath means no prefix is applied
 
 ### Supported Providers
 
@@ -279,14 +307,14 @@ OElite.Restme.S3 supports numerous S3-compatible providers:
 ### Provider Examples
 
 ```csharp
-// Backblaze B2
-var rest = new Rest("AccessKeyId=key;SecretAccessKey=secret;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true", RestMode.S3Client);
+// Backblaze B2 with root path
+var rest = new Rest("AccessKeyId=key;SecretAccessKey=secret;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true;RootPath=backups/2024", RestMode.S3Client);
 
-// MinIO (local development)
-var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true", RestMode.S3Client);
+// MinIO (local development) with root path
+var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true;RootPath=dev/uploads", RestMode.S3Client);
 
-// DigitalOcean Spaces
-var rest = new Rest("AccessKeyId=key;SecretAccessKey=secret;ServiceUrl=https://nyc3.digitaloceanspaces.com;ForcePathStyle=true", RestMode.S3Client);
+// DigitalOcean Spaces with root path
+var rest = new Rest("AccessKeyId=key;SecretAccessKey=secret;ServiceUrl=https://nyc3.digitaloceanspaces.com;ForcePathStyle=true;RootPath=production/assets", RestMode.S3Client);
 ```
 
 ## 🔒 Security Best Practices

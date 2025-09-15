@@ -12,40 +12,38 @@ namespace OElite.Providers
     /// AWS S3 implementation of ICacheProvider
     /// Uses S3 as a cache layer, useful for CDN scenarios
     /// </summary>
-    public class S3CacheProvider : ICacheProvider
+    public class S3CacheProvider : BaseCacheProvider
     {
         private readonly IAmazonS3 _s3Client;
         private readonly string _bucketName;
-        private readonly RestConfig _config;
+        private readonly S3Configuration _s3Config;
 
-        public S3CacheProvider(string connectionString, RestConfig config)
+        public S3CacheProvider(string connectionString, RestConfig config) : base(config)
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
-            
             if (string.IsNullOrEmpty(connectionString))
                 throw new ArgumentException("Connection string cannot be null or empty", nameof(connectionString));
 
             try
             {
                 // Parse connection string to extract S3 configuration
-                var s3Config = ParseConnectionString(connectionString);
+                _s3Config = S3ConnectionStringParser.ParseConnectionString(connectionString);
                 
                 // Create S3 client configuration
                 var clientConfig = new AmazonS3Config
                 {
-                    ServiceURL = s3Config.ServiceUrl,
-                    ForcePathStyle = s3Config.ForcePathStyle,
-                    UseHttp = s3Config.UseHttp
+                    ServiceURL = _s3Config.ServiceUrl,
+                    ForcePathStyle = _s3Config.ForcePathStyle,
+                    UseHttp = _s3Config.UseHttp
                 };
                 
                 // Set region if provided and no custom service URL
-                if (string.IsNullOrEmpty(s3Config.ServiceUrl) && s3Config.Region != null)
+                if (string.IsNullOrEmpty(_s3Config.ServiceUrl) && _s3Config.Region != null)
                 {
-                    clientConfig.RegionEndpoint = s3Config.Region;
+                    clientConfig.RegionEndpoint = _s3Config.Region;
                 }
                 
-                _s3Client = new AmazonS3Client(s3Config.AccessKeyId, s3Config.SecretAccessKey, clientConfig);
-                _bucketName = s3Config.BucketName ?? "restme-cache";
+                _s3Client = new AmazonS3Client(_s3Config.AccessKeyId, _s3Config.SecretAccessKey, clientConfig);
+                _bucketName = _s3Config.BucketName ?? "restme-cache";
                 
                 // Ensure bucket exists
                 EnsureBucketExistsAsync().Wait();
@@ -56,55 +54,6 @@ namespace OElite.Providers
             }
         }
 
-        private S3Config ParseConnectionString(string connectionString)
-        {
-            var config = new S3Config();
-            var parts = connectionString.Split(';');
-            
-            foreach (var part in parts)
-            {
-                var keyValue = part.Split('=');
-                if (keyValue.Length != 2) continue;
-                
-                var key = keyValue[0].Trim().ToLowerInvariant();
-                var value = keyValue[1].Trim();
-                
-                switch (key)
-                {
-                    case "accesskeyid":
-                        config.AccessKeyId = value;
-                        break;
-                    case "secretaccesskey":
-                        config.SecretAccessKey = value;
-                        break;
-                    case "region":
-                        config.Region = Amazon.RegionEndpoint.GetBySystemName(value);
-                        break;
-                    case "bucketname":
-                        config.BucketName = value;
-                        break;
-                    case "serviceurl":
-                    case "endpoint":
-                        config.ServiceUrl = value;
-                        break;
-                    case "forcepathstyle":
-                        config.ForcePathStyle = bool.Parse(value);
-                        break;
-                    case "usehttp":
-                        config.UseHttp = bool.Parse(value);
-                        break;
-                }
-            }
-            
-            if (string.IsNullOrEmpty(config.AccessKeyId) || string.IsNullOrEmpty(config.SecretAccessKey))
-                throw new ArgumentException("AccessKeyId and SecretAccessKey are required in connection string");
-            
-            // Set defaults for S3-compatible providers
-            if (config.Region == null && string.IsNullOrEmpty(config.ServiceUrl))
-                config.Region = Amazon.RegionEndpoint.USEast1;
-                
-            return config;
-        }
 
         private async Task EnsureBucketExistsAsync()
         {
@@ -129,17 +78,19 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<T?> GetAsync<T>(string key) where T : class
+        public override async Task<T?> GetAsync<T>(string key) where T : class
         {
-            if (string.IsNullOrEmpty(key))
-                return null;
+            ValidateKey(key, "GetAsync");
 
             try
             {
+                // Apply root path if specified
+                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+                
                 var request = new GetObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = key
+                    Key = objectKey
                 };
 
                 using var response = await _s3Client.GetObjectAsync(request);
@@ -158,21 +109,21 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
+        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
         {
-            if (string.IsNullOrEmpty(key))
-                return false;
-
-            if (value == null)
-                return false;
+            ValidateKey(key, "SetAsync");
+            ValidateValue(value, "SetAsync");
 
             try
             {
+                // Apply root path if specified
+                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+                
                 var json = value.JsonSerialize();
                 var request = new PutObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = key,
+                    Key = objectKey,
                     ContentBody = json,
                     ContentType = "application/json",
                     CannedACL = S3CannedACL.Private
@@ -200,17 +151,19 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> RemoveAsync(string key)
+        public override async Task<bool> RemoveAsync(string key)
         {
-            if (string.IsNullOrEmpty(key))
-                return false;
+            ValidateKey(key, "RemoveAsync");
 
             try
             {
+                // Apply root path if specified
+                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+                
                 var request = new DeleteObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = key
+                    Key = objectKey
                 };
 
                 await _s3Client.DeleteObjectAsync(request);
@@ -222,17 +175,19 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> ExistsAsync(string key)
+        public override async Task<bool> ExistsAsync(string key)
         {
-            if (string.IsNullOrEmpty(key))
-                return false;
+            ValidateKey(key, "ExistsAsync");
 
             try
             {
+                // Apply root path if specified
+                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+                
                 var request = new GetObjectMetadataRequest
                 {
                     BucketName = _bucketName,
-                    Key = key
+                    Key = objectKey
                 };
 
                 await _s3Client.GetObjectMetadataAsync(request);
@@ -248,18 +203,20 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
+        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
         {
-            if (string.IsNullOrEmpty(key))
-                return false;
+            ValidateKey(key, "SetExpiryAsync");
 
             try
             {
+                // Apply root path if specified
+                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+                
                 // First, get the object to copy its content
                 var getRequest = new GetObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = key
+                    Key = objectKey
                 };
 
                 using var getResponse = await _s3Client.GetObjectAsync(getRequest);
@@ -270,9 +227,9 @@ namespace OElite.Providers
                 var copyRequest = new CopyObjectRequest
                 {
                     SourceBucket = _bucketName,
-                    SourceKey = key,
+                    SourceKey = objectKey,
                     DestinationBucket = _bucketName,
-                    DestinationKey = key,
+                    DestinationKey = objectKey,
                     MetadataDirective = S3MetadataDirective.REPLACE
                 };
 
@@ -305,41 +262,9 @@ namespace OElite.Providers
             }
         }
 
-        public T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class
-        {
-            if (responseMessage?.Data == null)
-                return null;
-
-            try
-            {
-                if (responseMessage.Data is T directData)
-                    return directData;
-
-                if (responseMessage.Data is string jsonString)
-                    return jsonString.JsonDeserialize<T>();
-
-                return responseMessage.Data.JsonSerialize().JsonDeserialize<T>();
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        public void Dispose()
+        public override void Dispose()
         {
             _s3Client?.Dispose();
-        }
-
-        private class S3Config
-        {
-            public string AccessKeyId { get; set; } = string.Empty;
-            public string SecretAccessKey { get; set; } = string.Empty;
-            public Amazon.RegionEndpoint? Region { get; set; }
-            public string? BucketName { get; set; }
-            public string? ServiceUrl { get; set; }
-            public bool ForcePathStyle { get; set; } = false;
-            public bool UseHttp { get; set; } = false;
         }
     }
 }

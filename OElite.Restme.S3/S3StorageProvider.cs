@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using OElite.Abstractions;
+using OElite.Utils;
 using Amazon.S3;
 using Amazon.S3.Model;
 
@@ -11,71 +12,64 @@ namespace OElite.Providers
     /// <summary>
     /// S3 implementation of IStorageProvider
     /// </summary>
-    public class S3StorageProvider : IStorageProvider
+    public class S3StorageProvider : BaseStorageProvider
     {
         private readonly AmazonS3Client _s3Client;
-        private readonly RestConfig _config;
-        private bool _disposed = false;
+        private readonly S3Configuration _s3Config;
 
-        public S3StorageProvider(string connectionString, RestConfig config)
+        public S3StorageProvider(string connectionString, RestConfig config) : base(config)
         {
-            _config = config;
-            
             // Parse connection string to extract S3 configuration
-            var s3Config = ParseConnectionString(connectionString);
+            _s3Config = S3ConnectionStringParser.ParseConnectionString(connectionString);
             
             // Create S3 client configuration
             var clientConfig = new AmazonS3Config
             {
-                ServiceURL = s3Config.ServiceUrl,
-                ForcePathStyle = s3Config.ForcePathStyle,
-                UseHttp = s3Config.UseHttp
+                ServiceURL = _s3Config.ServiceUrl,
+                ForcePathStyle = _s3Config.ForcePathStyle,
+                UseHttp = _s3Config.UseHttp
             };
             
             // Set region if provided and no custom service URL
-            if (string.IsNullOrEmpty(s3Config.ServiceUrl) && s3Config.Region != null)
+            if (string.IsNullOrEmpty(_s3Config.ServiceUrl) && _s3Config.Region != null)
             {
-                clientConfig.RegionEndpoint = s3Config.Region;
+                clientConfig.RegionEndpoint = _s3Config.Region;
             }
             
             // Use credentials from config or parsed connection string
-            var accessKey = !string.IsNullOrEmpty(s3Config.AccessKeyId) ? s3Config.AccessKeyId : config.RestKey;
-            var secretKey = !string.IsNullOrEmpty(s3Config.SecretAccessKey) ? s3Config.SecretAccessKey : config.RestSecret;
+            var accessKey = !string.IsNullOrEmpty(_s3Config.AccessKeyId) ? _s3Config.AccessKeyId : config.RestKey;
+            var secretKey = !string.IsNullOrEmpty(_s3Config.SecretAccessKey) ? _s3Config.SecretAccessKey : config.RestSecret;
             
             _s3Client = new AmazonS3Client(accessKey, secretKey, clientConfig);
         }
 
-        public async Task<T?> GetAsync<T>(string key) where T : class
+        public override async Task<T> GetAsync<T>(string key) where T : class
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "GetAsync");
+
             try
             {
-                var bucketName = GetBucketName(key);
-                var objectKey = GetObjectKey(key);
+                var bucketName = S3ConnectionStringParser.GetBucketName(key);
+                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
                 
                 if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
                 var request = new GetObjectRequest
                 {
                     BucketName = bucketName,
-                    Key = objectKey
+                    Key = finalObjectKey
                 };
 
                 using var response = await _s3Client.GetObjectAsync(request);
                 
                 if (typeof(Stream).IsAssignableFrom(typeof(T)))
                 {
-                    var bytes = FileUtils.ReadStreamToEnd(response.ResponseStream);
-                    
-                    T? result;
-                    if (typeof(T).GetTypeInfo().IsAbstract)
-                    {
-                        result = (T)Activator.CreateInstance(typeof(MemoryStream), bytes)!;
-                    }
-                    else
-                        result = (T)Activator.CreateInstance(typeof(T), bytes)!;
-
-                    return result;
+                    return HandleStreamType<T>(response.ResponseStream);
                 }
 
                 using var reader = new StreamReader(response.ResponseStream);
@@ -99,20 +93,27 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<T?> PutAsync<T>(string key, T value) where T : class
+        public override async Task<T> PutAsync<T>(string key, T value) where T : class
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "PutAsync");
+            ValidateValue(value, "PutAsync");
+
             try
             {
-                var bucketName = GetBucketName(key);
-                var objectKey = GetObjectKey(key);
+                var bucketName = S3ConnectionStringParser.GetBucketName(key);
+                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
                 
                 if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
                 var request = new PutObjectRequest
                 {
                     BucketName = bucketName,
-                    Key = objectKey
+                    Key = finalObjectKey
                 };
 
                 // Set content type based on file extension
@@ -130,7 +131,7 @@ namespace OElite.Providers
                 }
                 else
                 {
-                    var jsonValue = value.JsonSerialize(_config.UseRestConvertForCollectionSerialization, _config.SerializerSettings);
+                    var jsonValue = value.JsonSerialize(Config.UseRestConvertForCollectionSerialization, Config.SerializerSettings);
                     request.ContentBody = jsonValue;
                     request.ContentType = "application/json";
                 }
@@ -144,20 +145,26 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> DeleteAsync(string key)
+        public override async Task<bool> DeleteAsync(string key)
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "DeleteAsync");
+
             try
             {
-                var bucketName = GetBucketName(key);
-                var objectKey = GetObjectKey(key);
+                var bucketName = S3ConnectionStringParser.GetBucketName(key);
+                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
                 
                 if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
                 var request = new DeleteObjectRequest
                 {
                     BucketName = bucketName,
-                    Key = objectKey
+                    Key = finalObjectKey
                 };
 
                 await _s3Client.DeleteObjectAsync(request);
@@ -169,20 +176,26 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> ExistsAsync(string key)
+        public override async Task<bool> ExistsAsync(string key)
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "ExistsAsync");
+
             try
             {
-                var bucketName = GetBucketName(key);
-                var objectKey = GetObjectKey(key);
+                var bucketName = S3ConnectionStringParser.GetBucketName(key);
+                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
                 
                 if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
                     return false;
 
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
                 var request = new GetObjectMetadataRequest
                 {
                     BucketName = bucketName,
-                    Key = objectKey
+                    Key = finalObjectKey
                 };
 
                 await _s3Client.GetObjectMetadataAsync(request);
@@ -198,20 +211,26 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<string?> GetStringAsync(string key)
+        public override async Task<string?> GetStringAsync(string key)
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "GetStringAsync");
+
             try
             {
-                var bucketName = GetBucketName(key);
-                var objectKey = GetObjectKey(key);
+                var bucketName = S3ConnectionStringParser.GetBucketName(key);
+                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
                 
                 if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
                 var request = new GetObjectRequest
                 {
                     BucketName = bucketName,
-                    Key = objectKey
+                    Key = finalObjectKey
                 };
 
                 using var response = await _s3Client.GetObjectAsync(request);
@@ -229,20 +248,27 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<string?> PutStringAsync(string key, string value)
+        public override async Task<string?> PutStringAsync(string key, string value)
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "PutStringAsync");
+            ValidateValue(value, "PutStringAsync");
+
             try
             {
-                var bucketName = GetBucketName(key);
-                var objectKey = GetObjectKey(key);
+                var bucketName = S3ConnectionStringParser.GetBucketName(key);
+                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
                 
                 if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
                 var request = new PutObjectRequest
                 {
                     BucketName = bucketName,
-                    Key = objectKey,
+                    Key = finalObjectKey,
                     ContentBody = value,
                     ContentType = "text/plain"
                 };
@@ -256,20 +282,26 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<Stream?> GetStreamAsync(string key)
+        public override async Task<Stream?> GetStreamAsync(string key)
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "GetStreamAsync");
+
             try
             {
-                var bucketName = GetBucketName(key);
-                var objectKey = GetObjectKey(key);
+                var bucketName = S3ConnectionStringParser.GetBucketName(key);
+                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
                 
                 if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
                 var request = new GetObjectRequest
                 {
                     BucketName = bucketName,
-                    Key = objectKey
+                    Key = finalObjectKey
                 };
 
                 var response = await _s3Client.GetObjectAsync(request);
@@ -289,20 +321,27 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> PutStreamAsync(string key, Stream stream)
+        public override async Task<bool> PutStreamAsync(string key, Stream stream)
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "PutStreamAsync");
+            ValidateValue(stream, "PutStreamAsync");
+
             try
             {
-                var bucketName = GetBucketName(key);
-                var objectKey = GetObjectKey(key);
+                var bucketName = S3ConnectionStringParser.GetBucketName(key);
+                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
                 
                 if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
                 var request = new PutObjectRequest
                 {
                     BucketName = bucketName,
-                    Key = objectKey,
+                    Key = finalObjectKey,
                     InputStream = stream
                 };
 
@@ -320,25 +359,15 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<T?> GetStreamAsync<T>(string key) where T : Stream
+        public override async Task<T> GetStreamAsync<T>(string key)
         {
+            ThrowIfDisposed();
+            ValidateKey(key, "GetStreamAsync");
+
             try
             {
                 var stream = await GetStreamAsync(key);
-                if (stream == null)
-                    return null;
-
-                var bytes = FileUtils.ReadStreamToEnd(stream);
-                
-                T? result;
-                if (typeof(T).GetTypeInfo().IsAbstract)
-                {
-                    result = (T)Activator.CreateInstance(typeof(MemoryStream), bytes)!;
-                }
-                else
-                    result = (T)Activator.CreateInstance(typeof(T), bytes)!;
-
-                return result;
+                return HandleStreamTypeForStream<T>(stream);
             }
             catch (Exception ex)
             {
@@ -346,93 +375,13 @@ namespace OElite.Providers
             }
         }
 
-        private string? GetBucketName(string storageRelativePath)
+        public override void Dispose()
         {
-            if (storageRelativePath.IsNullOrEmpty())
-                return null;
-            
-            var segments = storageRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            return segments.Length > 0 ? segments[0] : null;
-        }
-
-        private string? GetObjectKey(string storageRelativePath)
-        {
-            if (storageRelativePath.IsNullOrEmpty())
-                return null;
-            
-            var segments = storageRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Length <= 1)
-                return null;
-            
-            // Join all segments except the first one (bucket name) to form the object key
-            return string.Join("/", segments, 1, segments.Length - 1);
-        }
-
-        private S3Config ParseConnectionString(string connectionString)
-        {
-            var config = new S3Config();
-            var parts = connectionString.Split(';');
-            
-            foreach (var part in parts)
-            {
-                var keyValue = part.Split('=');
-                if (keyValue.Length != 2) continue;
-                
-                var key = keyValue[0].Trim().ToLowerInvariant();
-                var value = keyValue[1].Trim();
-                
-                switch (key)
-                {
-                    case "accesskeyid":
-                        config.AccessKeyId = value;
-                        break;
-                    case "secretaccesskey":
-                        config.SecretAccessKey = value;
-                        break;
-                    case "region":
-                        config.Region = Amazon.RegionEndpoint.GetBySystemName(value);
-                        break;
-                    case "bucketname":
-                        config.BucketName = value;
-                        break;
-                    case "serviceurl":
-                    case "endpoint":
-                        config.ServiceUrl = value;
-                        break;
-                    case "forcepathstyle":
-                        config.ForcePathStyle = bool.Parse(value);
-                        break;
-                    case "usehttp":
-                        config.UseHttp = bool.Parse(value);
-                        break;
-                }
-            }
-            
-            // Set defaults for S3-compatible providers
-            if (config.Region == null && string.IsNullOrEmpty(config.ServiceUrl))
-                config.Region = Amazon.RegionEndpoint.USEast1;
-                
-            return config;
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
+            if (!Disposed)
             {
                 _s3Client?.Dispose();
-                _disposed = true;
+                Disposed = true;
             }
-        }
-
-        private class S3Config
-        {
-            public string AccessKeyId { get; set; } = string.Empty;
-            public string SecretAccessKey { get; set; } = string.Empty;
-            public Amazon.RegionEndpoint? Region { get; set; }
-            public string? BucketName { get; set; }
-            public string? ServiceUrl { get; set; }
-            public bool ForcePathStyle { get; set; } = false;
-            public bool UseHttp { get; set; } = false;
         }
     }
 }

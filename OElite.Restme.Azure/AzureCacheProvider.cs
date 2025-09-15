@@ -12,22 +12,21 @@ namespace OElite.Providers
     /// Azure Blob Storage implementation of ICacheProvider
     /// Uses Azure Blob Storage as a cache layer, useful for CDN scenarios
     /// </summary>
-    public class AzureCacheProvider : ICacheProvider
+    public class AzureCacheProvider : BaseCacheProvider
     {
         private readonly CloudBlobClient _blobClient;
         private readonly CloudBlobContainer _container;
-        private readonly RestConfig _config;
+        private readonly AzureConfiguration _azureConfig;
 
-        public AzureCacheProvider(string connectionString, RestConfig config)
+        public AzureCacheProvider(string connectionString, RestConfig config) : base(config)
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
-            
             if (string.IsNullOrEmpty(connectionString))
                 throw new ArgumentException("Connection string cannot be null or empty", nameof(connectionString));
 
             try
             {
-                var storageAccount = CloudStorageAccount.Parse(connectionString);
+                _azureConfig = AzureConnectionStringParser.ParseConnectionString(connectionString);
+                var storageAccount = CloudStorageAccount.Parse(_azureConfig.ConnectionString);
                 _blobClient = storageAccount.CreateCloudBlobClient();
                 
                 // Use a dedicated cache container
@@ -43,14 +42,15 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<T?> GetAsync<T>(string key) where T : class
+        public override async Task<T?> GetAsync<T>(string key) where T : class
         {
-            if (string.IsNullOrEmpty(key))
-                return null;
+            ValidateKey(key, "GetAsync");
 
             try
             {
-                var blob = _container.GetBlockBlobReference(key);
+                // Apply root path if specified
+                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blob = _container.GetBlockBlobReference(blobKey);
                 
                 if (!await blob.ExistsAsync())
                     return null;
@@ -64,17 +64,16 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
+        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
         {
-            if (string.IsNullOrEmpty(key))
-                return false;
-
-            if (value == null)
-                return false;
+            ValidateKey(key, "SetAsync");
+            ValidateValue(value, "SetAsync");
 
             try
             {
-                var blob = _container.GetBlockBlobReference(key);
+                // Apply root path if specified
+                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blob = _container.GetBlockBlobReference(blobKey);
                 var json = value.JsonSerialize();
                 
                 // Set cache control headers for CDN scenarios
@@ -104,14 +103,15 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> RemoveAsync(string key)
+        public override async Task<bool> RemoveAsync(string key)
         {
-            if (string.IsNullOrEmpty(key))
-                return false;
+            ValidateKey(key, "RemoveAsync");
 
             try
             {
-                var blob = _container.GetBlockBlobReference(key);
+                // Apply root path if specified
+                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blob = _container.GetBlockBlobReference(blobKey);
                 return await blob.DeleteIfExistsAsync();
             }
             catch (Exception ex)
@@ -120,14 +120,15 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> ExistsAsync(string key)
+        public override async Task<bool> ExistsAsync(string key)
         {
-            if (string.IsNullOrEmpty(key))
-                return false;
+            ValidateKey(key, "ExistsAsync");
 
             try
             {
-                var blob = _container.GetBlockBlobReference(key);
+                // Apply root path if specified
+                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blob = _container.GetBlockBlobReference(blobKey);
                 return await blob.ExistsAsync();
             }
             catch (Exception ex)
@@ -136,14 +137,15 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
+        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
         {
-            if (string.IsNullOrEmpty(key))
-                return false;
+            ValidateKey(key, "SetExpiryAsync");
 
             try
             {
-                var blob = _container.GetBlockBlobReference(key);
+                // Apply root path if specified
+                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blob = _container.GetBlockBlobReference(blobKey);
                 
                 if (!await blob.ExistsAsync())
                     return false;
@@ -166,28 +168,7 @@ namespace OElite.Providers
             }
         }
 
-        public T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class
-        {
-            if (responseMessage?.Data == null)
-                return null;
-
-            try
-            {
-                if (responseMessage.Data is T directData)
-                    return directData;
-
-                if (responseMessage.Data is string jsonString)
-                    return jsonString.JsonDeserialize<T>();
-
-                return responseMessage.Data.JsonSerialize().JsonDeserialize<T>();
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        public void Dispose()
+        public override void Dispose()
         {
             // CloudBlobClient doesn't need explicit disposal in older versions
             // but we can clean up any resources if needed

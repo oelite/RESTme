@@ -8,20 +8,21 @@ namespace OElite.Providers
     /// <summary>
     /// Redis implementation of ICacheProvider
     /// </summary>
-    public class RedisCacheProvider : ICacheProvider
+    public class RedisCacheProvider : BaseCacheProvider
     {
         private readonly IDatabase _database;
         private readonly ConnectionMultiplexer _connection;
-        private bool _disposed = false;
 
-        public RedisCacheProvider(string connectionString, RestConfig config)
+        public RedisCacheProvider(string connectionString, RestConfig config) : base(config)
         {
             _connection = ConnectionMultiplexer.Connect(connectionString);
             _database = _connection.GetDatabase();
         }
 
-        public async Task<T?> GetAsync<T>(string key) where T : class
+        public override async Task<T?> GetAsync<T>(string key) where T : class
         {
+            ValidateKey(key, "GetAsync");
+
             try
             {
                 var value = await _database.StringGetAsync(key);
@@ -40,8 +41,11 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
+        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
         {
+            ValidateKey(key, "SetAsync");
+            ValidateValue(value, "SetAsync");
+
             try
             {
                 string jsonValue;
@@ -58,8 +62,10 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> RemoveAsync(string key)
+        public override async Task<bool> RemoveAsync(string key)
         {
+            ValidateKey(key, "RemoveAsync");
+
             try
             {
                 return await _database.KeyDeleteAsync(key);
@@ -70,8 +76,10 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> ExistsAsync(string key)
+        public override async Task<bool> ExistsAsync(string key)
         {
+            ValidateKey(key, "ExistsAsync");
+
             try
             {
                 return await _database.KeyExistsAsync(key);
@@ -82,8 +90,10 @@ namespace OElite.Providers
             }
         }
 
-        public async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
+        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
         {
+            ValidateKey(key, "SetExpiryAsync");
+
             try
             {
                 return await _database.KeyExpireAsync(key, expiry);
@@ -94,18 +104,9 @@ namespace OElite.Providers
             }
         }
 
-        public T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class
+        public override void Dispose()
         {
-            return responseMessage?.GetOriginalData<T>();
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                _connection?.Dispose();
-                _disposed = true;
-            }
+            _connection?.Dispose();
         }
     }
 }
