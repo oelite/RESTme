@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 // ReSharper disable once CheckNamespace
@@ -18,7 +17,7 @@ public static class RestmeCacheExtensions
 
     public static async Task<bool> ExpiremeAsync(this Rest rest, string? uid, bool invalidateGracePeriod = true)
     {
-        if (rest.CurrentMode != RestMode.RedisCacheClient)
+        if (rest.CurrentMode != RestMode.RedisAsCache)
             throw new OEliteException("Cacheme currently only support Redis mode");
         
         if (rest.CacheProvider == null)
@@ -49,7 +48,7 @@ public static class RestmeCacheExtensions
         int expiryInSeconds = -1,
         int graceInSeconds = -1)
     {
-        if (rest?.CurrentMode != RestMode.RedisCacheClient)
+        if (rest?.CurrentMode != RestMode.RedisAsCache)
             throw new OEliteException("Cacheme currently only support Redis mode");
         
         if (rest.CacheProvider == null)
@@ -102,7 +101,7 @@ public static class RestmeCacheExtensions
         Func<Task<T>>? refreshAction = null) where T : class?
 
     {
-        if (rest?.CurrentMode != RestMode.RedisCacheClient)
+        if (rest?.CurrentMode != RestMode.RedisAsCache)
             throw new OEliteException("Cacheme currently only support Redis mode");
         
         if (rest.CacheProvider == null)

@@ -234,47 +234,47 @@ namespace OElite.Abstractions
     {
         public void Dispose() { }
 
-        public Task<T?> GetAsync<T>(string key) where T : class
+        public Task<T?> GetAsync<T>(string objectKey) where T : class
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }
 
-        public Task<T?> PutAsync<T>(string key, T value) where T : class
+        public Task<T?> PutAsync<T>(string objectKey, T value) where T : class
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }
 
-        public Task<bool> DeleteAsync(string key)
+        public Task<bool> DeleteAsync(string objectKey)
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }
 
-        public Task<bool> ExistsAsync(string key)
+        public Task<bool> ExistsAsync(string objectKey)
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }
 
-        public Task<string?> GetStringAsync(string key)
+        public Task<string?> GetStringAsync(string objectKey)
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }
 
-        public Task<string?> PutStringAsync(string key, string value)
+        public Task<string?> PutStringAsync(string objectKey, string value)
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }
 
-        public Task<Stream?> GetStreamAsync(string key)
+        public Task<Stream?> GetStreamAsync(string objectKey)
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }
 
-        public Task<bool> PutStreamAsync(string key, Stream stream)
+        public Task<bool> PutStreamAsync(string objectKey, Stream stream)
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }
 
-        public Task<T?> GetStreamAsync<T>(string key) where T : Stream
+        public Task<T> GetStreamAsync<T>(string objectKey) where T : Stream
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }

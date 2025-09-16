@@ -1,59 +1,55 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
+using OElite.Abstractions;
 using Amazon.S3;
 using Amazon.S3.Model;
-using OElite.Abstractions;
-using OElite.Utils;
+using Amazon;
 
 namespace OElite.Providers
 {
     /// <summary>
-    /// AWS S3 implementation of ICacheProvider
-    /// Uses S3 as a cache layer, useful for CDN scenarios
+    /// S3 implementation of ICacheProvider
     /// </summary>
     public class S3CacheProvider : BaseCacheProvider
     {
-        private readonly IAmazonS3 _s3Client;
+        private readonly AmazonS3Client _s3Client;
         private readonly string _bucketName;
         private readonly S3Configuration _s3Config;
+        protected bool Disposed = false;
 
         public S3CacheProvider(string connectionString, RestConfig config) : base(config)
         {
-            if (string.IsNullOrEmpty(connectionString))
-                throw new ArgumentException("Connection string cannot be null or empty", nameof(connectionString));
+            // Parse connection string to extract S3 configuration
+            _s3Config = S3ConnectionStringParser.ParseConnectionString(connectionString);
 
-            try
+            // Use credentials from config or parsed connection string
+            var accessKey = !string.IsNullOrEmpty(_s3Config.AccessKeyId) ? _s3Config.AccessKeyId : config.RestKey;
+            var secretKey = !string.IsNullOrEmpty(_s3Config.SecretAccessKey)
+                ? _s3Config.SecretAccessKey
+                : config.RestSecret;
+
+            // Create AWS S3 client configuration
+            var s3Config = new AmazonS3Config
             {
-                // Parse connection string to extract S3 configuration
-                _s3Config = S3ConnectionStringParser.ParseConnectionString(connectionString);
-                
-                // Create S3 client configuration
-                var clientConfig = new AmazonS3Config
-                {
-                    ServiceURL = _s3Config.ServiceUrl,
-                    ForcePathStyle = _s3Config.ForcePathStyle,
-                    UseHttp = _s3Config.UseHttp
-                };
-                
-                // Set region if provided and no custom service URL
-                if (string.IsNullOrEmpty(_s3Config.ServiceUrl) && _s3Config.Region != null)
-                {
-                    clientConfig.RegionEndpoint = _s3Config.Region;
-                }
-                
-                _s3Client = new AmazonS3Client(_s3Config.AccessKeyId, _s3Config.SecretAccessKey, clientConfig);
-                _bucketName = _s3Config.BucketName ?? "restme-cache";
-                
-                // Ensure bucket exists
-                EnsureBucketExistsAsync().Wait();
-            }
-            catch (Exception ex)
+                ServiceURL = _s3Config.ServiceUrl,
+                ForcePathStyle = _s3Config.ForcePathStyle,
+                UseHttp = _s3Config.UseHttp
+            };
+
+            if (_s3Config.Region != null)
             {
-                throw new InvalidOperationException($"Failed to initialize S3 cache provider: {ex.Message}", ex);
+                s3Config.RegionEndpoint = _s3Config.Region;
             }
+
+            _s3Client = new AmazonS3Client(accessKey, secretKey, s3Config);
+            _bucketName = _s3Config.BucketName ?? "restme-cache";
+
+            // Ensure bucket exists
+            _ = Task.Run(async () => await EnsureBucketExistsAsync());
         }
-
 
         private async Task EnsureBucketExistsAsync()
         {
@@ -70,9 +66,7 @@ namespace OElite.Providers
                 // Bucket doesn't exist, create it
                 var createRequest = new PutBucketRequest
                 {
-                    BucketName = _bucketName,
-                    BucketRegion = S3Region.USEast1,
-                    CannedACL = S3CannedACL.Private
+                    BucketName = _bucketName
                 };
                 await _s3Client.PutBucketAsync(createRequest);
             }
@@ -80,66 +74,59 @@ namespace OElite.Providers
 
         public override async Task<T?> GetAsync<T>(string key) where T : class
         {
+            ThrowIfDisposed();
             ValidateKey(key, "GetAsync");
 
             try
             {
                 // Apply root path if specified
-                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
-                
+                var finalKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+
                 var request = new GetObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = objectKey
+                    Key = finalKey
                 };
 
                 using var response = await _s3Client.GetObjectAsync(request);
-                using var reader = new StreamReader(response.ResponseStream);
-                var json = await reader.ReadToEndAsync();
-                
-                return json.JsonDeserialize<T>();
+                return HandleStreamType<T>(response.ResponseStream);
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                return null; // Key doesn't exist
+                return null; // Cache miss
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to get cached item with key '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to get cached object '{key}': {ex.Message}", ex);
             }
         }
 
         public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
         {
+            ThrowIfDisposed();
             ValidateKey(key, "SetAsync");
-            ValidateValue(value, "SetAsync");
 
             try
             {
                 // Apply root path if specified
-                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
-                
-                var json = value.JsonSerialize();
+                var finalKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+
                 var request = new PutObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = objectKey,
-                    ContentBody = json,
-                    ContentType = "application/json",
-                    CannedACL = S3CannedACL.Private
+                    Key = finalKey
                 };
 
-                // Set cache control headers for CDN scenarios
-                request.Headers.CacheControl = "public, max-age=3600"; // Default 1 hour
-                
+                await HandleStreamPutAsync(value, async stream =>
+                {
+                    request.InputStream = stream;
+                });
+
+                // Set cache control headers for expiry
                 if (expiry.HasValue)
                 {
-                    var maxAge = (int)expiry.Value.TotalSeconds;
-                    request.Headers.CacheControl = $"public, max-age={maxAge}";
-                    
-                    // Set metadata for expiry tracking
-                    var expiryTime = DateTime.UtcNow.Add(expiry.Value);
-                    request.Metadata.Add("expiry", expiryTime.ToString("O"));
+                    request.Headers["Cache-Control"] = $"max-age={expiry.Value.TotalSeconds:F0}";
+                    request.Headers["Expires"] = DateTime.UtcNow.Add(expiry.Value).ToString("R");
                 }
 
                 await _s3Client.PutObjectAsync(request);
@@ -147,23 +134,24 @@ namespace OElite.Providers
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to set cached item with key '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to cache object '{key}': {ex.Message}", ex);
             }
         }
 
         public override async Task<bool> RemoveAsync(string key)
         {
+            ThrowIfDisposed();
             ValidateKey(key, "RemoveAsync");
 
             try
             {
                 // Apply root path if specified
-                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
-                
+                var finalKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+
                 var request = new DeleteObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = objectKey
+                    Key = finalKey
                 };
 
                 await _s3Client.DeleteObjectAsync(request);
@@ -171,23 +159,24 @@ namespace OElite.Providers
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to remove cached item with key '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to remove cached object '{key}': {ex.Message}", ex);
             }
         }
 
         public override async Task<bool> ExistsAsync(string key)
         {
+            ThrowIfDisposed();
             ValidateKey(key, "ExistsAsync");
 
             try
             {
                 // Apply root path if specified
-                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
-                
+                var finalKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
+
                 var request = new GetObjectMetadataRequest
                 {
                     BucketName = _bucketName,
-                    Key = objectKey
+                    Key = finalKey
                 };
 
                 await _s3Client.GetObjectMetadataAsync(request);
@@ -199,72 +188,94 @@ namespace OElite.Providers
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to check if cached item exists with key '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to check if cached object '{key}' exists: {ex.Message}", ex);
             }
         }
 
         public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
         {
+            ThrowIfDisposed();
             ValidateKey(key, "SetExpiryAsync");
 
             try
             {
                 // Apply root path if specified
-                var objectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
-                
-                // First, get the object to copy its content
-                var getRequest = new GetObjectRequest
-                {
-                    BucketName = _bucketName,
-                    Key = objectKey
-                };
+                var finalKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
 
-                using var getResponse = await _s3Client.GetObjectAsync(getRequest);
-                using var reader = new StreamReader(getResponse.ResponseStream);
-                var content = await reader.ReadToEndAsync();
-
-                // Copy the object with new metadata
+                // For S3, we need to copy the object with new metadata
                 var copyRequest = new CopyObjectRequest
                 {
                     SourceBucket = _bucketName,
-                    SourceKey = objectKey,
+                    SourceKey = finalKey,
                     DestinationBucket = _bucketName,
-                    DestinationKey = objectKey,
+                    DestinationKey = finalKey,
                     MetadataDirective = S3MetadataDirective.REPLACE
                 };
 
-                // Copy existing metadata
-                if (getResponse.Metadata != null)
-                {
-                    foreach (var metadataKey in getResponse.Metadata.Keys)
-                    {
-                        copyRequest.Metadata.Add(metadataKey, getResponse.Metadata[metadataKey]);
-                    }
-                }
-
-                // Update cache control and expiry
-                var maxAge = (int)expiry.TotalSeconds;
-                copyRequest.Headers.CacheControl = $"public, max-age={maxAge}";
-                
-                var expiryTime = DateTime.UtcNow.Add(expiry);
-                copyRequest.Metadata["expiry"] = expiryTime.ToString("O");
+                copyRequest.Metadata.Add("Cache-Control", $"max-age={expiry.TotalSeconds:F0}");
+                copyRequest.Metadata.Add("Expires", DateTime.UtcNow.Add(expiry).ToString("R"));
 
                 await _s3Client.CopyObjectAsync(copyRequest);
                 return true;
             }
-            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                return false; // Key doesn't exist
-            }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to set expiry for cached item with key '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to set expiry for cached object '{key}': {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// Common implementation for handling Stream types in GetAsync
+        /// </summary>
+        protected T? HandleStreamType<T>(Stream responseStream) where T : class
+        {
+            if (!typeof(Stream).IsAssignableFrom(typeof(T)))
+                return null;
+
+            var bytes = FileUtils.ReadStreamToEnd(responseStream);
+
+            T? result;
+            if (typeof(T).GetTypeInfo().IsAbstract)
+            {
+                result = (T)Activator.CreateInstance(typeof(MemoryStream), bytes)!;
+            }
+            else
+                result = (T)Activator.CreateInstance(typeof(T), bytes)!;
+
+            return result;
+        }
+
+        /// <summary>
+        /// Common implementation for handling Stream types in PutAsync
+        /// </summary>
+        protected async Task<bool> HandleStreamPutAsync<T>(T value, Func<Stream, Task> uploadAction) where T : class
+        {
+            if (typeof(Stream).IsAssignableFrom(typeof(T)))
+            {
+                if (value is not Stream stream)
+                    return false;
+
+                stream.Position = 0;
+                await uploadAction(stream);
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Validates that the provider is not disposed
+        /// </summary>
+        protected void ThrowIfDisposed()
+        {
+            if (Disposed)
+                throw new ObjectDisposedException(GetType().Name);
         }
 
         public override void Dispose()
         {
             _s3Client?.Dispose();
+            Disposed = true;
         }
     }
 }

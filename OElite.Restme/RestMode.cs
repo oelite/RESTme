@@ -2,11 +2,13 @@
 {
     public enum RestMode
     {
-        HTTPClient = 0,
-        HTTPRestClient = 1,
-        AzureStorageClient = 10,
-        RedisCacheClient = 20,
-        S3Client = 30,
+        Http = 0,
+        HttpRest = 1,
+        AzureAsStorage = 10,
+        AzureAsCache = 11,
+        RedisAsCache = 20,
+        S3AsStorage = 30,
+        S3AsCache = 31,
         RabbitMq = 40
     }
 }

@@ -1,7 +1,8 @@
 using System;
 using Amazon;
+using Amazon.S3;
 
-namespace OElite.Utils
+namespace OElite.Providers
 {
     /// <summary>
     /// S3 configuration model for parsing connection strings

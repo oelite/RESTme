@@ -85,22 +85,26 @@ namespace OElite
                 // Try to load providers dynamically based on mode
                 switch (Configuration.OperationMode)
                 {
-                    case RestMode.RedisCacheClient:
+                    case RestMode.RedisAsCache:
                         InitializeCacheProvider();
                         break;
                     case RestMode.RabbitMq:
                         InitializeQueueProvider();
                         break;
-                    case RestMode.AzureStorageClient:
+                    case RestMode.AzureAsStorage:
                         InitializeStorageProvider();
-                        InitializeCacheProvider(); // Azure can also serve as cache
                         break;
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsCache:
+                        InitializeCacheProvider();
+                        break;
+                    case RestMode.S3AsStorage:
                         InitializeStorageProvider();
-                        InitializeCacheProvider(); // S3 can also serve as cache
                         break;
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.S3AsCache:
+                        InitializeCacheProvider();
+                        break;
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                     default:
                         InitializeHttpProvider();
                         break;
@@ -124,16 +128,18 @@ namespace OElite
             {
                 switch (Configuration.OperationMode)
                 {
-                    case RestMode.RedisCacheClient:
+                    case RestMode.RedisAsCache:
                         LoadAssembly("OElite.Restme.Redis");
                         break;
                     case RestMode.RabbitMq:
                         LoadAssembly("OElite.Restme.RabbitMQ");
                         break;
-                    case RestMode.AzureStorageClient:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.AzureAsCache:
                         LoadAssembly("OElite.Restme.Azure");
                         break;
-                    case RestMode.S3Client:
+                    case RestMode.S3AsStorage:
+                    case RestMode.S3AsCache:
                         LoadAssembly("OElite.Restme.S3");
                         break;
                 }
@@ -172,9 +178,9 @@ namespace OElite
             {
                 string factoryName = Configuration.OperationMode switch
                 {
-                    RestMode.RedisCacheClient => "redis",
-                    RestMode.AzureStorageClient => "azure",
-                    RestMode.S3Client => "s3",
+                    RestMode.RedisAsCache => "redis",
+                    RestMode.AzureAsCache => "azure",
+                    RestMode.S3AsCache => "s3",
                     _ => "redis" // Default fallback
                 };
 
@@ -194,9 +200,9 @@ namespace OElite
                 Logger?.LogError(ex, "Failed to initialize cache provider");
                 var packageName = Configuration.OperationMode switch
                 {
-                    RestMode.RedisCacheClient => "OElite.Restme.Redis",
-                    RestMode.AzureStorageClient => "OElite.Restme.Azure",
-                    RestMode.S3Client => "OElite.Restme.S3",
+                    RestMode.RedisAsCache => "OElite.Restme.Redis",
+                    RestMode.AzureAsCache => "OElite.Restme.Azure",
+                    RestMode.S3AsCache => "OElite.Restme.S3",
                     _ => "OElite.Restme.Redis"
                 };
                 throw new OEliteWebException($"{Configuration.OperationMode} cache provider not loaded. Please reference {packageName} package.", ex);
@@ -245,7 +251,12 @@ namespace OElite
             try
             {
                 // Try to load storage provider dynamically based on mode
-                string factoryName = Configuration.OperationMode == RestMode.AzureStorageClient ? "azure" : "s3";
+                string factoryName = Configuration.OperationMode switch
+                {
+                    RestMode.AzureAsStorage => "azure",
+                    RestMode.S3AsStorage => "s3",
+                    _ => "azure"
+                };
                 var factory = ServiceLocator.GetFactory(factoryName);
                 if (factory != null)
                 {
@@ -260,7 +271,12 @@ namespace OElite
             catch (Exception ex)
             {
                 Logger?.LogError(ex, "Failed to initialize storage provider");
-                var packageName = Configuration.OperationMode == RestMode.AzureStorageClient ? "OElite.Restme.Azure" : "OElite.Restme.S3";
+                var packageName = Configuration.OperationMode switch
+                {
+                    RestMode.AzureAsStorage => "OElite.Restme.Azure",
+                    RestMode.S3AsStorage => "OElite.Restme.S3",
+                    _ => "OElite.Restme.Azure"
+                };
                 throw new OEliteWebException($"{Configuration.OperationMode} provider not loaded. Please reference {packageName} package.", ex);
             }
         }
@@ -345,13 +361,14 @@ namespace OElite
         {
             switch (CurrentMode)
             {
-                case RestMode.HTTPClient:
-                case RestMode.HTTPRestClient:
+                case RestMode.Http:
+                case RestMode.HttpRest:
                     return Task.Run(() =>
                         RestmeHttpExtensions.HttpRequestAsync<T>(this, method, relativePath)
                             .WaitAndGetResult(Configuration.DefaultTimeout));
-                case RestMode.AzureStorageClient:
-                case RestMode.RedisCacheClient:
+                case RestMode.AzureAsStorage:
+                case RestMode.AzureAsCache:
+                case RestMode.RedisAsCache:
                 default:
                     throw new NotSupportedException(
                         "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
@@ -378,19 +395,19 @@ namespace OElite
                     throw new SyntaxErrorException("No key or relative url path provided.");
                 switch (CurrentMode)
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                         return this.HttpGetAsync<T>(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.S3AsStorage:
                         if (StorageProvider != null)
                         {
                             return StorageProvider.GetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         }
                         throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
-                    case RestMode.RedisCacheClient:
+                    case RestMode.RedisAsCache:
                         if (CacheProvider != null)
                         {
                             return CacheProvider.GetAsync<T>(keyOrRelativeUrlPath)
@@ -436,12 +453,12 @@ namespace OElite
             {
                 switch (CurrentMode)
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                         return HttpRequestAsync<T>(HttpMethod.Put, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.S3AsStorage:
                         if (StorageProvider == null)
                             throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
                         
@@ -471,7 +488,7 @@ namespace OElite
                             return StorageProvider.PutAsync<T>(keyOrRelativeUrlPath, typedData4)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                    case RestMode.RedisCacheClient:
+                    case RestMode.RedisAsCache:
                         if (CacheProvider == null)
                             throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
                         
@@ -548,18 +565,18 @@ namespace OElite
             {
                 switch (CurrentMode)
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                         return HttpRequestAsync<T>(HttpMethod.Delete, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.S3AsStorage:
                         if (StorageProvider == null)
                             throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
                         var deleteSuccess = StorageProvider.DeleteAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                         return deleteSuccess ? default(T) : default(T);
-                    case RestMode.RedisCacheClient:
+                    case RestMode.RedisAsCache:
                         if (CacheProvider == null)
                             throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
                         var cacheDeleteSuccess = CacheProvider.RemoveAsync(keyOrRelativeUrlPath)
@@ -609,14 +626,14 @@ namespace OElite
             {
                 switch (CurrentMode)
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                         if (dataObject != null)
                             ObjAsParam = dataObject;
                         return HttpRequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.S3AsStorage:
                         if (StorageProvider == null)
                             throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
                         
@@ -646,7 +663,7 @@ namespace OElite
                             return StorageProvider.PutAsync<T>(keyOrRelativeUrlPath, typedData4)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                    case RestMode.RedisCacheClient:
+                    case RestMode.RedisAsCache:
                         if (CacheProvider == null)
                             throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
                         

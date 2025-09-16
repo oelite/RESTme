@@ -2,32 +2,26 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
-using OElite.Utils;
 
 namespace OElite.Abstractions
 {
     /// <summary>
     /// Base implementation for storage providers with common functionality
     /// </summary>
-    public abstract class BaseStorageProvider : IStorageProvider
+    public abstract class BaseStorageProvider(RestConfig config) : IStorageProvider
     {
-        protected readonly RestConfig Config;
+        protected readonly RestConfig Config = config ?? throw new ArgumentNullException(nameof(config));
         protected bool Disposed = false;
 
-        protected BaseStorageProvider(RestConfig config)
-        {
-            Config = config ?? throw new ArgumentNullException(nameof(config));
-        }
-
-        public abstract Task<T> GetAsync<T>(string key) where T : class;
-        public abstract Task<T> PutAsync<T>(string key, T value) where T : class;
-        public abstract Task<bool> DeleteAsync(string key);
-        public abstract Task<bool> ExistsAsync(string key);
-        public abstract Task<string?> GetStringAsync(string key);
-        public abstract Task<string?> PutStringAsync(string key, string value);
-        public abstract Task<Stream?> GetStreamAsync(string key);
-        public abstract Task<bool> PutStreamAsync(string key, Stream stream);
-        public abstract Task<T> GetStreamAsync<T>(string key) where T : Stream;
+        public abstract Task<T?> GetAsync<T>(string objectKey) where T : class;
+        public abstract Task<T?> PutAsync<T>(string objectKey, T value) where T : class;
+        public abstract Task<bool> DeleteAsync(string objectKey);
+        public abstract Task<bool> ExistsAsync(string objectKey);
+        public abstract Task<string?> GetStringAsync(string objectKey);
+        public abstract Task<string?> PutStringAsync(string objectKey, string value);
+        public abstract Task<Stream?> GetStreamAsync(string objectKey);
+        public abstract Task<bool> PutStreamAsync(string objectKey, Stream stream);
+        public abstract Task<T> GetStreamAsync<T>(string objectKey) where T : Stream;
         public abstract void Dispose();
 
         /// <summary>
@@ -39,7 +33,7 @@ namespace OElite.Abstractions
                 return null;
 
             var bytes = FileUtils.ReadStreamToEnd(responseStream);
-            
+
             T? result;
             if (typeof(T).GetTypeInfo().IsAbstract)
             {
@@ -54,13 +48,13 @@ namespace OElite.Abstractions
         /// <summary>
         /// Common implementation for handling Stream types in GetStreamAsync
         /// </summary>
-        protected T? HandleStreamTypeForStream<T>(Stream? stream) where T : Stream
+        protected T HandleStreamTypeForStream<T>(Stream? stream)
         {
-            if (stream == null)
-                return null;
+            if (stream == null || typeof(Stream).IsAssignableFrom(typeof(T)))
+                return default;
 
             var bytes = FileUtils.ReadStreamToEnd(stream);
-            
+
             T? result;
             if (typeof(T).GetTypeInfo().IsAbstract)
             {
@@ -81,11 +75,12 @@ namespace OElite.Abstractions
             {
                 if (value is not Stream stream)
                     return false;
-                
+
                 stream.Position = 0;
                 await uploadAction(stream);
                 return true;
             }
+
             return false;
         }
 

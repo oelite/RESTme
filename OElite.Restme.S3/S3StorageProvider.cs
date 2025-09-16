@@ -1,11 +1,10 @@
 using System;
 using System.IO;
-using System.Reflection;
 using System.Threading.Tasks;
 using OElite.Abstractions;
-using OElite.Utils;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon;
 
 namespace OElite.Providers
 {
@@ -15,45 +14,45 @@ namespace OElite.Providers
     public class S3StorageProvider : BaseStorageProvider
     {
         private readonly AmazonS3Client _s3Client;
+        private readonly string _bucketName;
         private readonly S3Configuration _s3Config;
 
         public S3StorageProvider(string connectionString, RestConfig config) : base(config)
         {
             // Parse connection string to extract S3 configuration
             _s3Config = S3ConnectionStringParser.ParseConnectionString(connectionString);
-            
-            // Create S3 client configuration
-            var clientConfig = new AmazonS3Config
+
+            // Use credentials from config or parsed connection string
+            var accessKey = !string.IsNullOrEmpty(_s3Config.AccessKeyId) ? _s3Config.AccessKeyId : config.RestKey;
+            var secretKey = !string.IsNullOrEmpty(_s3Config.SecretAccessKey)
+                ? _s3Config.SecretAccessKey
+                : config.RestSecret;
+
+            // Create AWS S3 client configuration
+            var s3Config = new AmazonS3Config
             {
                 ServiceURL = _s3Config.ServiceUrl,
                 ForcePathStyle = _s3Config.ForcePathStyle,
                 UseHttp = _s3Config.UseHttp
             };
-            
-            // Set region if provided and no custom service URL
-            if (string.IsNullOrEmpty(_s3Config.ServiceUrl) && _s3Config.Region != null)
+
+            if (_s3Config.Region != null)
             {
-                clientConfig.RegionEndpoint = _s3Config.Region;
+                s3Config.RegionEndpoint = _s3Config.Region;
             }
-            
-            // Use credentials from config or parsed connection string
-            var accessKey = !string.IsNullOrEmpty(_s3Config.AccessKeyId) ? _s3Config.AccessKeyId : config.RestKey;
-            var secretKey = !string.IsNullOrEmpty(_s3Config.SecretAccessKey) ? _s3Config.SecretAccessKey : config.RestSecret;
-            
-            _s3Client = new AmazonS3Client(accessKey, secretKey, clientConfig);
+
+            _s3Client = new AmazonS3Client(accessKey, secretKey, s3Config);
+            _bucketName = _s3Config.BucketName ?? "restme-storage";
         }
 
-        public override async Task<T> GetAsync<T>(string key) where T : class
+        public override async Task<T?> GetAsync<T>(string objectKey) where T : class
         {
             ThrowIfDisposed();
-            ValidateKey(key, "GetAsync");
+            ValidateKey(objectKey, "GetAsync");
 
             try
             {
-                var bucketName = S3ConnectionStringParser.GetBucketName(key);
-                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
-                
-                if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                if (objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
@@ -61,50 +60,37 @@ namespace OElite.Providers
 
                 var request = new GetObjectRequest
                 {
-                    BucketName = bucketName,
+                    BucketName = _bucketName,
                     Key = finalObjectKey
                 };
 
                 using var response = await _s3Client.GetObjectAsync(request);
                 
-                if (typeof(Stream).IsAssignableFrom(typeof(T)))
-                {
-                    return HandleStreamType<T>(response.ResponseStream);
-                }
-
-                using var reader = new StreamReader(response.ResponseStream);
-                var content = await reader.ReadToEndAsync();
+                // Copy the response stream to a MemoryStream since AWS S3 ResponseStream doesn't support seeking
+                using var memoryStream = new MemoryStream();
+                await response.ResponseStream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
                 
-                if (!content.IsNotNullOrEmpty())
-                    return null;
-
-                if (typeof(T) == typeof(string))
-                    return (T)Convert.ChangeType(content, typeof(T));
-
-                return content.JsonDeserialize<T>();
+                return HandleStreamType<T>(memoryStream);
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                return null;
+                throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to get S3 object '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<T> PutAsync<T>(string key, T value) where T : class
+        public override async Task<T?> PutAsync<T>(string objectKey, T data) where T : class
         {
             ThrowIfDisposed();
-            ValidateKey(key, "PutAsync");
-            ValidateValue(value, "PutAsync");
+            ValidateKey(objectKey, "PutAsync");
 
             try
             {
-                var bucketName = S3ConnectionStringParser.GetBucketName(key);
-                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
-                
-                if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                if (objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
@@ -112,50 +98,32 @@ namespace OElite.Providers
 
                 var request = new PutObjectRequest
                 {
-                    BucketName = bucketName,
+                    BucketName = _bucketName,
                     Key = finalObjectKey
                 };
 
-                // Set content type based on file extension
-                var extension = FileUtils.GetFileExtensionName(key);
-                if (extension.IsNotNullOrEmpty())
-                    request.ContentType = FileUtils.GetMimeType(extension);
-
-                if (typeof(Stream).IsAssignableFrom(typeof(T)))
+                await HandleStreamPutAsync(data, async stream =>
                 {
-                    if (value is not Stream stream)
-                        return value;
-                    
-                    stream.Position = 0;
                     request.InputStream = stream;
-                }
-                else
-                {
-                    var jsonValue = value.JsonSerialize(Config.UseRestConvertForCollectionSerialization, Config.SerializerSettings);
-                    request.ContentBody = jsonValue;
-                    request.ContentType = "application/json";
-                }
+                });
 
                 await _s3Client.PutObjectAsync(request);
-                return value;
+                return data;
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to upload S3 object '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> DeleteAsync(string key)
+        public override async Task<bool> DeleteAsync(string objectKey)
         {
             ThrowIfDisposed();
-            ValidateKey(key, "DeleteAsync");
+            ValidateKey(objectKey, "DeleteAsync");
 
             try
             {
-                var bucketName = S3ConnectionStringParser.GetBucketName(key);
-                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
-                
-                if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                if (objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
@@ -163,7 +131,7 @@ namespace OElite.Providers
 
                 var request = new DeleteObjectRequest
                 {
-                    BucketName = bucketName,
+                    BucketName = _bucketName,
                     Key = finalObjectKey
                 };
 
@@ -172,21 +140,18 @@ namespace OElite.Providers
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to delete S3 object '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to delete S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> ExistsAsync(string key)
+        public override async Task<bool> ExistsAsync(string objectKey)
         {
             ThrowIfDisposed();
-            ValidateKey(key, "ExistsAsync");
+            ValidateKey(objectKey, "ExistsAsync");
 
             try
             {
-                var bucketName = S3ConnectionStringParser.GetBucketName(key);
-                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
-                
-                if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                if (objectKey.IsNullOrEmpty())
                     return false;
 
                 // Apply root path if specified
@@ -194,7 +159,7 @@ namespace OElite.Providers
 
                 var request = new GetObjectMetadataRequest
                 {
-                    BucketName = bucketName,
+                    BucketName = _bucketName,
                     Key = finalObjectKey
                 };
 
@@ -207,21 +172,18 @@ namespace OElite.Providers
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to check S3 object existence '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to check if S3 object '{objectKey}' exists: {ex.Message}", ex);
             }
         }
 
-        public override async Task<string?> GetStringAsync(string key)
+        public override async Task<string?> GetStringAsync(string objectKey)
         {
             ThrowIfDisposed();
-            ValidateKey(key, "GetStringAsync");
+            ValidateKey(objectKey, "GetStringAsync");
 
             try
             {
-                var bucketName = S3ConnectionStringParser.GetBucketName(key);
-                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
-                
-                if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                if (objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
@@ -229,37 +191,32 @@ namespace OElite.Providers
 
                 var request = new GetObjectRequest
                 {
-                    BucketName = bucketName,
+                    BucketName = _bucketName,
                     Key = finalObjectKey
                 };
 
                 using var response = await _s3Client.GetObjectAsync(request);
                 using var reader = new StreamReader(response.ResponseStream);
-                
                 return await reader.ReadToEndAsync();
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                return null;
+                throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to get S3 object string '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<string?> PutStringAsync(string key, string value)
+        public override async Task<string?> PutStringAsync(string objectKey, string content)
         {
             ThrowIfDisposed();
-            ValidateKey(key, "PutStringAsync");
-            ValidateValue(value, "PutStringAsync");
+            ValidateKey(objectKey, "PutStringAsync");
 
             try
             {
-                var bucketName = S3ConnectionStringParser.GetBucketName(key);
-                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
-                
-                if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                if (objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
@@ -267,32 +224,29 @@ namespace OElite.Providers
 
                 var request = new PutObjectRequest
                 {
-                    BucketName = bucketName,
+                    BucketName = _bucketName,
                     Key = finalObjectKey,
-                    ContentBody = value,
+                    ContentBody = content,
                     ContentType = "text/plain"
                 };
 
                 await _s3Client.PutObjectAsync(request);
-                return value;
+                return content;
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to upload S3 object string '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<Stream?> GetStreamAsync(string key)
+        public override async Task<Stream?> GetStreamAsync(string objectKey)
         {
             ThrowIfDisposed();
-            ValidateKey(key, "GetStreamAsync");
+            ValidateKey(objectKey, "GetStreamAsync");
 
             try
             {
-                var bucketName = S3ConnectionStringParser.GetBucketName(key);
-                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
-                
-                if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                if (objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
@@ -300,39 +254,31 @@ namespace OElite.Providers
 
                 var request = new GetObjectRequest
                 {
-                    BucketName = bucketName,
+                    BucketName = _bucketName,
                     Key = finalObjectKey
                 };
 
                 var response = await _s3Client.GetObjectAsync(request);
-                var stream = new MemoryStream();
-                await response.ResponseStream.CopyToAsync(stream);
-                stream.Position = 0;
-                
-                return stream;
+                return response.ResponseStream;
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                return null;
+                throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to get S3 object stream '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> PutStreamAsync(string key, Stream stream)
+        public override async Task<bool> PutStreamAsync(string objectKey, Stream stream)
         {
             ThrowIfDisposed();
-            ValidateKey(key, "PutStreamAsync");
-            ValidateValue(stream, "PutStreamAsync");
+            ValidateKey(objectKey, "PutStreamAsync");
 
             try
             {
-                var bucketName = S3ConnectionStringParser.GetBucketName(key);
-                var objectKey = S3ConnectionStringParser.GetObjectKey(key);
-                
-                if (bucketName.IsNullOrEmpty() || objectKey.IsNullOrEmpty())
+                if (objectKey.IsNullOrEmpty())
                     throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
@@ -340,48 +286,61 @@ namespace OElite.Providers
 
                 var request = new PutObjectRequest
                 {
-                    BucketName = bucketName,
+                    BucketName = _bucketName,
                     Key = finalObjectKey,
                     InputStream = stream
                 };
-
-                // Set content type based on file extension
-                var extension = FileUtils.GetFileExtensionName(key);
-                if (extension.IsNotNullOrEmpty())
-                    request.ContentType = FileUtils.GetMimeType(extension);
 
                 await _s3Client.PutObjectAsync(request);
                 return true;
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to upload S3 object stream '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<T> GetStreamAsync<T>(string key)
+        public override async Task<T> GetStreamAsync<T>(string objectKey)
         {
             ThrowIfDisposed();
-            ValidateKey(key, "GetStreamAsync");
+            ValidateKey(objectKey, "GetStreamAsync");
 
             try
             {
-                var stream = await GetStreamAsync(key);
-                return HandleStreamTypeForStream<T>(stream);
+                if (objectKey.IsNullOrEmpty())
+                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+
+                // Apply root path if specified
+                var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
+
+                var request = new GetObjectRequest
+                {
+                    BucketName = _bucketName,
+                    Key = finalObjectKey
+                };
+
+                using var response = await _s3Client.GetObjectAsync(request);
+                
+                // Copy the response stream to a MemoryStream since AWS S3 ResponseStream doesn't support seeking
+                using var memoryStream = new MemoryStream();
+                await response.ResponseStream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
+                
+                return HandleStreamTypeForStream<T>(memoryStream);
+            }
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                throw new OEliteWebException($"Failed to get S3 object stream as type '{typeof(T).Name}' for '{key}': {ex.Message}", ex);
+                throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
         public override void Dispose()
         {
-            if (!Disposed)
-            {
-                _s3Client?.Dispose();
-                Disposed = true;
-            }
+            _s3Client?.Dispose();
         }
     }
 }

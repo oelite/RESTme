@@ -36,7 +36,7 @@ namespace OElite
             restme.PrepareHeaders(httpClient.DefaultRequestHeaders);
             HttpResponseMessage? response = null;
             ByteArrayContent? submitContent = null;
-            if (restme.CurrentMode == RestMode.HTTPClient)
+            if (restme.CurrentMode == RestMode.Http)
             {
                 if (restme.Params.Count > 0)
                     submitContent = new OEliteFormUrlEncodedContent(restme.Params);
