@@ -159,3 +159,15 @@ deploy_packages:
         fi
       done
 
+    # Notify WeCom group
+    - |
+      MESSAGE=$(cat <<EOF
+      {
+        "msgtype": "markdown",
+        "markdown": {
+          "content": "**📦 Package Deployment Notification**\n\n**Repository/Project:** $CI_PROJECT_NAME\n**Branch:** $CI_COMMIT_REF_NAME\n**Version:** $VERSION_NUMBER$([ -n "$VERSION_SUFFIX" ] && echo "-$VERSION_SUFFIX")\n**Deployment Target:** $DEPLOY_TARGET\n**Build Number:** $CI_PIPELINE_ID\n**Packages:**\n$(for package in ./packages/*.nupkg; do if [ -f "$package" ]; then package_name=$(basename "$package" .nupkg); echo "- $package_name"; fi; done | sed ':a;N;$!ba;s/\n/\\n/g')"
+        }
+      }
+      EOF
+      )
+      curl -X POST -H "Content-Type: application/json" -d "$MESSAGE" $WECOM_DEV_GROUP_ROBOT_WEBHOOK
