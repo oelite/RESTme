@@ -1,6 +1,6 @@
 using System;
 
-namespace OElite.Restme.MongoDb;
+namespace OElite;
 
 /// <summary>
 /// Custom MongoDB collection attribute - equivalent to RestmeTable but for MongoDB

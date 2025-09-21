@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 
-namespace OElite.Restme.MongoDb;
+namespace OElite;
 
 /// <summary>
 /// Custom ObjectId equivalent for OElite.Common - maps to MongoDB ObjectId in data layer

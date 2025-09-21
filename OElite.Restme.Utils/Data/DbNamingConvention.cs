@@ -1,4 +1,4 @@
-namespace OElite.Restme.MongoDb;
+namespace OElite;
 
 public enum DbNamingConvention
 {

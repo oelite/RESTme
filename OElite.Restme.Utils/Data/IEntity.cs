@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace OElite.Restme.MongoDb;
+namespace OElite;
 
 /// <summary>
 /// Base interface for entities that can be used with MongoDB operations

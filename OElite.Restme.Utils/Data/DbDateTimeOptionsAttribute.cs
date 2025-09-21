@@ -1,6 +1,6 @@
 using System;
 
-namespace OElite.Restme.MongoDb;
+namespace OElite;
 
 /// <summary>
 /// Specifies options for DateTime serialization in Restme database operations

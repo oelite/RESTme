@@ -1,6 +1,6 @@
 using System;
 
-namespace OElite.Restme.MongoDb;
+namespace OElite;
 
 /// <summary>
 /// Custom MongoDB field attribute - equivalent to RestmeDbColumn but for MongoDB
