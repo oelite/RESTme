@@ -8,6 +8,7 @@ variables:
     OElite.Restme.Azure
     OElite.Restme.S3
     OElite.Restme.Utils
+    OElite.Restme.MongoDb
 
 stages:
   - version
