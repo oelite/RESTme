@@ -11,24 +11,9 @@ public interface IEntity
     /// Unique identifier for the entity
     /// </summary>
     DbObjectId Id { get; set; }
-    
-    /// <summary>
-    /// Status of the entity
-    /// </summary>
-    EntityStatus Status { get; set; }
-    
+
     /// <summary>
     /// Additional metadata for the entity
     /// </summary>
     Dictionary<string, object>? MetaData { get; set; }
-}
-
-/// <summary>
-/// Entity status enumeration
-/// </summary>
-public enum EntityStatus
-{
-    Active = 1,
-    Inactive = 0,
-    Deleted = -1
 }
