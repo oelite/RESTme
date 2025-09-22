@@ -191,7 +191,18 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
 
     public async Task<bool> AnyAsync()
     {
-        return await CountAsync() > 0;
+        // More efficient than CountAsync() > 0 - stops at first match
+        var combinedFilter = CombineFilters();
+        var options = new CountOptions { Limit = 1 };
+
+        if (_session != null)
+        {
+            return await _collection.CountDocumentsAsync(_session, combinedFilter, options) > 0;
+        }
+        else
+        {
+            return await _collection.CountDocumentsAsync(combinedFilter, options) > 0;
+        }
     }
 
     public async Task<List<TResult>> AggregateAsync<TResult>(Dictionary<string, object>[] pipeline)
@@ -600,5 +611,95 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
         }
 
         return mongoFilters;
+    }
+
+    /// <summary>
+    /// Efficiently checks if any documents exist matching the query - optimized for existence checks
+    /// </summary>
+    public async Task<bool> ExistsAsync()
+    {
+        return await AnyAsync();
+    }
+
+    /// <summary>
+    /// Gets a single document or null - optimized for single result queries
+    /// </summary>
+    public async Task<T?> SingleOrDefaultAsync()
+    {
+        // Limit to 2 to check for uniqueness
+        var options = new FindOptions<T> { Limit = 2 };
+        
+        if (_skip.HasValue)
+            options.Skip = _skip.Value;
+
+        var combinedFilter = CombineFilters();
+        var combinedSort = CombineSorts();
+
+        if (combinedSort != null)
+            options.Sort = combinedSort;
+
+        List<T> results;
+        if (_session != null)
+        {
+            var cursor = await _collection.FindAsync(_session, combinedFilter, options);
+            results = await cursor.ToListAsync();
+        }
+        else
+        {
+            var cursor = await _collection.FindAsync(combinedFilter, options);
+            results = await cursor.ToListAsync();
+        }
+
+        return results.Count switch
+        {
+            0 => default(T),
+            1 => results[0],
+            _ => throw new InvalidOperationException("Sequence contains more than one element")
+        };
+    }
+
+    /// <summary>
+    /// Gets a single document - throws if no results or multiple results
+    /// </summary>
+    public async Task<T> SingleAsync()
+    {
+        var result = await SingleOrDefaultAsync();
+        if (result == null)
+            throw new InvalidOperationException("Sequence contains no elements");
+        return result;
+    }
+
+    /// <summary>
+    /// Gets the first document - throws if no results
+    /// </summary>
+    public async Task<T> FirstAsync()
+    {
+        var result = await FirstOrDefaultAsync();
+        if (result == null)
+            throw new InvalidOperationException("Sequence contains no elements");
+        return result;
+    }
+
+    /// <summary>
+    /// Executes the query with pagination and returns both items and total count
+    /// </summary>
+    public async Task<(List<T> Items, long TotalCount)> ToPagedListAsync(int pageIndex, int pageSize)
+    {
+        var totalCount = await CountAsync();
+        var items = await Skip(pageIndex * pageSize).Limit(pageSize).ToListAsync();
+        return (items, totalCount);
+    }
+
+    /// <summary>
+    /// Executes the query and returns results as a BaseEntityCollection with total count
+    /// </summary>
+    public async Task<TCollection> ToPagedCollectionAsync<TCollection>(int pageIndex, int pageSize) 
+        where TCollection : BaseEntityCollection<T>, new()
+    {
+        var (items, totalCount) = await ToPagedListAsync(pageIndex, pageSize);
+        var collection = new TCollection();
+        collection.AddRange(items);
+        collection.TotalRecordsCount = (int)totalCount;
+        return collection;
     }
 }
