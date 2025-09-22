@@ -119,6 +119,7 @@ public static class ExpressionToMongoPipeline
 
     /// <summary>
     /// Gets the MongoDB field name from a member expression, respecting attribute mappings
+    /// Supports nested properties like p.MeasureUnit.IsDefaultStockMeasure
     /// </summary>
     private static string GetFieldName(MemberExpression memberExpression)
     {
@@ -126,40 +127,67 @@ public static class ExpressionToMongoPipeline
         if (property == null)
             throw new ArgumentException("Expression must reference a property");
 
-        // Check for DbId attribute first
-        var idAttr = property.GetCustomAttribute<DbIdAttribute>();
-        if (idAttr != null)
+        // Build the full field path for nested properties
+        var fieldPath = new List<string>();
+        var currentExpression = memberExpression;
+        
+        while (currentExpression != null)
         {
-            return "_id";
-        }
-
-        // Check for DbField attribute
-        var fieldAttr = property.GetCustomAttribute<DbFieldAttribute>();
-        if (fieldAttr != null && !string.IsNullOrEmpty(fieldAttr.FieldName))
-        {
-            return fieldAttr.FieldName;
-        }
-
-        // Check for DbFieldIgnore attribute
-        var ignoreAttr = property.GetCustomAttribute<DbFieldIgnore>();
-        if (ignoreAttr != null)
-        {
-            throw new InvalidOperationException($"Property {property.Name} is marked with [DbFieldIgnore] and cannot be used in aggregation");
-        }
-
-        // Get the declaring type to check for naming convention
-        var declaringType = property.DeclaringType;
-        if (declaringType != null)
-        {
-            var collectionAttr = declaringType.GetCustomAttribute<DbCollectionAttribute>();
-            if (collectionAttr != null)
+            var currentProperty = currentExpression.Member as PropertyInfo;
+            if (currentProperty == null)
+                break;
+                
+            // Check for DbId attribute first
+            var idAttr = currentProperty.GetCustomAttribute<DbIdAttribute>();
+            if (idAttr != null)
             {
-                return ConvertToNamingConvention(property.Name, collectionAttr.NamingConvention);
+                fieldPath.Insert(0, "_id");
+                break;
             }
-        }
 
-        // Default to snake_case conversion
-        return ConvertToSnakeCase(property.Name);
+            // Check for DbField attribute
+            var fieldAttr = currentProperty.GetCustomAttribute<DbFieldAttribute>();
+            if (fieldAttr != null && !string.IsNullOrEmpty(fieldAttr.FieldName))
+            {
+                fieldPath.Insert(0, fieldAttr.FieldName);
+            }
+            else
+            {
+                // Check for DbFieldIgnore attribute
+                var ignoreAttr = currentProperty.GetCustomAttribute<DbFieldIgnore>();
+                if (ignoreAttr != null)
+                {
+                    throw new InvalidOperationException($"Property {currentProperty.Name} is marked with [DbFieldIgnore] and cannot be used in aggregation");
+                }
+
+                // Get the declaring type to check for naming convention
+                var declaringType = currentProperty.DeclaringType;
+                string fieldName;
+                if (declaringType != null)
+                {
+                    var collectionAttr = declaringType.GetCustomAttribute<DbCollectionAttribute>();
+                    if (collectionAttr != null)
+                    {
+                        fieldName = ConvertToNamingConvention(currentProperty.Name, collectionAttr.NamingConvention);
+                    }
+                    else
+                    {
+                        fieldName = ConvertToSnakeCase(currentProperty.Name);
+                    }
+                }
+                else
+                {
+                    fieldName = ConvertToSnakeCase(currentProperty.Name);
+                }
+                
+                fieldPath.Insert(0, fieldName);
+            }
+            
+            // Move to the parent expression (for nested properties)
+            currentExpression = currentExpression.Expression as MemberExpression;
+        }
+        
+        return string.Join(".", fieldPath);
     }
 
     /// <summary>

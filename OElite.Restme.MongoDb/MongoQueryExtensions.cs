@@ -213,6 +213,15 @@ public static class MongoQueryExtensions
     }
 
     /// <summary>
+    /// Projects the query results to a different type - deferred execution version
+    /// Returns a wrapper that defers execution until FetchAsync() or other execution methods are called
+    /// </summary>
+    public static ProjectionQuery<T, TResult> Select<T, TResult>(this IMongoQuery<T> query, Expression<Func<T, TResult>> selector) where T : BaseEntity
+    {
+        return new ProjectionQuery<T, TResult>(query, selector);
+    }
+
+    /// <summary>
     /// Projects the query results to a different type using MongoDB aggregation pipeline
     /// </summary>
     public static async Task<List<TResult>> SelectAsync<T, TResult>(this IMongoQuery<T> query, Expression<Func<T, TResult>> selector) where T : BaseEntity
@@ -692,3 +701,116 @@ public static class MongoQueryExtensions
 
     #endregion
 }
+
+/// <summary>
+/// A deferred projection query that wraps an existing query with a projection selector
+/// Executes the projection when FetchAsync() or other execution methods are called
+/// </summary>
+public class ProjectionQuery<T, TResult> where T : BaseEntity
+{
+    private readonly IMongoQuery<T> _sourceQuery;
+    private readonly Expression<Func<T, TResult>> _selector;
+
+    public ProjectionQuery(IMongoQuery<T> sourceQuery, Expression<Func<T, TResult>> selector)
+    {
+        _sourceQuery = sourceQuery;
+        _selector = selector;
+    }
+
+    /// <summary>
+    /// Execute the query and return the projected result
+    /// </summary>
+    public async Task<TResult?> FetchAsync()
+    {
+        var sourceResult = await _sourceQuery.FetchAsync();
+        return sourceResult != null ? _selector.Compile()(sourceResult) : default(TResult);
+    }
+
+    /// <summary>
+    /// Execute the query and return all projected results
+    /// </summary>
+    public async Task<List<TResult>> ToListAsync()
+    {
+        var sourceResults = await _sourceQuery.ToListAsync();
+        return sourceResults.Select(_selector.Compile()).ToList();
+    }
+
+    /// <summary>
+    /// Execute the query and return the first projected result
+    /// </summary>
+    public async Task<TResult?> FirstOrDefaultAsync()
+    {
+        var sourceResult = await _sourceQuery.FirstOrDefaultAsync();
+        return sourceResult != null ? _selector.Compile()(sourceResult) : default(TResult);
+    }
+
+    /// <summary>
+    /// Count the number of matching records
+    /// </summary>
+    public async Task<long> CountAsync()
+    {
+        return await _sourceQuery.CountAsync();
+    }
+
+    /// <summary>
+    /// Check if any records match the query
+    /// </summary>
+    public async Task<bool> AnyAsync()
+    {
+        return await _sourceQuery.AnyAsync();
+    }
+
+    /// <summary>
+    /// Add additional filtering to the query
+    /// </summary>
+    public ProjectionQuery<T, TResult> Where(Expression<Func<T, bool>> filter)
+    {
+        _sourceQuery.Query(filter);
+        return this;
+    }
+
+    /// <summary>
+    /// Add sorting to the query
+    /// </summary>
+    public ProjectionQuery<T, TResult> OrderBy<TKey>(Expression<Func<T, TKey>> keySelector)
+    {
+        // Convert Expression<Func<T, TKey>> to Expression<Func<T, object>>
+        var objectSelector = Expression.Lambda<Func<T, object>>(
+            Expression.Convert(keySelector.Body, typeof(object)),
+            keySelector.Parameters);
+        _sourceQuery.Sort(objectSelector, true);
+        return this;
+    }
+
+    /// <summary>
+    /// Add descending sorting to the query
+    /// </summary>
+    public ProjectionQuery<T, TResult> OrderByDescending<TKey>(Expression<Func<T, TKey>> keySelector)
+    {
+        // Convert Expression<Func<T, TKey>> to Expression<Func<T, object>>
+        var objectSelector = Expression.Lambda<Func<T, object>>(
+            Expression.Convert(keySelector.Body, typeof(object)),
+            keySelector.Parameters);
+        _sourceQuery.Sort(objectSelector, false);
+        return this;
+    }
+
+    /// <summary>
+    /// Limit the number of results
+    /// </summary>
+    public ProjectionQuery<T, TResult> Take(int count)
+    {
+        _sourceQuery.Limit(count);
+        return this;
+    }
+
+    /// <summary>
+    /// Skip a number of results
+    /// </summary>
+    public ProjectionQuery<T, TResult> Skip(int count)
+    {
+        _sourceQuery.Skip(count);
+        return this;
+    }
+}
+

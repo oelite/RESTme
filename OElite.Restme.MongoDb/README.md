@@ -57,9 +57,15 @@ Add the package reference to your project:
 
 ### 4. Denormalization System
 - Automatic data population from related collections
-- Flexible field mapping
-- Advanced query capabilities
-- Performance optimization
+- Flexible reference key syntax with `@` and `#` prefixes
+- Support for complex queries and field mapping
+- Cascade update capabilities
+
+### 5. Advanced LINQ Expression Support
+- **Nested Document Queries**: Full support for querying nested properties like `p.MeasureUnit?.IsDefaultStockMeasure`
+- **Extension Method Support**: Use OElite.Restme.Utils extension methods like `IsNotNullOrEmpty()` in LINQ expressions
+- **Type Safety**: Compile-time checking of property names and types
+- **MongoDB Translation**: Automatic translation to efficient MongoDB queries
 
 ## Entity Configuration
 
@@ -220,6 +226,24 @@ public class ProductRepository : DataRepository
         return await ProductStock
             .Where(p => p.Name == productName)
             .AnyAsync();
+    }
+    
+    // Nested document queries - fully supported!
+    public async Task<List<Product>> GetProductsWithNonDefaultMeasureUnitsAsync()
+    {
+        return await ProductStock
+            .Where(p => p.MeasureUnit != null && p.MeasureUnit.IsDefaultStockMeasure == false)
+            .Where(p => p.MeasureUnit.Name.Contains("kg"))
+            .ToListAsync();
+    }
+    
+    // Extension method queries - fully supported!
+    public async Task<List<Product>> GetProductsWithValidOwnerAsync()
+    {
+        return await ProductStock
+            .Where(p => p.OwnerMerchantId.IsNotNullOrEmpty())
+            .Where(p => p.Name.IsNotNullOrEmpty())
+            .ToListAsync();
     }
     
     public async Task<(List<Product> Items, long TotalCount)> GetPagedProductsAsync(int pageIndex, int pageSize)
@@ -1737,6 +1761,105 @@ public async Task<object> GetProductStatisticsAsync()
 ```
 
 This comprehensive documentation provides developers with all the guidance they need to effectively use the new aggregation-based methods, including special syntax considerations, field mapping behavior, error handling, and performance optimization techniques.
+
+### Advanced LINQ Expression Support
+
+The library provides comprehensive support for LINQ expressions with MongoDB, including nested document queries and extension methods.
+
+#### Nested Document Queries
+
+Full support for querying nested properties in embedded documents:
+
+```csharp
+// Nested document queries - fully supported!
+public async Task<List<Product>> GetProductsWithNonDefaultMeasureUnitsAsync()
+{
+    return await ProductStock
+        .Where(p => p.MeasureUnit != null && p.MeasureUnit.IsDefaultStockMeasure == false)
+        .Where(p => p.MeasureUnit.Name.Contains("kg"))
+        .OrderBy(p => p.Name)
+        .ToListAsync();
+}
+
+// Complex nested queries with multiple levels
+public async Task<List<Product>> GetProductsWithValidCategoryAsync()
+{
+    return await ProductStock
+        .Where(p => p.Category != null && p.Category.ParentCategory != null)
+        .Where(p => p.Category.ParentCategory.IsActive == true)
+        .ToListAsync();
+}
+```
+
+#### Extension Method Support
+
+Use OElite.Restme.Utils extension methods directly in LINQ expressions:
+
+```csharp
+// Extension method queries - fully supported!
+public async Task<List<Product>> GetProductsWithValidOwnerAsync()
+{
+    return await ProductStock
+        .Where(p => p.OwnerMerchantId.IsNotNullOrEmpty())
+        .Where(p => p.Name.IsNotNullOrEmpty())
+        .OrderBy(p => p.Name)
+        .ToListAsync();
+}
+
+// Combined nested and extension method queries
+public async Task<List<Product>> GetProductsWithValidOwnerAndNonDefaultMeasureUnitAsync()
+{
+    return await ProductStock
+        .Where(p => p.OwnerMerchantId.IsNotNullOrEmpty())           // Extension method
+        .Where(p => p.MeasureUnit != null && p.MeasureUnit.IsDefaultStockMeasure == false)  // Nested query
+        .OrderBy(p => p.Name)
+        .ToListAsync();
+}
+```
+
+#### Important: Null-Conditional Operator Limitations
+
+**⚠️ CRITICAL**: The null-conditional operator (`?.`) **cannot be used** in LINQ expression trees (IQueryable queries) because it causes the error: *"An expression tree lambda cannot contain conditional access expressions"*.
+
+**❌ This will cause compilation errors:**
+```csharp
+// DON'T DO THIS - causes "conditional access expressions" error
+.Where(p => p.MeasureUnit?.IsDefaultStockMeasure == false)
+.Where(p => p.TagData?.OwnerEntityId == productId)
+.Where(p => p.Category?.ParentCategory?.IsActive == true)
+```
+
+**✅ Use explicit null checking instead:**
+```csharp
+// DO THIS - works correctly in expression trees
+.Where(p => p.MeasureUnit != null && p.MeasureUnit.IsDefaultStockMeasure == false)
+.Where(p => p.TagData != null && p.TagData.OwnerEntityId == productId)
+.Where(p => p.Category != null && p.Category.ParentCategory != null && p.Category.ParentCategory.IsActive == true)
+```
+
+#### String Method Support
+
+LINQ string methods are fully supported and translate to MongoDB regular expressions:
+
+```csharp
+// String methods - fully supported!
+public async Task<List<Product>> GetProductsWithStringFiltersAsync()
+{
+    return await ProductStock
+        .Where(p => p.Name.Contains("widget"))           // MongoDB $regex
+        .Where(p => p.Description.StartsWith("Premium")) // MongoDB $regex with ^
+        .Where(p => p.Sku.EndsWith("001"))              // MongoDB $regex with $
+        .Where(p => p.Name.ToLower().Contains("sale"))  // MongoDB $regex with $options: "i"
+        .ToListAsync();
+}
+```
+
+#### Type Safety and Performance
+
+- **Type Safety**: Compile-time checking of property names and types
+- **MongoDB Translation**: Automatic translation to efficient MongoDB queries
+- **Performance**: Server-side execution using MongoDB aggregation pipelines
+- **IntelliSense**: Full IntelliSense support for all LINQ operations
 
 ## Troubleshooting
 
