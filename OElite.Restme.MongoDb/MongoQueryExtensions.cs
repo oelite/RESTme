@@ -626,5 +626,69 @@ public static class MongoQueryExtensions
         return (TResult)anonymousObj;
     }
 
+    /// <summary>
+    /// Executes the query and returns the first result or null - equivalent to FirstOrDefaultAsync
+    /// </summary>
+    public static async Task<T?> FetchAsync<T>(this IMongoQuery<T> query) where T : BaseEntity
+    {
+        return await query.FirstOrDefaultAsync();
+    }
+
+    /// <summary>
+    /// Executes the query and returns results as a BaseEntityCollection - equivalent to ToListAsync with collection wrapper
+    /// </summary>
+    public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, bool returnTotalCount = false) 
+        where T : BaseEntity 
+        where TCollection : BaseEntityCollection<T>, new()
+    {
+        var collection = new TCollection();
+        
+        if (returnTotalCount)
+        {
+            // Execute count and data queries in parallel for better performance
+            var countTask = query.CountAsync();
+            var dataTask = query.ToListAsync();
+            
+            await Task.WhenAll(countTask, dataTask);
+            
+            collection.AddRange(await dataTask);
+            collection.TotalRecordsCount = (int)await countTask;
+        }
+        else
+        {
+            // Skip count query for better performance when total count is not needed
+            var results = await query.ToListAsync();
+            collection.AddRange(results);
+        }
+        
+        return collection;
+    }
+
+    /// <summary>
+    /// Executes the query with pagination and returns results as a BaseEntityCollection with optional total count
+    /// </summary>
+    public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, int pageIndex, int pageSize, bool returnTotalCount = false) 
+        where T : BaseEntity 
+        where TCollection : BaseEntityCollection<T>, new()
+    {
+        var collection = new TCollection();
+        
+        if (returnTotalCount)
+        {
+            // Use existing optimized pagination method that executes count and data queries efficiently
+            var (items, totalCount) = await query.ToPagedListAsync(pageIndex, pageSize);
+            collection.AddRange(items);
+            collection.TotalRecordsCount = (int)totalCount;
+        }
+        else
+        {
+            // Skip count query for better performance when total count is not needed
+            var results = await query.Skip(pageIndex * pageSize).Take(pageSize).ToListAsync();
+            collection.AddRange(results);
+        }
+        
+        return collection;
+    }
+
     #endregion
 }

@@ -229,6 +229,22 @@ public class ProductRepository : DataRepository
             .ToPagedListAsync(pageIndex, pageSize);
     }
     
+    // Using the new FetchAsync extensions
+    public async Task<Product?> GetProductByIdAsync(DbObjectId productId)
+    {
+        return await ProductStock
+            .Where(p => p.Id == productId)
+            .FetchAsync(); // Equivalent to FirstOrDefaultAsync()
+    }
+    
+    public async Task<ProductCollection> GetProductsByCategoryAsync(DbObjectId categoryId)
+    {
+        return await ProductStock
+            .Where(p => p.CategoryId == categoryId)
+            .Where(p => p.Status == EntityStatus.Active)
+            .FetchAsync<Product, ProductCollection>(); // Returns BaseEntityCollection<T>
+    }
+    
     // Aggregation-based methods for maximum performance
     public async Task<List<string>> GetDistinctProductNamesAsync()
     {
@@ -881,6 +897,68 @@ public class UserService
 - `DbSimpleQuery` - Query configuration for denormalization
 - `DbNamingConvention` - Enum for naming conventions (SnakeCase, CamelCase, PascalCase)
 
+## FetchAsync Extensions
+
+The library provides convenient `FetchAsync` extensions that simplify common query patterns:
+
+### Single Record Fetching
+```csharp
+// FetchAsync() - equivalent to FirstOrDefaultAsync()
+public async Task<Product?> GetProductByIdAsync(DbObjectId productId)
+{
+    return await ProductStock
+        .Where(p => p.Id == productId)
+        .FetchAsync(); // Returns T? or null if not found
+}
+```
+
+### Collection Fetching
+```csharp
+// FetchAsync<T, TCollection>() - returns BaseEntityCollection<T>
+public async Task<ProductCollection> GetActiveProductsAsync()
+{
+    return await ProductStock
+        .Where(p => p.Status == EntityStatus.Active)
+        .OrderBy(p => p.Name)
+        .FetchAsync<Product, ProductCollection>(); // Returns typed collection
+}
+
+// FetchAsync with optional total count calculation
+public async Task<ProductCollection> GetActiveProductsWithCountAsync()
+{
+    return await ProductStock
+        .Where(p => p.Status == EntityStatus.Active)
+        .OrderBy(p => p.Name)
+        .FetchAsync<Product, ProductCollection>(returnTotalCount: true); // Includes TotalRecordsCount
+}
+
+// FetchAsync with pagination (default: no total count for better performance)
+public async Task<ProductCollection> GetActiveProductsPagedAsync(int pageIndex, int pageSize)
+{
+    return await ProductStock
+        .Where(p => p.Status == EntityStatus.Active)
+        .OrderBy(p => p.Name)
+        .FetchAsync<Product, ProductCollection>(pageIndex, pageSize); // returnTotalCount defaults to false
+}
+
+// FetchAsync with pagination and total count (explicitly requested)
+public async Task<ProductCollection> GetActiveProductsPagedWithCountAsync(int pageIndex, int pageSize)
+{
+    return await ProductStock
+        .Where(p => p.Status == EntityStatus.Active)
+        .OrderBy(p => p.Name)
+        .FetchAsync<Product, ProductCollection>(pageIndex, pageSize, returnTotalCount: true);
+}
+```
+
+### Benefits of FetchAsync
+- **Cleaner syntax** - More intuitive than `FirstOrDefaultAsync()` and `ToListAsync()`
+- **Type safety** - Generic constraints ensure proper collection types
+- **Consistent API** - Both methods follow the same naming pattern
+- **Performance optimization** - Optional total count calculation to avoid unnecessary queries
+- **Pagination support** - Built-in pagination with efficient total count handling
+- **Parallel execution** - Count and data queries run in parallel when total count is needed
+
 ## Performance Considerations
 
 ### Query Optimization
@@ -889,6 +967,39 @@ public class UserService
 - **Consider using aggregation pipelines** for complex queries
 - **Use projection** to limit returned fields when possible
 - **Implement pagination** for large result sets
+- **Use `FetchAsync()`** for single result queries
+- **Use `returnTotalCount: false`** when total count is not needed for better performance
+
+### Performance-Optimized Methods
+
+#### FetchAsync Performance Optimization
+
+The `FetchAsync<T, TCollection>()` method provides intelligent performance optimization:
+
+**When `returnTotalCount = false` (default for all methods):**
+- **Skips the count query entirely** - saves one database round trip
+- **Significantly faster** for scenarios where total count is not needed
+- Perfect for infinite scroll, "load more" buttons, or when you only need the current page data
+- **Default behavior** - prioritizes performance by default
+
+**When `returnTotalCount = true` (explicitly requested):**
+- Executes count and data queries **in parallel** using `Task.WhenAll()`
+- Uses existing optimized `ToPagedListAsync()` method for pagination
+- Provides accurate `TotalRecordsCount` for UI pagination controls
+- Use only when total count is actually needed
+
+**Performance Comparison:**
+```csharp
+// Fast - Single query, no count (default behavior)
+var fastResults = await ProductStock
+    .Where(p => p.Status == EntityStatus.Active)
+    .FetchAsync<Product, ProductCollection>(); // returnTotalCount defaults to false
+
+// Slower - Two queries (count + data) but provides total count (explicitly requested)
+var resultsWithCount = await ProductStock
+    .Where(p => p.Status == EntityStatus.Active)
+    .FetchAsync<Product, ProductCollection>(returnTotalCount: true);
+```
 
 ### Performance-Optimized Methods
 
