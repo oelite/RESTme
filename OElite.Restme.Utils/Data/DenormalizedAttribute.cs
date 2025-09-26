@@ -52,6 +52,13 @@ public abstract class DenormalizedAttribute : Attribute
     public bool IsPropertyBased => IsReferenceKeyBased;
 
     /// <summary>
+    /// Controls whether changes to the source entity should trigger cascade updates to entities that reference this field.
+    /// Default is false to prevent mass updates and improve performance.
+    /// Set to true only for fields where changes should propagate to referencing entities.
+    /// </summary>
+    public bool CascadeUpdate { get; set; } = false;
+
+    /// <summary>
     /// Gets the processed MongoDB query with @ parameters ready for substitution
     /// and single quotes converted to double quotes
     /// </summary>
@@ -120,7 +127,7 @@ public abstract class DenormalizedAttribute : Attribute
     /// <summary>
     /// Converts PascalCase to snake_case
     /// </summary>
-    protected static string ToSnakeCase(string pascalCase)
+    public static string ToSnakeCase(string pascalCase)
     {
         if (string.IsNullOrEmpty(pascalCase))
         {
@@ -170,7 +177,7 @@ public abstract class DenormalizedAttribute : Attribute
     /// </summary>
     /// <param name="referenceKey">The reference key string to parse</param>
     /// <returns>Tuple of (propertyName, targetFieldName, isCurrentClass)</returns>
-    protected static (string propertyName, string? targetFieldName, bool isCurrentClass) ParseReferenceKey(
+    public static (string propertyName, string? targetFieldName, bool isCurrentClass) ParseReferenceKey(
         string referenceKey)
     {
         if (string.IsNullOrWhiteSpace(referenceKey))
@@ -224,6 +231,11 @@ public abstract class DenormalizedAttribute : Attribute
         {
             isCurrentClass = true;
             propertyName = trimmed;
+        }
+
+        if (targetFieldName.IsNullOrEmpty())
+        {
+            targetFieldName = "_id";
         }
 
         return (propertyName, targetFieldName, isCurrentClass);

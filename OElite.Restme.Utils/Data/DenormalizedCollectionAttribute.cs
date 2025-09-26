@@ -18,8 +18,9 @@ public class DenormalizedCollectionAttribute : DenormalizedAttribute
     /// <param name="query">MongoDB query string with @ parameter substitution</param>
     /// <param name="sort">MongoDB sort specification</param>
     /// <param name="limit">Maximum number of records to return</param>
+    /// <param name="cascadeUpdate">Whether changes to the source entity should trigger cascade updates to referencing entities. Default is false.</param>
     public DenormalizedCollectionAttribute(string fromCollection, string referenceKey = "#Id",
-        string? collectionReference = null, string? query = null, string? sort = null, int limit = 10)
+        string? collectionReference = null, string? query = null, string? sort = null, int limit = 10, bool cascadeUpdate = false)
     {
         if (string.IsNullOrWhiteSpace(fromCollection))
         {
@@ -43,5 +44,8 @@ public class DenormalizedCollectionAttribute : DenormalizedAttribute
         {
             Query = new DbSimpleQuery(query, sort, limit);
         }
+        
+        // Set cascade update control
+        CascadeUpdate = cascadeUpdate;
     }
 }

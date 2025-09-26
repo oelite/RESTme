@@ -19,11 +19,6 @@ public class DenormalizedFieldAttribute : DenormalizedCollectionAttribute
     /// </summary>
     public string FromField { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Indicates whether this field is the key field used to identify the record in the denormalized collection
-    /// Only applicable when using FromField approach
-    /// </summary>
-    public bool IsDenormalizedKey { get; set; } = false;
 
     /// <summary>
     /// Determines if this attribute uses field-based denormalization (not query-based)
@@ -94,8 +89,9 @@ public class DenormalizedFieldAttribute : DenormalizedCollectionAttribute
     /// <param name="query">MongoDB query string with @ parameter substitution</param>
     /// <param name="sort">MongoDB sort specification</param>
     /// <param name="limit">Maximum number of records to return</param>
+    /// <param name="cascadeUpdate">Whether changes to the source entity should trigger cascade updates to referencing entities. Default is false.</param>
     public DenormalizedFieldAttribute(string fromCollection, string fromField = "*", string referenceKey = "#Id",
-        string? collectionReference = null, string? query = null, string? sort = null, int limit = 1)
+        string? collectionReference = null, string? query = null, string? sort = null, int limit = 1, bool cascadeUpdate = false)
         : base(fromCollection, referenceKey, collectionReference, query, sort, limit)
     {
         if (string.IsNullOrWhiteSpace(fromField))
@@ -112,5 +108,6 @@ public class DenormalizedFieldAttribute : DenormalizedCollectionAttribute
         }
 
         FromField = fromField;
+        CascadeUpdate = cascadeUpdate;
     }
 }

@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace OElite;
 
-public class BaseEntity
+public class BaseEntity : IEntity
 {
     [DbId(DbIdType.DbObjectId)] public DbObjectId Id { get; set; }
 

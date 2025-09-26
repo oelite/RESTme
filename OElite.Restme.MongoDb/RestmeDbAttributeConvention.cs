@@ -23,7 +23,7 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
         classMap.SetIgnoreExtraElements(true);
 
         // Configure collection name
-        var collectionAttr = type.GetCustomAttribute<DbCollectionAttribute>();
+        var collectionAttr = type.GetCustomAttribute<OElite.DbCollectionAttribute>();
         if (collectionAttr != null)
         {
             var collectionName = collectionAttr.GetCollectionName(type.Name);
@@ -121,13 +121,13 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
     /// <param name="propertyName">The property name to convert</param>
     /// <param name="collectionAttr">The DbCollectionAttribute from the class</param>
     /// <returns>The converted field name</returns>
-    private static string GetFieldNameFromNamingConvention(string propertyName, DbCollectionAttribute? collectionAttr)
+    private static string GetFieldNameFromNamingConvention(string propertyName, OElite.DbCollectionAttribute? collectionAttr)
     {
         if (collectionAttr == null)
         {
-            // If no DbCollectionAttribute is found, throw exception as required
-            throw new InvalidOperationException(
-                "Class must have DbCollectionAttribute to determine field naming convention");
+            // If no DbCollectionAttribute is found, default to snake_case convention
+            // This allows embedded classes to work without requiring DbCollectionAttribute
+            return ConvertToNamingConvention(propertyName, OElite.DbNamingConvention.SnakeCase);
         }
 
         return ConvertToNamingConvention(propertyName, collectionAttr.NamingConvention);
