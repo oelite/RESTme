@@ -14,17 +14,16 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
     {
         var type = classMap.ClassType;
 
-        // Only apply to BaseEntity types
-        if (!typeof(BaseEntity).IsAssignableFrom(type))
-            return;
+        // Apply to all types for comprehensive naming convention support
+        // This includes BaseEntity types and embedded document classes
 
         // Configure to ignore extra elements (fields that don't exist in the C# class)
         // This prevents deserialization errors when MongoDB documents have extra fields
         classMap.SetIgnoreExtraElements(true);
 
-        // Configure collection name
+        // Configure collection name (only for BaseEntity types that are actual collections)
         var collectionAttr = type.GetCustomAttribute<OElite.DbCollectionAttribute>();
-        if (collectionAttr != null)
+        if (collectionAttr != null && typeof(BaseEntity).IsAssignableFrom(type))
         {
             var collectionName = collectionAttr.GetCollectionName(type.Name);
             classMap.SetDiscriminator(collectionName);
@@ -97,7 +96,8 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
                 else
                 {
                     // Apply naming convention from the class for properties without explicit field names
-                    var fieldName = GetFieldNameFromNamingConvention(property.Name, collectionAttr);
+                    // For embedded classes without DbCollection attribute, inherit from parent or use snake_case
+                    var fieldName = GetFieldNameFromNamingConvention(property.Name, collectionAttr, type);
                     memberMap.SetElementName(fieldName);
                 }
 
@@ -105,8 +105,18 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
                 if (dateTimeAttr != null)
                 {
                     // Configure DateTime serialization with UTC kind
-                    var dateTimeSerializer = new DateTimeSerializer(dateTimeAttr.Kind);
-                    memberMap.SetSerializer(dateTimeSerializer);
+                    if (property.PropertyType == typeof(DateTime))
+                    {
+                        var dateTimeSerializer = new DateTimeSerializer(dateTimeAttr.Kind);
+                        memberMap.SetSerializer(dateTimeSerializer);
+                    }
+                    else if (property.PropertyType == typeof(DateTime?))
+                    {
+                        // For nullable DateTime, use NullableSerializer with DateTimeSerializer
+                        var dateTimeSerializer = new DateTimeSerializer(dateTimeAttr.Kind);
+                        var nullableDateTimeSerializer = new NullableSerializer<DateTime>(dateTimeSerializer);
+                        memberMap.SetSerializer(nullableDateTimeSerializer);
+                    }
                 }
 
                 // Set up custom deserializer for null value handling
@@ -120,17 +130,32 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
     /// </summary>
     /// <param name="propertyName">The property name to convert</param>
     /// <param name="collectionAttr">The DbCollectionAttribute from the class</param>
+    /// <param name="type">The class type for inheritance resolution</param>
     /// <returns>The converted field name</returns>
-    private static string GetFieldNameFromNamingConvention(string propertyName, OElite.DbCollectionAttribute? collectionAttr)
+    private static string GetFieldNameFromNamingConvention(string propertyName, OElite.DbCollectionAttribute? collectionAttr, Type type)
     {
         if (collectionAttr == null)
         {
-            // If no DbCollectionAttribute is found, default to snake_case convention
-            // This allows embedded classes to work without requiring DbCollectionAttribute
-            return ConvertToNamingConvention(propertyName, OElite.DbNamingConvention.SnakeCase);
+            // For embedded classes without DbCollectionAttribute, try to find naming convention from property context
+            // or default to snake_case convention for consistency with the platform
+            var inheritedConvention = FindParentNamingConvention(type);
+            return ConvertToNamingConvention(propertyName, inheritedConvention);
         }
 
         return ConvertToNamingConvention(propertyName, collectionAttr.NamingConvention);
+    }
+
+    /// <summary>
+    /// Finds the naming convention from parent classes or defaults to snake_case
+    /// </summary>
+    /// <param name="type">The type to analyze</param>
+    /// <returns>The naming convention to use</returns>
+    private static OElite.DbNamingConvention FindParentNamingConvention(Type type)
+    {
+        // Check if this type is used as a property in any BaseEntity class
+        // For now, default to snake_case to maintain consistency with the platform
+        // This could be enhanced to dynamically discover the parent collection's naming convention
+        return OElite.DbNamingConvention.SnakeCase;
     }
 
     /// <summary>

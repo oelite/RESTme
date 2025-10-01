@@ -23,11 +23,11 @@ public static class MongoClassMapConfigurator
         {
             if (_isConfigured) return;
 
-            // Register our custom convention
+            // Register our custom convention for all types to support embedded documents
             var conventionPack = new ConventionPack();
             conventionPack.Add(new RestmeDbAttributeConvention());
             ConventionRegistry.Register("RestmeDbConvention", conventionPack,
-                t => typeof(BaseEntity).IsAssignableFrom(t));
+                t => true); // Apply to all types to support embedded documents
             _isConfigured = true;
         }
     }

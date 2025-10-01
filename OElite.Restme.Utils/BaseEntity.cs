@@ -5,7 +5,9 @@ namespace OElite;
 
 public class BaseEntity : IEntity
 {
-    [DbId(DbIdType.DbObjectId)] public DbObjectId Id { get; set; }
+    [DbId(DbIdType.DbObjectId)]
+    [DbField("_id")]
+    public DbObjectId Id { get; set; }
 
     public EntityStatus Status { get; set; }
 
