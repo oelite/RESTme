@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -179,6 +180,32 @@ namespace OElite.Abstractions
         {
             return responseMessage?.GetOriginalData<T>();
         }
+
+        // Cancellation token overloads
+        public Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class
+        {
+            throw new NotImplementedException("Redis provider not loaded. Please reference OElite.Restme.Redis package.");
+        }
+
+        public Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null, CancellationToken cancellationToken = default) where T : class
+        {
+            throw new NotImplementedException("Redis provider not loaded. Please reference OElite.Restme.Redis package.");
+        }
+
+        public Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Redis provider not loaded. Please reference OElite.Restme.Redis package.");
+        }
+
+        public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Redis provider not loaded. Please reference OElite.Restme.Redis package.");
+        }
+
+        public Task<bool> SetExpiryAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Redis provider not loaded. Please reference OElite.Restme.Redis package.");
+        }
     }
 
     /// <summary>
@@ -222,6 +249,46 @@ namespace OElite.Abstractions
         }
 
         public Task BindQueueAsync(string queueName, string exchangeName, string routingKey)
+        {
+            throw new NotImplementedException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.");
+        }
+
+        // Cancellation token overloads
+        public Task<bool> PublishAsync<T>(T message, string? queueName = null, string? routingKey = null,
+            string? exchangeName = null, bool isDurable = true, bool isExclusive = false,
+            bool autoDelete = true, string exchangeType = "direct", bool isMessagePersistent = true,
+            CancellationToken cancellationToken = default) where T : class
+        {
+            throw new NotImplementedException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.");
+        }
+
+        public Task StartConsumingAsync<T>(Func<T, Task<bool>> messageHandler,
+            Func<Task<bool>>? completionCondition = null, string? exchangeName = null,
+            string? queueName = null, string? routingKey = null, ushort prefetchCount = 1,
+            bool isDurable = true, bool isExclusive = false, bool autoDelete = true,
+            string exchangeType = "direct", CancellationToken cancellationToken = default) where T : class
+        {
+            throw new NotImplementedException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.");
+        }
+
+        public Task StopConsumingAsync(CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.");
+        }
+
+        public Task<string> DeclareQueueAsync(string? queueName = null, bool isDurable = true,
+            bool isExclusive = false, bool autoDelete = true, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.");
+        }
+
+        public Task DeclareExchangeAsync(string exchangeName, string exchangeType = "direct",
+            bool isDurable = true, bool autoDelete = true, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.");
+        }
+
+        public Task BindQueueAsync(string queueName, string exchangeName, string routingKey, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.");
         }
@@ -275,6 +342,52 @@ namespace OElite.Abstractions
         }
 
         public Task<T> GetStreamAsync<T>(string objectKey) where T : Stream
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        // Cancellation token overloads
+        public Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : class
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        public Task<T?> PutAsync<T>(string objectKey, T value, CancellationToken cancellationToken = default) where T : class
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        public Task<bool> DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        public Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        public Task<string?> GetStringAsync(string objectKey, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        public Task<string?> PutStringAsync(string objectKey, string value, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        public Task<Stream?> GetStreamAsync(string objectKey, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        public Task<bool> PutStreamAsync(string objectKey, Stream stream, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+        }
+
+        public Task<T> GetStreamAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : Stream
         {
             throw new NotImplementedException("Storage provider not loaded. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
         }

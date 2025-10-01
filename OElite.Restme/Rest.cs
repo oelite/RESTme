@@ -499,7 +499,7 @@ namespace OElite
                             {
                                 var success = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData, expiry)
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
-                                return success ? typedData : default(T);
+                                return success ? typedData : null;
                             }
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
@@ -523,7 +523,7 @@ namespace OElite
                         {
                             var success2 = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData5, expiry2)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
-                            return success2 ? typedData5 : default(T);
+                            return success2 ? typedData5 : null;
                         }
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RabbitMq:
@@ -575,13 +575,13 @@ namespace OElite
                             throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
                         var deleteSuccess = StorageProvider.DeleteAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                        return deleteSuccess ? default(T) : default(T);
+                        return deleteSuccess ? null : null;
                     case RestMode.RedisAsCache:
                         if (CacheProvider == null)
                             throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
                         var cacheDeleteSuccess = CacheProvider.RemoveAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                        return cacheDeleteSuccess ? default(T) : default(T);
+                        return cacheDeleteSuccess ? null : null;
                     default:
                         throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
                 }
@@ -674,7 +674,7 @@ namespace OElite
                             {
                                 var success = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData, expiry)
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
-                                return success ? typedData : default(T);
+                                return success ? typedData : null;
                             }
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
@@ -696,7 +696,7 @@ namespace OElite
                         {
                             var success2 = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData6, expiry2)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
-                            return success2 ? typedData6 : default(T);
+                            return success2 ? typedData6 : null;
                         }
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RabbitMq:
