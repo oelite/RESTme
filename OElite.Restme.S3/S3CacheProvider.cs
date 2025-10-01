@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using OElite.Abstractions;
 using Amazon.S3;
@@ -72,7 +73,8 @@ namespace OElite.Providers
             }
         }
 
-        public override async Task<T?> GetAsync<T>(string key) where T : class
+
+        public override async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class
         {
             ThrowIfDisposed();
             ValidateKey(key, "GetAsync");
@@ -88,20 +90,22 @@ namespace OElite.Providers
                     Key = finalKey
                 };
 
-                using var response = await _s3Client.GetObjectAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                using var response = await _s3Client.GetObjectAsync(request, cancellationToken);
                 return HandleStreamType<T>(response.ResponseStream);
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 return null; // Cache miss
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to get cached object '{key}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
+
+        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null, CancellationToken cancellationToken = default) where T : class
         {
             ThrowIfDisposed();
             ValidateKey(key, "SetAsync");
@@ -129,16 +133,18 @@ namespace OElite.Providers
                     request.Headers["Expires"] = DateTime.UtcNow.Add(expiry.Value).ToString("R");
                 }
 
-                await _s3Client.PutObjectAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.PutObjectAsync(request, cancellationToken);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to cache object '{key}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> RemoveAsync(string key)
+
+        public override async Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(key, "RemoveAsync");
@@ -154,16 +160,18 @@ namespace OElite.Providers
                     Key = finalKey
                 };
 
-                await _s3Client.DeleteObjectAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.DeleteObjectAsync(request, cancellationToken);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to remove cached object '{key}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> ExistsAsync(string key)
+
+        public override async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(key, "ExistsAsync");
@@ -179,20 +187,22 @@ namespace OElite.Providers
                     Key = finalKey
                 };
 
-                await _s3Client.GetObjectMetadataAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.GetObjectMetadataAsync(request, cancellationToken);
                 return true;
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 return false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to check if cached object '{key}' exists: {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
+
+        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(key, "SetExpiryAsync");
@@ -215,10 +225,11 @@ namespace OElite.Providers
                 copyRequest.Metadata.Add("Cache-Control", $"max-age={expiry.TotalSeconds:F0}");
                 copyRequest.Metadata.Add("Expires", DateTime.UtcNow.Add(expiry).ToString("R"));
 
-                await _s3Client.CopyObjectAsync(copyRequest);
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.CopyObjectAsync(copyRequest, cancellationToken);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to set expiry for cached object '{key}': {ex.Message}", ex);
             }

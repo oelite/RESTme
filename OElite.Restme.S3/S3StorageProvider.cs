@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using OElite.Abstractions;
 using Amazon.S3;
@@ -45,7 +46,7 @@ namespace OElite.Providers
             _bucketName = _s3Config.BucketName ?? "restme-storage";
         }
 
-        public override async Task<T?> GetAsync<T>(string objectKey) where T : class
+        public override async Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : class
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "GetAsync");
@@ -64,26 +65,27 @@ namespace OElite.Providers
                     Key = finalObjectKey
                 };
 
-                using var response = await _s3Client.GetObjectAsync(request);
-                
+                cancellationToken.ThrowIfCancellationRequested();
+                using var response = await _s3Client.GetObjectAsync(request, cancellationToken);
+
                 // Copy the response stream to a MemoryStream since AWS S3 ResponseStream doesn't support seeking
                 using var memoryStream = new MemoryStream();
-                await response.ResponseStream.CopyToAsync(memoryStream);
+                await response.ResponseStream.CopyToAsync(memoryStream, cancellationToken);
                 memoryStream.Position = 0;
-                
+
                 return HandleStreamType<T>(memoryStream);
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<T?> PutAsync<T>(string objectKey, T data) where T : class
+        public override async Task<T?> PutAsync<T>(string objectKey, T value, CancellationToken cancellationToken = default) where T : class
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "PutAsync");
@@ -102,21 +104,22 @@ namespace OElite.Providers
                     Key = finalObjectKey
                 };
 
-                await HandleStreamPutAsync(data, async stream =>
+                await HandleStreamPutAsync(value, async stream =>
                 {
                     request.InputStream = stream;
                 });
 
-                await _s3Client.PutObjectAsync(request);
-                return data;
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.PutObjectAsync(request, cancellationToken);
+                return value;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> DeleteAsync(string objectKey)
+        public override async Task<bool> DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "DeleteAsync");
@@ -135,16 +138,17 @@ namespace OElite.Providers
                     Key = finalObjectKey
                 };
 
-                await _s3Client.DeleteObjectAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.DeleteObjectAsync(request, cancellationToken);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to delete S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> ExistsAsync(string objectKey)
+        public override async Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "ExistsAsync");
@@ -163,20 +167,21 @@ namespace OElite.Providers
                     Key = finalObjectKey
                 };
 
-                await _s3Client.GetObjectMetadataAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.GetObjectMetadataAsync(request, cancellationToken);
                 return true;
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 return false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to check if S3 object '{objectKey}' exists: {ex.Message}", ex);
             }
         }
 
-        public override async Task<string?> GetStringAsync(string objectKey)
+        public override async Task<string?> GetStringAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "GetStringAsync");
@@ -195,21 +200,22 @@ namespace OElite.Providers
                     Key = finalObjectKey
                 };
 
-                using var response = await _s3Client.GetObjectAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                using var response = await _s3Client.GetObjectAsync(request, cancellationToken);
                 using var reader = new StreamReader(response.ResponseStream);
-                return await reader.ReadToEndAsync();
+                return await reader.ReadToEndAsync(cancellationToken);
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<string?> PutStringAsync(string objectKey, string content)
+        public override async Task<string?> PutStringAsync(string objectKey, string value, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "PutStringAsync");
@@ -226,20 +232,21 @@ namespace OElite.Providers
                 {
                     BucketName = _bucketName,
                     Key = finalObjectKey,
-                    ContentBody = content,
+                    ContentBody = value,
                     ContentType = "text/plain"
                 };
 
-                await _s3Client.PutObjectAsync(request);
-                return content;
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.PutObjectAsync(request, cancellationToken);
+                return value;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<Stream?> GetStreamAsync(string objectKey)
+        public override async Task<Stream?> GetStreamAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "GetStreamAsync");
@@ -258,20 +265,21 @@ namespace OElite.Providers
                     Key = finalObjectKey
                 };
 
-                var response = await _s3Client.GetObjectAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                var response = await _s3Client.GetObjectAsync(request, cancellationToken);
                 return response.ResponseStream;
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> PutStreamAsync(string objectKey, Stream stream)
+        public override async Task<bool> PutStreamAsync(string objectKey, Stream stream, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "PutStreamAsync");
@@ -291,16 +299,17 @@ namespace OElite.Providers
                     InputStream = stream
                 };
 
-                await _s3Client.PutObjectAsync(request);
+                cancellationToken.ThrowIfCancellationRequested();
+                await _s3Client.PutObjectAsync(request, cancellationToken);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<T> GetStreamAsync<T>(string objectKey)
+        public override async Task<T> GetStreamAsync<T>(string objectKey, CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "GetStreamAsync");
@@ -319,20 +328,21 @@ namespace OElite.Providers
                     Key = finalObjectKey
                 };
 
-                using var response = await _s3Client.GetObjectAsync(request);
-                
+                cancellationToken.ThrowIfCancellationRequested();
+                using var response = await _s3Client.GetObjectAsync(request, cancellationToken);
+
                 // Copy the response stream to a MemoryStream since AWS S3 ResponseStream doesn't support seeking
                 using var memoryStream = new MemoryStream();
-                await response.ResponseStream.CopyToAsync(memoryStream);
+                await response.ResponseStream.CopyToAsync(memoryStream, cancellationToken);
                 memoryStream.Position = 0;
-                
+
                 return HandleStreamTypeForStream<T>(memoryStream);
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
@@ -42,7 +43,8 @@ namespace OElite.Providers
             }
         }
 
-        public override async Task<T?> GetAsync<T>(string key) where T : class
+
+        public override async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class
         {
             ValidateKey(key, "GetAsync");
 
@@ -51,20 +53,23 @@ namespace OElite.Providers
                 // Apply root path if specified
                 var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
-                
+
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!await blob.ExistsAsync())
                     return null;
 
+                cancellationToken.ThrowIfCancellationRequested();
                 var json = await blob.DownloadTextAsync();
                 return json.JsonDeserialize<T>();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new InvalidOperationException($"Failed to get cached item with key '{key}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null) where T : class
+
+        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null, CancellationToken cancellationToken = default) where T : class
         {
             ValidateKey(key, "SetAsync");
             ValidateValue(value, "SetAsync");
@@ -75,35 +80,38 @@ namespace OElite.Providers
                 var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
                 var json = value.JsonSerialize();
-                
+
                 // Set cache control headers for CDN scenarios
                 blob.Properties.CacheControl = "public, max-age=3600"; // Default 1 hour
-                
+
                 if (expiry.HasValue)
                 {
                     var maxAge = (int)expiry.Value.TotalSeconds;
                     blob.Properties.CacheControl = $"public, max-age={maxAge}";
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
                 await blob.UploadTextAsync(json);
-                
+
                 // Set metadata for expiry tracking
                 if (expiry.HasValue)
                 {
                     var expiryTime = DateTime.UtcNow.Add(expiry.Value);
                     blob.Metadata["expiry"] = expiryTime.ToString("O");
+                    cancellationToken.ThrowIfCancellationRequested();
                     await blob.SetMetadataAsync();
                 }
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new InvalidOperationException($"Failed to set cached item with key '{key}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> RemoveAsync(string key)
+
+        public override async Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default)
         {
             ValidateKey(key, "RemoveAsync");
 
@@ -112,15 +120,17 @@ namespace OElite.Providers
                 // Apply root path if specified
                 var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
+                cancellationToken.ThrowIfCancellationRequested();
                 return await blob.DeleteIfExistsAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new InvalidOperationException($"Failed to remove cached item with key '{key}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> ExistsAsync(string key)
+
+        public override async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
         {
             ValidateKey(key, "ExistsAsync");
 
@@ -129,15 +139,17 @@ namespace OElite.Providers
                 // Apply root path if specified
                 var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
+                cancellationToken.ThrowIfCancellationRequested();
                 return await blob.ExistsAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new InvalidOperationException($"Failed to check if cached item exists with key '{key}': {ex.Message}", ex);
             }
         }
 
-        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry)
+
+        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
             ValidateKey(key, "SetExpiryAsync");
 
@@ -146,23 +158,25 @@ namespace OElite.Providers
                 // Apply root path if specified
                 var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
-                
+
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!await blob.ExistsAsync())
                     return false;
 
                 // Update cache control and metadata
                 var maxAge = (int)expiry.TotalSeconds;
                 blob.Properties.CacheControl = $"public, max-age={maxAge}";
-                
+
                 var expiryTime = DateTime.UtcNow.Add(expiry);
                 blob.Metadata["expiry"] = expiryTime.ToString("O");
-                
+
+                cancellationToken.ThrowIfCancellationRequested();
                 await blob.SetPropertiesAsync();
                 await blob.SetMetadataAsync();
-                
+
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 throw new InvalidOperationException($"Failed to set expiry for cached item with key '{key}': {ex.Message}", ex);
             }

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace OElite.Abstractions
@@ -13,15 +14,17 @@ namespace OElite.Abstractions
         protected readonly RestConfig Config = config ?? throw new ArgumentNullException(nameof(config));
         protected bool Disposed = false;
 
-        public abstract Task<T?> GetAsync<T>(string objectKey) where T : class;
-        public abstract Task<T?> PutAsync<T>(string objectKey, T value) where T : class;
-        public abstract Task<bool> DeleteAsync(string objectKey);
-        public abstract Task<bool> ExistsAsync(string objectKey);
-        public abstract Task<string?> GetStringAsync(string objectKey);
-        public abstract Task<string?> PutStringAsync(string objectKey, string value);
-        public abstract Task<Stream?> GetStreamAsync(string objectKey);
-        public abstract Task<bool> PutStreamAsync(string objectKey, Stream stream);
-        public abstract Task<T> GetStreamAsync<T>(string objectKey) where T : Stream;
+        // Methods with cancellation token support (default parameter provides backward compatibility)
+        public abstract Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : class;
+        public abstract Task<T?> PutAsync<T>(string objectKey, T value, CancellationToken cancellationToken = default) where T : class;
+        public abstract Task<bool> DeleteAsync(string objectKey, CancellationToken cancellationToken = default);
+        public abstract Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default);
+        public abstract Task<string?> GetStringAsync(string objectKey, CancellationToken cancellationToken = default);
+        public abstract Task<string?> PutStringAsync(string objectKey, string value, CancellationToken cancellationToken = default);
+        public abstract Task<Stream?> GetStreamAsync(string objectKey, CancellationToken cancellationToken = default);
+        public abstract Task<bool> PutStreamAsync(string objectKey, Stream stream, CancellationToken cancellationToken = default);
+        public abstract Task<T> GetStreamAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : Stream;
+
         public abstract void Dispose();
 
         /// <summary>
