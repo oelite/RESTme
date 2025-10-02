@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
+        <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
         <VersionPrefix>2.0.9</VersionPrefix>
         <AssemblyVersion>2.0.9</AssemblyVersion>
         <Authors>OElite Limited</Authors>
