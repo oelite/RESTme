@@ -26,7 +26,7 @@ workflow:
 
 determine_version:
   stage: version
-  image: mcr.microsoft.com/dotnet/sdk:9.0
+  image: mcr.microsoft.com/dotnet/sdk:10.0
   script:
     - |
       # Read current version from first project
@@ -57,7 +57,7 @@ determine_version:
 
 build_solution:
   stage: build
-  image: mcr.microsoft.com/dotnet/sdk:9.0
+  image: mcr.microsoft.com/dotnet/sdk:10.0
   script:
     - dotnet restore --configfile NuGet.config
     - dotnet build --configuration Release --configfile NuGet.config
@@ -78,7 +78,7 @@ build_solution:
 
 run_tests:
   stage: test
-  image: mcr.microsoft.com/dotnet/sdk:9.0
+  image: mcr.microsoft.com/dotnet/sdk:10.0
   dependencies:
     - build_solution
   script:
@@ -89,7 +89,7 @@ run_tests:
 
 pack_packages:
   stage: pack
-  image: mcr.microsoft.com/dotnet/sdk:9.0
+  image: mcr.microsoft.com/dotnet/sdk:10.0
   dependencies:
     - build_solution
     - determine_version
@@ -124,7 +124,7 @@ pack_packages:
 
 deploy_packages:
   stage: deploy
-  image: mcr.microsoft.com/dotnet/sdk:9.0
+  image: mcr.microsoft.com/dotnet/sdk:10.0
   dependencies:
     - pack_packages
     - determine_version
