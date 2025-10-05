@@ -2,6 +2,7 @@ using System.Reflection;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.Serializers;
+using OElite;
 
 namespace OElite.Restme.MongoDb;
 
@@ -40,9 +41,17 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
             var idAttr = property.GetCustomAttribute<DbIdAttribute>();
             var ignoreAttr = property.GetCustomAttribute<DbFieldIgnore>();
             var dateTimeAttr = property.GetCustomAttribute<DbDateTimeOptionsAttribute>();
+            var denormalizedAttr = property.GetCustomAttribute<DenormalizedAttribute>();
 
             // Skip ignored properties
             if (ignoreAttr != null)
+            {
+                classMap.UnmapProperty(property.Name);
+                continue;
+            }
+
+            // Skip denormalized properties - they are populated by DataPopulationService, not MongoDB serialization
+            if (denormalizedAttr != null)
             {
                 classMap.UnmapProperty(property.Name);
                 continue;

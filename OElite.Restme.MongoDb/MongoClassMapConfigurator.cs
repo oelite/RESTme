@@ -50,6 +50,9 @@ public static class MongoClassMapConfigurator
                 // Then apply our custom attribute mappings
                 var convention = new RestmeDbAttributeConvention();
                 convention.Apply(cm);
+
+                // Finally, resolve property conflicts
+                MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, typeof(T));
             });
         }
     }
@@ -99,9 +102,46 @@ public static class MongoClassMapConfigurator
                     cm.AutoMap();
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(cm);
+                    MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, baseType);
                 });
                 genericMethod.Invoke(null, new object[] { action });
             }
         }
+    }
+
+    /// <summary>
+    /// Configures class mapping for any type (not just BaseEntity) with conflict resolution
+    /// This method is designed for use by repository classes that need to configure legacy types
+    /// </summary>
+    /// <param name="type">The type to configure</param>
+    /// <param name="configuredTypes">Set of already configured types to avoid duplicate work</param>
+    public static void ConfigureClassMappingForType(Type type, HashSet<Type> configuredTypes)
+    {
+        if (configuredTypes.Contains(type))
+            return;
+
+        // Ensure all base classes are configured first
+        MongoPropertyConflictResolver.EnsureBaseClassesConfigured(type, configuredTypes);
+
+        // Configure the main type
+        if (!BsonClassMap.IsClassMapRegistered(type))
+        {
+            try
+            {
+                // Create a new BsonClassMap and register it manually
+                var classMap = new BsonClassMap(type);
+                BsonClassMap.RegisterClassMap(classMap);
+                classMap.AutoMap();
+                var convention = new RestmeDbAttributeConvention();
+                convention.Apply(classMap);
+                MongoPropertyConflictResolver.ResolvePropertyConflicts(classMap, type);
+            }
+            catch (InvalidOperationException)
+            {
+                // Class map already registered by another thread
+            }
+        }
+
+        configuredTypes.Add(type);
     }
 }
