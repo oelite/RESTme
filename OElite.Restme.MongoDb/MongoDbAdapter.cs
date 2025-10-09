@@ -304,3 +304,17 @@ public class MongoDbAdapter
         return await collection.DeleteOneAsync(filterDef);
     }
 }
+
+/// <summary>
+/// Extension methods for MongoDbAdapter
+/// </summary>
+public static class MongoDbAdapterExtensions
+{
+    /// <summary>
+    /// Gets an IMongoQuery instance for the specified entity type
+    /// </summary>
+    public static IMongoQuery<T> GetQuery<T>(this MongoDbAdapter adapter) where T : BaseEntity
+    {
+        return new MongoQuery<T>(adapter.GetCollection<T>());
+    }
+}

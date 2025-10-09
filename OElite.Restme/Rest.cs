@@ -115,7 +115,8 @@ namespace OElite
             catch (Exception ex)
             {
                 Logger?.LogError(ex, "Failed to initialize providers for mode {Mode}", Configuration.OperationMode);
-                throw new OEliteWebException($"Failed to initialize providers for mode {Configuration.OperationMode}: {ex.Message}", ex);
+                throw new OEliteException(
+                    $"Failed to initialize providers for mode {Configuration.OperationMode}: {ex.Message}", ex);
             }
         }
 
@@ -165,7 +166,8 @@ namespace OElite
             catch (System.IO.FileNotFoundException)
             {
                 // Assembly not found - this is expected if the backend package isn't referenced
-                Logger?.LogDebug("Provider assembly {AssemblyName} not found - backend package may not be referenced", assemblyName);
+                Logger?.LogDebug("Provider assembly {AssemblyName} not found - backend package may not be referenced",
+                    assemblyName);
             }
         }
 
@@ -205,7 +207,9 @@ namespace OElite
                     RestMode.S3AsCache => "OElite.Restme.S3",
                     _ => "OElite.Restme.Redis"
                 };
-                throw new OEliteWebException($"{Configuration.OperationMode} cache provider not loaded. Please reference {packageName} package.", ex);
+                throw new OEliteException(
+                    $"{Configuration.OperationMode} cache provider not loaded. Please reference {packageName} package.",
+                    ex);
             }
         }
 
@@ -227,7 +231,7 @@ namespace OElite
                         // Append VHost info to connection string for RabbitMQ
                         connectionStringWithVHost += $"|vhost={RequestUrlPath}";
                     }
-                    
+
                     QueueProvider = factory.CreateQueueProvider(connectionStringWithVHost, Configuration);
                 }
                 else
@@ -239,7 +243,8 @@ namespace OElite
             catch (Exception ex)
             {
                 Logger?.LogError(ex, "Failed to initialize queue provider");
-                throw new OEliteWebException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.", ex);
+                throw new OEliteException(
+                    "RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.", ex);
             }
         }
 
@@ -277,7 +282,8 @@ namespace OElite
                     RestMode.S3AsStorage => "OElite.Restme.S3",
                     _ => "OElite.Restme.Azure"
                 };
-                throw new OEliteWebException($"{Configuration.OperationMode} provider not loaded. Please reference {packageName} package.", ex);
+                throw new OEliteException(
+                    $"{Configuration.OperationMode} provider not loaded. Please reference {packageName} package.", ex);
             }
         }
 
@@ -406,14 +412,18 @@ namespace OElite
                             return StorageProvider.GetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         }
-                        throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+
+                        throw new InvalidOperationException(
+                            "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
                     case RestMode.RedisAsCache:
                         if (CacheProvider != null)
                         {
                             return CacheProvider.GetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         }
-                        throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+
+                        throw new InvalidOperationException(
+                            "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
                     case RestMode.RabbitMq:
                     default:
                         throw new NotSupportedException(
@@ -460,8 +470,9 @@ namespace OElite
                     case RestMode.AzureAsStorage:
                     case RestMode.S3AsStorage:
                         if (StorageProvider == null)
-                            throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
-                        
+                            throw new InvalidOperationException(
+                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+
                         if (dataObject != null)
                         {
                             if (dataObject is T typedData)
@@ -469,6 +480,7 @@ namespace OElite
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
+
                         if (ObjAsParam == null)
                         {
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
@@ -490,8 +502,9 @@ namespace OElite
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RedisAsCache:
                         if (CacheProvider == null)
-                            throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
-                        
+                            throw new InvalidOperationException(
+                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+
                         if (dataObject != null)
                         {
                             var expiry = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
@@ -501,8 +514,10 @@ namespace OElite
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
                                 return success ? typedData : null;
                             }
+
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
+
                         if (ObjAsParam == null)
                         {
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
@@ -525,6 +540,7 @@ namespace OElite
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                             return success2 ? typedData5 : null;
                         }
+
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RabbitMq:
                     default:
@@ -572,13 +588,15 @@ namespace OElite
                     case RestMode.AzureAsStorage:
                     case RestMode.S3AsStorage:
                         if (StorageProvider == null)
-                            throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+                            throw new InvalidOperationException(
+                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
                         var deleteSuccess = StorageProvider.DeleteAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                         return deleteSuccess ? null : null;
                     case RestMode.RedisAsCache:
                         if (CacheProvider == null)
-                            throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+                            throw new InvalidOperationException(
+                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
                         var cacheDeleteSuccess = CacheProvider.RemoveAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                         return cacheDeleteSuccess ? null : null;
@@ -635,8 +653,9 @@ namespace OElite
                     case RestMode.AzureAsStorage:
                     case RestMode.S3AsStorage:
                         if (StorageProvider == null)
-                            throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
-                        
+                            throw new InvalidOperationException(
+                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+
                         if (dataObject != null)
                         {
                             if (dataObject is T typedData)
@@ -644,6 +663,7 @@ namespace OElite
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
+
                         if (ObjAsParam == null)
                         {
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
@@ -665,8 +685,9 @@ namespace OElite
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RedisAsCache:
                         if (CacheProvider == null)
-                            throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
-                        
+                            throw new InvalidOperationException(
+                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+
                         if (dataObject != null)
                         {
                             var expiry = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
@@ -676,8 +697,10 @@ namespace OElite
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
                                 return success ? typedData : null;
                             }
+
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
+
                         switch (ObjAsParam)
                         {
                             case null:
@@ -698,6 +721,7 @@ namespace OElite
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                             return success2 ? typedData6 : null;
                         }
+
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RabbitMq:
                     default:

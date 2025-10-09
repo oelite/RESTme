@@ -915,6 +915,12 @@ public class UserService
 - `[DenormalizedField(...)]` - Field denormalization
 - `[DenormalizedCollection(...)]` - Collection denormalization
 
+### MongoDB-Specific Components
+
+- **`MongoPropertyConflictResolver`** - Resolves MongoDB property conflicts, including denormalized fields and inherited properties
+- **`MongoClassMapConfigurator`** - Configures MongoDB class mappings to use custom attributes with conflict resolution
+- **`RestmeDbAttributeConvention`** - Custom MongoDB convention that applies RestmeDb attributes to class mappings
+
 ### Data Types
 
 - `DbObjectId` - MongoDB ObjectId equivalent
@@ -1762,6 +1768,211 @@ public async Task<object> GetProductStatisticsAsync()
 
 This comprehensive documentation provides developers with all the guidance they need to effectively use the new aggregation-based methods, including special syntax considerations, field mapping behavior, error handling, and performance optimization techniques.
 
+## MongoDB Class Mapping and Conflict Resolution
+
+The library provides advanced MongoDB class mapping capabilities with automatic conflict resolution for complex inheritance scenarios and denormalized fields.
+
+### MongoPropertyConflictResolver
+
+The `MongoPropertyConflictResolver` handles property conflicts that arise from inheritance and denormalized fields in MongoDB class mappings.
+
+#### Key Features
+
+- **Property Conflict Resolution**: Automatically resolves conflicts between base and derived class properties
+- **Denormalized Field Handling**: Properly unmaps denormalized properties from MongoDB serialization
+- **Inheritance Chain Support**: Ensures base classes are configured before derived classes
+
+#### Usage
+
+```csharp
+// The resolver is automatically used by MongoClassMapConfigurator
+// No direct usage required in most scenarios
+```
+
+#### Conflict Types Handled
+
+1. **Hidden Base Properties**: Properties using the `new` keyword that hide base class properties
+2. **Denormalized Fields**: Properties marked with `[DenormalizedField]` or `[DenormalizedCollection]`
+3. **Inherited Properties**: Properties from base classes that need proper mapping
+
+### MongoClassMapConfigurator
+
+The `MongoClassMapConfigurator` provides centralized configuration for MongoDB class mappings with automatic conflict resolution.
+
+#### Core Methods
+
+##### RegisterClassMapping<T>
+```csharp
+public static void RegisterClassMapping<T>() where T : BaseEntity
+```
+Registers class mapping for a specific type with automatic conflict resolution.
+
+##### ConfigureClassMappingForType
+```csharp
+public static void ConfigureClassMappingForType(Type type, HashSet<Type> configuredTypes)
+```
+Configures class mapping for any type (including legacy types) with conflict resolution. This method is designed for use by repository classes.
+
+#### Usage Examples
+
+```csharp
+// Register mapping for a new entity type
+MongoClassMapConfigurator.RegisterClassMapping<Product>();
+
+// Configure mapping for legacy types in repositories
+var configuredTypes = new HashSet<Type>();
+MongoClassMapConfigurator.ConfigureClassMappingForType(typeof(LegacyProduct), configuredTypes);
+```
+
+### RestmeDbAttributeConvention
+
+The `RestmeDbAttributeConvention` is a custom MongoDB convention that automatically applies RestmeDb attributes to class mappings.
+
+#### Key Features
+
+- **Automatic Attribute Application**: Applies `[DbField]`, `[DbId]`, `[DbFieldIgnore]`, and other attributes
+- **Naming Convention Support**: Automatically converts property names based on collection naming conventions
+- **Denormalized Field Exclusion**: Automatically excludes denormalized properties from MongoDB serialization
+- **Custom Serializers**: Applies custom serializers for specific data types like `DbObjectId`
+
+#### Automatic Field Mapping
+
+The convention automatically handles field mapping based on the following priority:
+
+1. **`[DbId]` attribute** → Maps to `_id` field
+2. **`[DbField]` attribute** → Uses the specified `FieldName`
+3. **`[DbCollection]` naming convention** → Converts based on the collection's naming convention
+4. **Default snake_case conversion** → Converts PascalCase to snake_case
+
+#### Denormalized Field Handling
+
+```csharp
+public class Product : BaseEntity
+{
+    [DbId]
+    public DbObjectId Id { get; set; }
+    
+    public string Name { get; set; } = string.Empty;
+    
+    // This property is automatically excluded from MongoDB serialization
+    [DenormalizedField("categories", "name", "@CategoryId")]
+    public string CategoryName { get; set; } = string.Empty;
+    
+    // This property is also automatically excluded
+    [DenormalizedCollection("products", "@CategoryId as category_id")]
+    public List<Product> RelatedProducts { get; set; } = new();
+}
+```
+
+#### Custom Serializer Application
+
+The convention automatically applies custom serializers for specific data types:
+
+```csharp
+public class Product : BaseEntity
+{
+    [DbId]
+    public DbObjectId Id { get; set; } // Automatically uses DbObjectIdSerializer
+    
+    [DbDateTimeOptions(DateTimeKind.Utc)]
+    public DateTime CreatedAt { get; set; } // Automatically uses UTC DateTime handling
+}
+```
+
+### Integration with Repository Pattern
+
+The MongoDB class mapping system integrates seamlessly with the repository pattern:
+
+```csharp
+public class ProductRepository : DataRepository
+{
+    public MongoQuery<Product> ProductStock => new(_adapter.GetCollection<Product>());
+    
+    // Class mapping is automatically configured when the collection is first accessed
+    public async Task<List<Product>> GetActiveProductsAsync()
+    {
+        return await ProductStock
+            .Where(p => p.Status == EntityStatus.Active)
+            .ToListAsync();
+    }
+}
+```
+
+### Best Practices
+
+#### 1. Use Appropriate Attributes
+
+```csharp
+// Good - Clear attribute usage
+[DbCollection("products", DbNamingConvention.SnakeCase)]
+public class Product : BaseEntity
+{
+    [DbId]
+    public DbObjectId Id { get; set; }
+    
+    [DbField("product_name")]
+    public string Name { get; set; } = string.Empty;
+    
+    [DbFieldIgnore]
+    public string ComputedProperty { get; set; } = string.Empty;
+}
+```
+
+#### 2. Handle Inheritance Properly
+
+```csharp
+// Base class
+[DbCollection("base_entities", DbNamingConvention.SnakeCase)]
+public class BaseEntity
+{
+    [DbId]
+    public DbObjectId Id { get; set; }
+    
+    public DateTime CreatedAt { get; set; }
+}
+
+// Derived class - conflicts are automatically resolved
+public class Product : BaseEntity
+{
+    // This property hides BaseEntity.Id but conflict is resolved automatically
+    public new DbObjectId Id { get; set; }
+    
+    public string Name { get; set; } = string.Empty;
+}
+```
+
+#### 3. Use Denormalized Fields Appropriately
+
+```csharp
+public class Product : BaseEntity
+{
+    public DbObjectId CategoryId { get; set; }
+    
+    // Denormalized fields are automatically excluded from MongoDB serialization
+    [DenormalizedField("categories", "name", "@CategoryId")]
+    public string CategoryName { get; set; } = string.Empty;
+    
+    [DenormalizedCollection("product_reviews", "@Id as product_id")]
+    public List<ProductReview> Reviews { get; set; } = new();
+}
+```
+
+### Performance Considerations
+
+- **Automatic Caching**: Class mappings are cached to avoid repeated configuration
+- **Lazy Initialization**: Mappings are configured only when collections are first accessed
+- **Conflict Resolution**: Conflicts are resolved once during initial mapping configuration
+- **Memory Efficiency**: Only necessary mappings are created and cached
+
+### Error Handling
+
+The system provides comprehensive error handling for mapping issues:
+
+- **Missing Attributes**: Logs warnings when expected attributes are not found
+- **Invalid Configurations**: Validates attribute configurations and logs errors
+- **Type Mismatches**: Handles type compatibility issues gracefully
+- **Circular Dependencies**: Prevents infinite loops in inheritance chain configuration
+
 ### Advanced LINQ Expression Support
 
 The library provides comprehensive support for LINQ expressions with MongoDB, including nested document queries and extension methods.
@@ -1927,6 +2138,12 @@ For support and questions:
 
 ---
 
-**Version**: 2.0.9  
+**Version**: 2.1.0  
 **Last Updated**: 2024  
 **Compatibility**: .NET 9.0+
+
+### Version History
+
+- **v2.1.0** - Added MongoDB class mapping and conflict resolution system with MongoPropertyConflictResolver, MongoClassMapConfigurator, and enhanced RestmeDbAttributeConvention
+- **v2.0.9** - Enhanced aggregation operations and LINQ expression support
+- **v2.0.0** - Initial release with core MongoDB functionality

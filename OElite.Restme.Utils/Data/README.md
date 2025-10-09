@@ -372,8 +372,264 @@ The enhanced syntax is fully backward compatible:
 - **`QueryParameterSubstitutionHelper`** - Parameter substitution in queries
 - **`DataPopulationService`** - Service that handles denormalization logic
 - **`CascadeUpdateService`** - Service that handles cascade updates for denormalized data
+- **`PropertyMappingUtils`** - Utility methods for property mapping and naming convention conversions
+- **`AttributeResolver`** - Generic attribute resolver for handling property conflicts and attribute-based logic
+
+## Property Mapping Utilities
+
+The `PropertyMappingUtils` class provides generic utility methods for property mapping and naming convention conversions that are used throughout the OElite platform.
+
+### Core Methods
+
+#### GetNamingConventionFromClass
+```csharp
+public static DbNamingConvention GetNamingConventionFromClass(Type? type)
+```
+Gets the naming convention from the `DbCollectionAttribute` of the class, looking up the inheritance hierarchy to find a class with the attribute. Defaults to `SnakeCase` if not found.
+
+#### ConvertToNamingConvention
+```csharp
+public static string ConvertToNamingConvention(string input, DbNamingConvention convention)
+```
+Converts a string to the specified naming convention (SnakeCase, CamelCase, or PascalCase).
+
+#### AreTypesCompatible
+```csharp
+public static bool AreTypesCompatible(Type sourceType, Type targetType)
+```
+Checks if two types are compatible for property mapping, handling nullable types, inheritance, and convertible types.
+
+### Usage Examples
+
+```csharp
+// Get naming convention from a class
+var convention = PropertyMappingUtils.GetNamingConventionFromClass(typeof(Product));
+// Returns DbNamingConvention.SnakeCase if Product has [DbCollection(..., DbNamingConvention.SnakeCase)]
+
+// Convert property name to snake_case
+var fieldName = PropertyMappingUtils.ConvertToNamingConvention("ProductName", DbNamingConvention.SnakeCase);
+// Returns "product_name"
+
+// Check type compatibility
+var isCompatible = PropertyMappingUtils.AreTypesCompatible(typeof(string), typeof(string?));
+// Returns true
+```
+
+## Attribute Resolution Utilities
+
+The `AttributeResolver` class provides generic attribute resolution logic for handling property conflicts and attribute-based operations.
+
+### Core Methods
+
+#### GetExcludedProperties
+```csharp
+public static IEnumerable<string> GetExcludedProperties(Type type)
+```
+Gets all properties that should be excluded from serialization based on attributes like `[DenormalizedAttribute]` and `[DbFieldIgnore]`.
+
+#### GetPropertyConflicts
+```csharp
+public static IEnumerable<PropertyConflict> GetPropertyConflicts(Type type)
+```
+Gets properties that have conflicts with base class properties (using the 'new' keyword).
+
+#### GetPropertiesWithAttribute
+```csharp
+public static IEnumerable<PropertyInfo> GetPropertiesWithAttribute<TAttribute>(Type type) where TAttribute : Attribute
+```
+Gets all properties with specific attribute types.
+
+#### GetInheritanceChain
+```csharp
+public static IEnumerable<Type> GetInheritanceChain(Type type)
+```
+Gets the inheritance chain for a type (excluding object).
+
+### Usage Examples
+
+```csharp
+// Get excluded properties
+var excludedProps = AttributeResolver.GetExcludedProperties(typeof(Product));
+// Returns properties marked with [DenormalizedAttribute] or [DbFieldIgnore]
+
+// Get property conflicts
+var conflicts = AttributeResolver.GetPropertyConflicts(typeof(DerivedProduct));
+// Returns properties that hide base class properties with 'new' keyword
+
+// Get properties with specific attributes
+var denormalizedProps = AttributeResolver.GetPropertiesWithAttribute<DenormalizedAttribute>(typeof(Product));
+
+// Get inheritance chain
+var inheritanceChain = AttributeResolver.GetInheritanceChain(typeof(DerivedProduct));
+// Returns [BaseProduct, BaseEntity] (most derived first)
+```
+
+### PropertyConflict Class
+
+```csharp
+public class PropertyConflict
+{
+    public string PropertyName { get; set; } = string.Empty;
+    public PropertyInfo DerivedProperty { get; set; } = null!;
+    public PropertyInfo BaseProperty { get; set; } = null!;
+    public PropertyConflictType ConflictType { get; set; }
+}
+
+public enum PropertyConflictType
+{
+    HiddenBaseProperty,
+    DuplicateFieldName,
+    TypeMismatch
+}
+```
+
+## MongoDB Serialization Issues and Resolutions
+
+### Issue: Denormalized Properties Not Being Saved to Database
+
+#### Problem Description
+
+When using denormalized properties in entities, you may encounter situations where:
+
+1. **Denormalized properties are correctly populated** by `DataPopulationService` during runtime
+2. **The target entity contains all expected values** after transformation
+3. **But the denormalized properties are missing** when the entity is saved to the MongoDB database
+
+#### Root Cause
+
+This issue occurs due to MongoDB serialization configuration in the `RestmeDbAttributeConvention`. The convention was previously configured to exclude **ALL** denormalized properties from MongoDB serialization, regardless of whether they should be persisted to the database.
+
+**The problematic code was:**
+```csharp
+// Skip denormalized properties - they are populated by DataPopulationService, not MongoDB serialization
+if (denormalizedAttr != null)
+{
+    classMap.UnmapProperty(property.Name);
+    continue;
+}
+```
+
+This approach was too aggressive and excluded denormalized properties that should be saved to the database.
+
+#### Solution
+
+The fix involves two key changes:
+
+1. **Modified `RestmeDbAttributeConvention`** to only exclude denormalized properties that are explicitly marked with `[DbFieldIgnore]`:
+
+```csharp
+// Skip denormalized properties that are marked with [DbFieldIgnore] - they are populated by DataPopulationService, not MongoDB serialization
+if (denormalizedAttr != null && ignoreAttr != null)
+{
+    classMap.UnmapProperty(property.Name);
+    continue;
+}
+```
+
+2. **Added `[DbFieldIgnore]` attributes** to denormalized properties in **source entities** (legacy entities) that should not be persisted to the database:
+
+```csharp
+public class LegacyMerchantAccount : LegacyBaseEntity
+{
+    [DbField("defaultCurrencyId")] 
+    public long DefaultCurrencyLegacyId { get; set; }
+
+    [DenormalizedField(DbSchema.Legacy.Currencies.Name, DbSchema.ObjectId, referenceKey: "@DefaultCurrencyLegacyId as id")]
+    [DbFieldIgnore]  // ← This prevents MongoDB serialization conflicts
+    public DbObjectId? DefaultCurrencyId { get; set; }
+
+    [DenormalizedField(DbSchema.Currencies.Name, referenceKey: "@DefaultCurrencyId as _id")]
+    [DbFieldIgnore]  // ← This prevents MongoDB serialization conflicts
+    public Currency? DefaultCurrency { get; set; }
+}
+```
+
+#### When to Use `[DbFieldIgnore]`
+
+Use `[DbFieldIgnore]` on denormalized properties in the following scenarios:
+
+1. **Source/Legacy Entities**: Denormalized properties that are populated by `DataPopulationService` but should not be persisted to the database
+2. **Computed Properties**: Properties that are calculated at runtime and should not be stored
+3. **Temporary Properties**: Properties used for migration or transformation purposes only
+
+#### When NOT to Use `[DbFieldIgnore]`
+
+Do **NOT** use `[DbFieldIgnore]` on denormalized properties in:
+
+1. **Target Entities**: Properties that should be persisted to the database after migration
+2. **Business Entities**: Properties that represent actual business data that needs to be stored
+3. **Queryable Properties**: Properties that need to be indexed or queried in MongoDB
+
+#### Example: Migration Scenario
+
+**Source Entity (LegacyMerchantAccount):**
+```csharp
+public class LegacyMerchantAccount : LegacyBaseEntity
+{
+    [DbField("defaultCurrencyId")] 
+    public long DefaultCurrencyLegacyId { get; set; }
+
+    // These denormalized properties are populated by DataPopulationService
+    // but should NOT be saved to the legacy database
+    [DenormalizedField(DbSchema.Legacy.Currencies.Name, DbSchema.ObjectId, referenceKey: "@DefaultCurrencyLegacyId as id")]
+    [DbFieldIgnore]  // ← Exclude from MongoDB serialization
+    public DbObjectId? DefaultCurrencyId { get; set; }
+
+    [DenormalizedField(DbSchema.Currencies.Name, referenceKey: "@DefaultCurrencyId as _id")]
+    [DbFieldIgnore]  // ← Exclude from MongoDB serialization
+    public Currency? DefaultCurrency { get; set; }
+}
+```
+
+**Target Entity (Merchant):**
+```csharp
+public class Merchant : BaseEntity
+{
+    public DbObjectId? DefaultCurrencyId { get; set; }
+
+    // These denormalized properties SHOULD be saved to the database
+    // No [DbFieldIgnore] attribute needed
+    [DenormalizedField(DbSchema.Currencies.Name, referenceKey: "@DefaultCurrencyId as _id")]
+    public Currency? DefaultCurrency { get; set; }
+}
+```
+
+#### Common Error Messages
+
+If you encounter this issue, you may see error messages like:
+
+```
+MongoDB.Bson.BsonSerializationException: The property 'DefaultCurrencyId' of type 'LegacyMerchantAccount' 
+cannot use element name 'defaultCurrencyId' because it is already being used by property 'DefaultCurrencyLegacyId'.
+```
+
+This indicates that two properties are trying to use the same MongoDB field name, which is resolved by adding `[DbFieldIgnore]` to the denormalized property.
+
+#### Best Practices
+
+1. **Always add `[DbFieldIgnore]`** to denormalized properties in source/legacy entities
+2. **Never add `[DbFieldIgnore]`** to denormalized properties in target entities that should be persisted
+3. **Test thoroughly** after making changes to ensure properties are correctly saved to the database
+4. **Use specific entity IDs** for testing to verify the fix works correctly
+
+#### Testing the Fix
+
+To verify that denormalized properties are correctly saved:
+
+1. Run a migration with a specific entity ID
+2. Check the database to ensure all expected properties are present
+3. Verify that the migration completes without MongoDB serialization errors
+
+Example test command:
+```bash
+dotnet run sync --s MerchantMigration --entity-id 68e15c45eccc15c6b35f84e1
+```
+
+Expected output should show successful migration without serialization conflicts.
 
 ## Version History
 
+- **v2.2** - Fixed MongoDB serialization issue with denormalized properties; added comprehensive documentation for serialization conflicts and resolutions
+- **v2.1** - Added PropertyMappingUtils and AttributeResolver for generic property mapping and attribute resolution
 - **v2.0** - Enhanced reference key syntax with field remapping support
 - **v1.0** - Initial implementation with basic `@` and `#` syntax

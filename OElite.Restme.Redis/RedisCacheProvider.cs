@@ -40,7 +40,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get cache value for key '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get cache value for key '{key}': {ex.Message}", ex);
             }
         }
 
@@ -62,7 +62,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to set cache value for key '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to set cache value for key '{key}': {ex.Message}", ex);
             }
         }
 
@@ -77,7 +77,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to remove cache key '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to remove cache key '{key}': {ex.Message}", ex);
             }
         }
 
@@ -92,7 +92,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to check cache key existence '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to check cache key existence '{key}': {ex.Message}", ex);
             }
         }
 
@@ -107,7 +107,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to set expiry for cache key '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to set expiry for cache key '{key}': {ex.Message}", ex);
             }
         }
 

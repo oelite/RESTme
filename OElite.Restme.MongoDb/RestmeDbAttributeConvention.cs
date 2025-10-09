@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.Serializers;
 using OElite;
+using OElite.Restme.Utils.Data;
 
 namespace OElite.Restme.MongoDb;
 
@@ -42,20 +43,17 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
             var ignoreAttr = property.GetCustomAttribute<DbFieldIgnore>();
             var dateTimeAttr = property.GetCustomAttribute<DbDateTimeOptionsAttribute>();
             var denormalizedAttr = property.GetCustomAttribute<DenormalizedAttribute>();
+            
 
-            // Skip ignored properties
+            // Skip properties marked with [DbFieldIgnore] - they are populated by DataPopulationService, not MongoDB serialization
             if (ignoreAttr != null)
             {
                 classMap.UnmapProperty(property.Name);
                 continue;
             }
 
-            // Skip denormalized properties - they are populated by DataPopulationService, not MongoDB serialization
-            if (denormalizedAttr != null)
-            {
-                classMap.UnmapProperty(property.Name);
-                continue;
-            }
+            // Note: Denormalized properties without [DbFieldIgnore] will be serialized to MongoDB
+            // This allows target entities (like Merchant) to persist denormalized fields to the database
 
             // Try to get existing member map first, then map if needed
             var memberMap = classMap.GetMemberMap(property.Name);
@@ -108,6 +106,7 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
                     // For embedded classes without DbCollection attribute, inherit from parent or use snake_case
                     var fieldName = GetFieldNameFromNamingConvention(property.Name, collectionAttr, type);
                     memberMap.SetElementName(fieldName);
+                    
                 }
 
                 // Handle DateTime options
@@ -147,94 +146,13 @@ public class RestmeDbAttributeConvention : ConventionBase, IClassMapConvention
         {
             // For embedded classes without DbCollectionAttribute, try to find naming convention from property context
             // or default to snake_case convention for consistency with the platform
-            var inheritedConvention = FindParentNamingConvention(type);
-            return ConvertToNamingConvention(propertyName, inheritedConvention);
+            var inheritedConvention = PropertyMappingUtils.GetNamingConventionFromClass(type);
+            return PropertyMappingUtils.ConvertToNamingConvention(propertyName, inheritedConvention);
         }
 
-        return ConvertToNamingConvention(propertyName, collectionAttr.NamingConvention);
+        return PropertyMappingUtils.ConvertToNamingConvention(propertyName, collectionAttr.NamingConvention);
     }
 
-    /// <summary>
-    /// Finds the naming convention from parent classes or defaults to snake_case
-    /// </summary>
-    /// <param name="type">The type to analyze</param>
-    /// <returns>The naming convention to use</returns>
-    private static OElite.DbNamingConvention FindParentNamingConvention(Type type)
-    {
-        // Check if this type is used as a property in any BaseEntity class
-        // For now, default to snake_case to maintain consistency with the platform
-        // This could be enhanced to dynamically discover the parent collection's naming convention
-        return OElite.DbNamingConvention.SnakeCase;
-    }
-
-    /// <summary>
-    /// Converts a string to the specified naming convention
-    /// </summary>
-    /// <param name="input">The input string (typically a property name)</param>
-    /// <param name="convention">The naming convention to apply</param>
-    /// <returns>The converted string</returns>
-    private static string ConvertToNamingConvention(string input, DbNamingConvention convention)
-    {
-        if (string.IsNullOrEmpty(input))
-        {
-            return input;
-        }
-
-        return convention switch
-        {
-            DbNamingConvention.SnakeCase => ToSnakeCase(input),
-            DbNamingConvention.CamelCase => ToCamelCase(input),
-            DbNamingConvention.PascalCase => input, // Already PascalCase
-            _ => ToSnakeCase(input)
-        };
-    }
-
-    /// <summary>
-    /// Converts PascalCase to snake_case for MongoDB field naming convention
-    /// </summary>
-    private static string ToSnakeCase(string pascalCase)
-    {
-        if (string.IsNullOrEmpty(pascalCase))
-        {
-            return pascalCase;
-        }
-
-        var result = new System.Text.StringBuilder();
-
-        for (int i = 0; i < pascalCase.Length; i++)
-        {
-            char currentChar = pascalCase[i];
-
-            // If this is an uppercase character and not the first character, add underscore
-            if (char.IsUpper(currentChar) && i > 0)
-            {
-                result.Append('_');
-            }
-
-            // Convert to lowercase
-            result.Append(char.ToLowerInvariant(currentChar));
-        }
-
-        return result.ToString();
-    }
-
-    /// <summary>
-    /// Converts PascalCase to camelCase
-    /// </summary>
-    private static string ToCamelCase(string pascalCase)
-    {
-        if (string.IsNullOrEmpty(pascalCase))
-        {
-            return pascalCase;
-        }
-
-        if (pascalCase.Length == 1)
-        {
-            return pascalCase.ToLowerInvariant();
-        }
-
-        return char.ToLowerInvariant(pascalCase[0]) + pascalCase.Substring(1);
-    }
 
     /// <summary>
     /// Sets up custom deserializer for null value handling

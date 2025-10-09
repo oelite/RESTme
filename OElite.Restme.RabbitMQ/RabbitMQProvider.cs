@@ -120,7 +120,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to publish message: {ex.Message}", ex);
+                throw new OEliteException($"Failed to publish message: {ex.Message}", ex);
             }
         }
 
@@ -187,7 +187,7 @@ namespace OElite.Providers
                     catch (Exception ex)
                     {
                         await _channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true, cancellationToken);
-                        throw new OEliteWebException($"Error processing message: {ex.Message}", ex);
+                        throw new OEliteException($"Error processing message: {ex.Message}", ex);
                     }
                 };
 
@@ -195,7 +195,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to start consuming: {ex.Message}", ex);
+                throw new OEliteException($"Failed to start consuming: {ex.Message}", ex);
             }
         }
 
@@ -214,7 +214,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to stop consuming: {ex.Message}", ex);
+                throw new OEliteException($"Failed to stop consuming: {ex.Message}", ex);
             }
         }
 
@@ -242,7 +242,7 @@ namespace OElite.Providers
                     // Queue exists but with different parameters - this is usually OK for consumers
                     return queueName ?? "";
                 }
-                throw new OEliteWebException($"Failed to declare queue '{queueName}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to declare queue '{queueName}': {ex.Message}", ex);
             }
         }
 
@@ -265,7 +265,7 @@ namespace OElite.Providers
                     // Exchange exists but with different parameters - this is usually OK
                     return;
                 }
-                throw new OEliteWebException($"Failed to declare exchange '{exchangeName}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to declare exchange '{exchangeName}': {ex.Message}", ex);
             }
         }
 
@@ -279,7 +279,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to bind queue '{queueName}' to exchange '{exchangeName}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to bind queue '{queueName}' to exchange '{exchangeName}': {ex.Message}", ex);
             }
         }
 

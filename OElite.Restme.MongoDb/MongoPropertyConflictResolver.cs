@@ -17,22 +17,9 @@ public static class MongoPropertyConflictResolver
     /// <param name="type">The type being mapped</param>
     public static void ResolvePropertyConflicts(BsonClassMap classMap, Type type)
     {
-        // Handle denormalized properties - unmap them from MongoDB serialization
-        var excludedProperties = AttributeResolver.GetExcludedProperties(type);
-        foreach (var propertyName in excludedProperties)
-        {
-            try
-            {
-                classMap.UnmapProperty(propertyName);
-            }
-            catch (Exception ex)
-            {
-                // Log warning but continue - this is expected for some properties
-                Console.WriteLine($"Warning: Could not unmap property {type.Name}.{propertyName}: {ex.Message}");
-            }
-        }
-
-        // Handle property conflicts (new keyword hiding base properties)
+        // Note: Denormalized properties are handled by RestmeDbAttributeConvention
+        // This method only handles property conflicts (new keyword hiding base properties)
+        
         var conflicts = AttributeResolver.GetPropertyConflicts(type);
         foreach (var conflict in conflicts)
         {

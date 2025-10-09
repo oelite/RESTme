@@ -38,7 +38,7 @@ namespace OElite.Providers
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
 
@@ -66,7 +66,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get blob '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get blob '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -84,7 +84,7 @@ namespace OElite.Providers
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
 
@@ -112,7 +112,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to upload blob '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to upload blob '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -129,7 +129,7 @@ namespace OElite.Providers
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
                 cancellationToken.ThrowIfCancellationRequested();
@@ -137,7 +137,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to delete blob '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to delete blob '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -162,7 +162,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to check blob existence '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to check blob existence '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -179,7 +179,7 @@ namespace OElite.Providers
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
 
@@ -192,7 +192,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get blob string '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get blob string '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -210,7 +210,7 @@ namespace OElite.Providers
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
                 cancellationToken.ThrowIfCancellationRequested();
@@ -220,7 +220,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to upload blob string '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to upload blob string '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -237,7 +237,7 @@ namespace OElite.Providers
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
 
@@ -254,7 +254,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get blob stream '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get blob stream '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -272,7 +272,7 @@ namespace OElite.Providers
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
 
@@ -288,7 +288,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to upload blob stream '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to upload blob stream '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -304,7 +304,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get blob stream as type '{typeof(T).Name}' for '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get blob stream as type '{typeof(T).Name}' for '{objectKey}': {ex.Message}", ex);
             }
         }
 

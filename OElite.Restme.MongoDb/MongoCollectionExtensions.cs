@@ -207,6 +207,24 @@ public static class MongoCollectionExtensions
     }
 
     /// <summary>
+    /// Replaces the first document matching the specified filter expression with upsert option
+    /// </summary>
+    public static async Task<ReplaceOneResult> ReplaceOneAsync<T>(this IMongoCollection<T> collection, Expression<Func<T, bool>> filter, T replacement, bool isUpsert) where T : BaseEntity
+    {
+        var options = new ReplaceOptions { IsUpsert = isUpsert };
+        return await collection.ReplaceOneAsync(Builders<T>.Filter.Where(filter), replacement, options);
+    }
+
+    /// <summary>
+    /// Replaces the first document matching the specified filter expression with session and upsert option
+    /// </summary>
+    public static async Task<ReplaceOneResult> ReplaceOneAsync<T>(this IMongoCollection<T> collection, IClientSessionHandle session, Expression<Func<T, bool>> filter, T replacement, bool isUpsert) where T : BaseEntity
+    {
+        var options = new ReplaceOptions { IsUpsert = isUpsert };
+        return await collection.ReplaceOneAsync(session, Builders<T>.Filter.Where(filter), replacement, options);
+    }
+
+    /// <summary>
     /// Finds documents and returns them as a list with sorting
     /// </summary>
     public static async Task<List<T>> FindAsync<T>(this IMongoCollection<T> collection, Expression<Func<T, bool>> filter, Expression<Func<T, object>> sortBy, bool ascending = true) where T : BaseEntity

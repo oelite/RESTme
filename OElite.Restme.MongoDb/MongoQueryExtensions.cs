@@ -676,12 +676,12 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Executes the query with pagination and returns results as a BaseEntityCollection with optional total count
     /// </summary>
-    public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, int pageIndex, int pageSize, bool returnTotalCount = false) 
-        where T : BaseEntity 
+    public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, int pageIndex, int pageSize, bool returnTotalCount = false)
+        where T : BaseEntity
         where TCollection : BaseEntityCollection<T>, new()
     {
         var collection = new TCollection();
-        
+
         if (returnTotalCount)
         {
             // Use existing optimized pagination method that executes count and data queries efficiently
@@ -695,8 +695,92 @@ public static class MongoQueryExtensions
             var results = await query.Skip(pageIndex * pageSize).Take(pageSize).ToListAsync();
             collection.AddRange(results);
         }
-        
+
         return collection;
+    }
+
+    /// <summary>
+    /// Inserts a new entity into the collection
+    /// </summary>
+    public static async Task InsertAsync<T>(this IMongoQuery<T> query, T entity) where T : BaseEntity
+    {
+        var collection = GetCollectionFromQuery(query);
+        await collection.InsertOneAsync(entity);
+    }
+
+    /// <summary>
+    /// Inserts multiple entities into the collection
+    /// </summary>
+    public static async Task InsertManyAsync<T>(this IMongoQuery<T> query, IEnumerable<T> entities) where T : BaseEntity
+    {
+        var collection = GetCollectionFromQuery(query);
+        await collection.InsertManyAsync(entities);
+    }
+
+    /// <summary>
+    /// Replaces an entity matching the filter with a new entity (with upsert option)
+    /// </summary>
+    public static async Task<ReplaceOneResult> ReplaceAsync<T>(this IMongoQuery<T> query, T entity, bool isUpsert = false) where T : BaseEntity
+    {
+        var collection = GetCollectionFromQuery(query);
+        return await collection.ReplaceOneAsync(e => e.Id == entity.Id, entity, isUpsert);
+    }
+
+    /// <summary>
+    /// Updates entities matching the query filters with the specified update definition
+    /// </summary>
+    public static async Task<UpdateResult> UpdateAsync<T>(this IMongoQuery<T> query, UpdateDefinition<T> update) where T : BaseEntity
+    {
+        var collection = GetCollectionFromQuery(query);
+
+        // Get filters from the query
+        var matchStage = GetMatchStageFromQuery(query);
+        if (matchStage != null)
+        {
+            // Extract filter from match stage
+            var field = query.GetType().GetField("_filters", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (field != null)
+            {
+                var filters = (List<FilterDefinition<T>>)field.GetValue(query)!;
+                var combinedFilter = filters.Count == 1 ? filters[0] : Builders<T>.Filter.And(filters);
+                return await collection.UpdateManyAsync(combinedFilter, update);
+            }
+        }
+
+        // No filters - update all (dangerous, should we throw?)
+        return await collection.UpdateManyAsync(Builders<T>.Filter.Empty, update);
+    }
+
+    /// <summary>
+    /// Deletes all entities matching the query filters
+    /// </summary>
+    public static async Task<DeleteResult> DeleteAsync<T>(this IMongoQuery<T> query) where T : BaseEntity
+    {
+        var collection = GetCollectionFromQuery(query);
+
+        // Get filters from the query
+        var field = query.GetType().GetField("_filters", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (field != null)
+        {
+            var filters = (List<FilterDefinition<T>>)field.GetValue(query)!;
+            if (filters.Count > 0)
+            {
+                var combinedFilter = filters.Count == 1 ? filters[0] : Builders<T>.Filter.And(filters);
+                return await collection.DeleteManyAsync(combinedFilter);
+            }
+        }
+
+        // No filters - throw exception to prevent accidental deletion of all documents
+        throw new InvalidOperationException("Cannot delete without filters. Use Where() to specify which documents to delete.");
+    }
+
+    /// <summary>
+    /// Deletes a single entity by ID
+    /// </summary>
+    public static async Task<DeleteResult> DeleteByIdAsync<T>(this IMongoQuery<T> query, DbObjectId id) where T : BaseEntity
+    {
+        var collection = GetCollectionFromQuery(query);
+        return await collection.DeleteOneAsync(e => e.Id == id);
     }
 
     #endregion

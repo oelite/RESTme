@@ -54,7 +54,7 @@ namespace OElite.Providers
             try
             {
                 if (objectKey.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+                    throw new OEliteException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
                 var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
@@ -77,11 +77,11 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
+                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -93,7 +93,7 @@ namespace OElite.Providers
             try
             {
                 if (objectKey.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+                    throw new OEliteException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
                 var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
@@ -115,7 +115,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -127,7 +127,7 @@ namespace OElite.Providers
             try
             {
                 if (objectKey.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+                    throw new OEliteException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
                 var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
@@ -144,7 +144,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to delete S3 object '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to delete S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -177,7 +177,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to check if S3 object '{objectKey}' exists: {ex.Message}", ex);
+                throw new OEliteException($"Failed to check if S3 object '{objectKey}' exists: {ex.Message}", ex);
             }
         }
 
@@ -189,7 +189,7 @@ namespace OElite.Providers
             try
             {
                 if (objectKey.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+                    throw new OEliteException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
                 var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
@@ -207,11 +207,11 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
+                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -223,7 +223,7 @@ namespace OElite.Providers
             try
             {
                 if (objectKey.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+                    throw new OEliteException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
                 var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
@@ -242,7 +242,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -254,7 +254,7 @@ namespace OElite.Providers
             try
             {
                 if (objectKey.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+                    throw new OEliteException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
                 var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
@@ -271,11 +271,11 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
+                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -287,7 +287,7 @@ namespace OElite.Providers
             try
             {
                 if (objectKey.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+                    throw new OEliteException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
                 var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
@@ -305,7 +305,7 @@ namespace OElite.Providers
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to put S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 
@@ -317,7 +317,7 @@ namespace OElite.Providers
             try
             {
                 if (objectKey.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid S3 path. Expected format: bucket-name/object-key");
+                    throw new OEliteException("Invalid S3 path. Expected format: bucket-name/object-key");
 
                 // Apply root path if specified
                 var finalObjectKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, objectKey);
@@ -340,11 +340,11 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                throw new OEliteWebException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
+                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get S3 object '{objectKey}': {ex.Message}", ex);
             }
         }
 

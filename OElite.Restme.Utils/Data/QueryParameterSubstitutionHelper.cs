@@ -61,6 +61,17 @@ public static class QueryParameterSubstitutionHelper
     }
 
     /// <summary>
+    /// Substitutes @ parameters in a MongoDB query with actual values from the entity and returns a JSON string ready for BsonDocument parsing
+    /// </summary>
+    /// <param name="query">MongoDB query string with @ parameters</param>
+    /// <param name="entity">Entity containing the property values</param>
+    /// <returns>JSON string with substituted values ready for BsonDocument.Parse()</returns>
+    public static string SubstituteParametersAsJson<T>(string query, T entity) where T : IEntity
+    {
+        return SubstituteParameters(query, entity);
+    }
+
+    /// <summary>
     /// Gets the value of a property from an entity using reflection
     /// </summary>
     private static object? GetPropertyValue<T>(T entity, string propertyName, Type entityType)
