@@ -77,7 +77,7 @@ namespace OElite
             try
             {
                 // Initialize log provider first (always available)
-                LogProvider = new DefaultLogProvider(Logger);
+                LogProvider = new OElite.Base.ConsoleLogProvider();
 
                 // Load appropriate assemblies to trigger static constructors
                 LoadProviderAssemblies();
@@ -85,6 +85,15 @@ namespace OElite
                 // Try to load providers dynamically based on mode
                 switch (Configuration.OperationMode)
                 {
+                    case RestMode.MemoryAsCache:
+                        CacheProvider = new OElite.Base.MemoryCacheProvider();
+                        break;
+                    case RestMode.LocalFileSystemAsStorage:
+                        StorageProvider = new OElite.Base.LocalFileSystemStorageProvider(ConnectionString);
+                        break;
+                    case RestMode.InMemoryQueue:
+                        QueueProvider = new OElite.Base.MemoryQueueProvider();
+                        break;
                     case RestMode.RedisAsCache:
                         InitializeCacheProvider();
                         break;
@@ -302,15 +311,15 @@ namespace OElite
                 }
                 else
                 {
-                    // Fallback to default implementation
-                    HttpProvider = new DefaultHttpProvider(Configuration, Logger);
+                    // Fallback to base implementation without external deps
+                    HttpProvider = new OElite.Base.HttpClientProvider(Configuration, Logger);
                 }
             }
             catch (Exception ex)
             {
                 Logger?.LogError(ex, "Failed to initialize HTTP provider");
                 // HTTP provider should always be available as fallback
-                HttpProvider = new DefaultHttpProvider(Configuration, Logger);
+                HttpProvider = new OElite.Base.HttpClientProvider(Configuration, Logger);
             }
         }
 
@@ -347,10 +356,10 @@ namespace OElite
                 if (allowMultipleValues)
                     Headers[header].Add(value);
                 else
-                    Headers[header] = [value];
+                    Headers[header] = new List<string> { value };
             }
             else
-                Headers.Add(header, [value]);
+                Headers.Add(header, new List<string> { value });
         }
 
         public void AddAuthorizationHeader(string token, string authTypePrefix = "Bearer ")

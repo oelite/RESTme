@@ -64,7 +64,7 @@ Backend Packages:
 using OElite;
 
 // Initialize HTTP client
-var rest = new Rest("https://api.example.com", RestMode.HTTPClient);
+var rest = new Rest("https://api.example.com", new RestConfig { OperationMode = RestMode.Http });
 
 // GET request
 var user = await rest.GetAsync<User>("/users/123");
@@ -147,15 +147,51 @@ await rest.DomeAsync<User>("user.created", async (user) => {
 });
 ```
 
+### 6. Base Providers (No additional packages required)
+
+Use built-in base providers for simple scenarios without external infrastructure.
+
+```csharp
+using OElite;
+
+// Memory cache
+var restMemoryCache = new Rest(
+    configuration: new RestConfig { OperationMode = RestMode.MemoryAsCache }
+);
+await restMemoryCache.CachemeAsync("user:123", userData, TimeSpan.FromMinutes(30));
+var cached = await restMemoryCache.FindmeAsync<User>("user:123");
+
+// Local file system storage (uses default AppContext.BaseDirectory/restme_storage)
+var restLocalFs = new Rest(
+    endPointOrConnectionString: "/var/data/myapp", // optional base directory; omit to use default
+    configuration: new RestConfig { OperationMode = RestMode.LocalFileSystemAsStorage }
+);
+await restLocalFs.StoremAsync("docs/report.pdf", fileBytes);
+var file = await restLocalFs.RetrievemeAsync<byte[]>("docs/report.pdf");
+
+// In-memory queue (single-process)
+var restInMemoryQueue = new Rest(
+    configuration: new RestConfig { OperationMode = RestMode.InMemoryQueue }
+);
+await restInMemoryQueue.QueuemeAsync("events.user.created", newUser);
+await restInMemoryQueue.DomeAsync<User>("events.user.created", async user => {
+    // handle user
+    return true;
+});
+```
+
 ## 🔧 Configuration
 
 ### RestMode Options
 
-- `RestMode.HTTPClient` - HTTP REST client
+- `RestMode.Http` - HTTP REST client
 - `RestMode.RedisCacheClient` - Redis caching
 - `RestMode.AzureStorageClient` - Azure Blob Storage
 - `RestMode.S3Client` - S3-compatible storage
 - `RestMode.RabbitMq` - RabbitMQ message queuing
+- `RestMode.MemoryAsCache` - In-memory cache (base provider)
+- `RestMode.LocalFileSystemAsStorage` - Local filesystem storage (base provider)
+- `RestMode.InMemoryQueue` - In-process queue (base provider)
 
 ### Connection Strings
 
@@ -289,78 +325,4 @@ var file = await rest.RetrievemeAsync<byte[]>("documents/file.pdf"); // Retrieve
 ```
 
 **Connection String Parameters:**
-- `RootPath=path/to/prefix` - Sets the root path prefix for all operations
-- Paths are automatically normalized (trailing/leading slashes handled)
-- Empty or null rootPath means no prefix is applied
-
-### Supported Providers
-
-- **Amazon S3** - Default AWS S3
-- **Backblaze B2** - Cost-effective cloud storage
-- **MinIO** - Self-hosted object storage
-- **DigitalOcean Spaces** - Simple object storage
-- **Cloudflare R2** - Cloudflare's object storage
-- **Wasabi** - Hot cloud storage
-- **Scaleway Object Storage** - European cloud storage
-- **Any S3-compatible provider**
-
-### Provider Examples
-
-```csharp
-// Backblaze B2 with root path
-var rest = new Rest("AccessKeyId=key;SecretAccessKey=secret;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true;RootPath=backups/2024", RestMode.S3Client);
-
-// MinIO (local development) with root path
-var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true;RootPath=dev/uploads", RestMode.S3Client);
-
-// DigitalOcean Spaces with root path
-var rest = new Rest("AccessKeyId=key;SecretAccessKey=secret;ServiceUrl=https://nyc3.digitaloceanspaces.com;ForcePathStyle=true;RootPath=production/assets", RestMode.S3Client);
-```
-
-## 🔒 Security Best Practices
-
-1. **Use HTTPS**: Always use secure connections in production
-2. **Rotate Keys**: Regularly rotate your access keys
-3. **Bucket Policies**: Configure appropriate bucket policies
-4. **VPC**: Use VPC endpoints when available
-5. **IAM**: Use IAM roles when possible instead of access keys
-
-## 🚀 Performance Tips
-
-1. **Connection Pooling**: The AWS SDK handles connection pooling automatically
-2. **CDN Integration**: Both cache and storage providers set appropriate cache headers
-3. **Compression**: Consider compressing large objects before storage
-4. **Batch Operations**: Use batch operations when possible
-5. **Async Operations**: Always use async methods for better performance
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **403 Forbidden**: Check your credentials and permissions
-2. **404 Not Found**: Ensure the resource exists and you have access
-3. **Connection Timeout**: Verify the endpoint is correct and accessible
-4. **SSL Errors**: Check if you need `UseHttp=true` for local development
-
-### Debug Mode
-
-Enable debug logging to see detailed request/response information:
-
-```csharp
-var rest = new Rest(connectionString, RestMode.S3Client);
-rest.Logger = logger; // Your ILogger instance
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-Released under [MIT License](http://choosealicense.com/licenses/mit).
-
-## 🔗 Links
-
-- [NuGet Package](https://www.nuget.org/packages/OElite.Restme/)
-- [GitHub Repository](https://github.com/your-org/OElite.Restme)
-- [Documentation](https://github.com/your-org/OElite.Restme/wiki)
+- `
