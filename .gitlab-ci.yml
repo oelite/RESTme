@@ -9,6 +9,8 @@ variables:
     OElite.Restme.S3
     OElite.Restme.Utils
     OElite.Restme.MongoDb
+    OElite.Restme.RateLimiting
+    OElite.Restme.AspNetCore
 
 stages:
   - version
