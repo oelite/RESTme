@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>OElite.Restme.RateLimiting</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <Authors>OElite Development Team</Authors>
+    <Company>Phanes</Company>
+    <Description>Production-grade rate limiting middleware for ASP.NET Core applications with support for distributed scenarios, memory and Redis storage, and flexible configuration.</Description>
+    <PackageTags>aspnetcore;middleware;ratelimiting;redis;distributed;security</PackageTags>
+    <RepositoryUrl>https://github.com/PhanesDigital/oelite</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.9" />
+    <PackageReference Include="System.Text.Json" Version="9.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../OElite.Restme.Utils/OElite.Restme.Utils.csproj" />
+  </ItemGroup>
+
+</Project>
