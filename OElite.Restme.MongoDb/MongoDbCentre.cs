@@ -29,6 +29,16 @@ public abstract class MongoDbCentre : IDisposable
     }
 
     /// <summary>
+    /// Get a query for a specific entity collection
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public IMongoQuery<T> GetQuery<T>() where T : BaseEntity
+    {
+        return new MongoQuery<T>(_adapter.GetCollection<T>());
+    }
+
+    /// <summary>
     /// Get a collection for a specific entity type
     /// </summary>
     public IMongoCollection<T> GetCollection<T>(string collectionName = null) where T : BaseEntity
