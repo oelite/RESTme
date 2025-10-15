@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using OElite.Restme.RateLimiting.Interfaces;
 using OElite.Restme.RateLimiting.Models;
@@ -26,119 +25,127 @@ public class RedisRateLimitStore : IRateLimitStore
         };
     }
 
-    public async Task<RateLimitResult> CheckAndIncrementAsync(string key, RateLimitOptions options, CancellationToken cancellationToken = default)
+    public async Task<TokenBucket?> GetTokenBucketAsync(string key)
     {
-        var now = DateTime.UtcNow;
-        var windowStart = GetWindowStart(now, options.WindowInSeconds);
-        var windowEnd = windowStart.AddSeconds(options.WindowInSeconds);
-        var redisKey = $"{options.RedisKeyPrefix}{key}:{windowStart:yyyyMMddHHmmss}";
-
         try
         {
-            // Use Redis INCR for atomic increment
-            var currentCount = await _database.StringIncrementAsync(redisKey);
+            var value = await _database.StringGetAsync(key);
+            if (!value.HasValue)
+                return null;
 
-            // Set expiration on first increment
-            if (currentCount == 1)
-            {
-                var expiration = windowEnd.AddMinutes(1) - now;
-                await _database.KeyExpireAsync(redisKey, expiration);
-            }
-
-            var isAllowed = currentCount <= options.Limit;
-            var windowRemainingSeconds = (long)(windowEnd - now).TotalSeconds;
-
-            _logger.LogDebug("Redis rate limit check for key {Key}: {CurrentCount}/{Limit}, Window: {WindowStart}-{WindowEnd}",
-                key, currentCount, options.Limit, windowStart, windowEnd);
-
-            return new RateLimitResult
-            {
-                IsAllowed = isAllowed,
-                CurrentCount = currentCount,
-                Limit = options.Limit,
-                WindowRemainingSeconds = Math.Max(0, windowRemainingSeconds),
-                WindowResetTime = windowEnd,
-                Key = key
-            };
+            return JsonSerializer.Deserialize<TokenBucket>((string)value!, _jsonOptions);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error incrementing rate limit for key {Key}", key);
+            _logger.LogError(ex, "Error getting token bucket for key {Key}", key);
+            return null;
+        }
+    }
+
+    public async Task SetTokenBucketAsync(TokenBucket bucket)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(bucket, _jsonOptions);
+            await _database.StringSetAsync(bucket.Key, json, TimeSpan.FromMinutes(10));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting token bucket for key {Key}", bucket.Key);
             throw;
         }
     }
 
-    public async Task<RateLimitResult> GetStatusAsync(string key, RateLimitOptions options, CancellationToken cancellationToken = default)
+    public async Task<FixedWindow?> GetFixedWindowAsync(string key)
     {
-        var now = DateTime.UtcNow;
-        var windowStart = GetWindowStart(now, options.WindowInSeconds);
-        var windowEnd = windowStart.AddSeconds(options.WindowInSeconds);
-        var redisKey = $"{options.RedisKeyPrefix}{key}:{windowStart:yyyyMMddHHmmss}";
-
         try
         {
-            var currentCountValue = await _database.StringGetAsync(redisKey);
-            var currentCount = currentCountValue.HasValue ? (long)currentCountValue : 0L;
-            var isAllowed = currentCount < options.Limit;
-            var windowRemainingSeconds = (long)(windowEnd - now).TotalSeconds;
+            var value = await _database.StringGetAsync(key);
+            if (!value.HasValue)
+                return null;
 
-            return new RateLimitResult
-            {
-                IsAllowed = isAllowed,
-                CurrentCount = currentCount,
-                Limit = options.Limit,
-                WindowRemainingSeconds = Math.Max(0, windowRemainingSeconds),
-                WindowResetTime = windowEnd,
-                Key = key
-            };
+            return JsonSerializer.Deserialize<FixedWindow>((string)value!, _jsonOptions);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rate limit status for key {Key}", key);
+            _logger.LogError(ex, "Error getting fixed window for key {Key}", key);
+            return null;
+        }
+    }
+
+    public async Task SetFixedWindowAsync(FixedWindow window)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(window, _jsonOptions);
+            await _database.StringSetAsync(window.Key, json, TimeSpan.FromMinutes(10));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting fixed window for key {Key}", window.Key);
             throw;
         }
     }
 
-    public async Task<bool> ClearAsync(string key, CancellationToken cancellationToken = default)
+    public async Task<SlidingWindow?> GetSlidingWindowAsync(string key)
     {
         try
         {
-            var deleted = await _database.KeyDeleteAsync(key);
-            _logger.LogDebug("Cleared rate limit key: {Key}, Existed: {Existed}", key, deleted);
-            return deleted;
+            var value = await _database.StringGetAsync(key);
+            if (!value.HasValue)
+                return null;
+
+            return JsonSerializer.Deserialize<SlidingWindow>((string)value!, _jsonOptions);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error clearing rate limit key {Key}", key);
+            _logger.LogError(ex, "Error getting sliding window for key {Key}", key);
+            return null;
+        }
+    }
+
+    public async Task SetSlidingWindowAsync(string key, SlidingWindow window)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(window, _jsonOptions);
+            await _database.StringSetAsync(key, json, TimeSpan.FromMinutes(10));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting sliding window for key {Key}", key);
             throw;
         }
     }
 
-    public async Task<long> ClearAllAsync(CancellationToken cancellationToken = default)
+    public async Task<LeakyBucket?> GetLeakyBucketAsync(string key)
     {
         try
         {
-            var server = _database.Multiplexer.GetServer(_database.Multiplexer.GetEndPoints().First());
-            var keys = server.Keys(pattern: "rate_limit:*").ToArray();
+            var value = await _database.StringGetAsync(key);
+            if (!value.HasValue)
+                return null;
 
-            if (keys.Length == 0)
-                return 0;
-
-            var deleted = await _database.KeyDeleteAsync(keys);
-            _logger.LogInformation("Cleared {Count} rate limit keys", deleted);
-            return deleted;
+            return JsonSerializer.Deserialize<LeakyBucket>((string)value!, _jsonOptions);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error clearing all rate limit keys");
-            throw;
+            _logger.LogError(ex, "Error getting leaky bucket for key {Key}", key);
+            return null;
         }
     }
 
-    private static DateTime GetWindowStart(DateTime now, int windowInSeconds)
+    public async Task SetLeakyBucketAsync(LeakyBucket bucket)
     {
-        var windowTicks = TimeSpan.FromSeconds(windowInSeconds).Ticks;
-        var windowStartTicks = (now.Ticks / windowTicks) * windowTicks;
-        return new DateTime(windowStartTicks, DateTimeKind.Utc);
+        try
+        {
+            var json = JsonSerializer.Serialize(bucket, _jsonOptions);
+            await _database.StringSetAsync(bucket.Key, json, TimeSpan.FromMinutes(10));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting leaky bucket for key {Key}", bucket.Key);
+            throw;
+        }
     }
 }

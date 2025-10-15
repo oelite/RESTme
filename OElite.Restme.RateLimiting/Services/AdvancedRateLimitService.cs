@@ -6,6 +6,7 @@ using OElite.Restme.RateLimiting.Models;
 using OElite.Restme.RateLimiting.Storage;
 using System.Collections.Concurrent;
 using System.Net;
+using System.Diagnostics;
 
 namespace OElite.Restme.RateLimiting.Services;
 
@@ -383,13 +384,13 @@ public class AdvancedRateLimitService : IRateLimitService
         return (Math.Max(1, adaptiveLimit), Math.Max(1, adaptiveBurst));
     }
 
-    private async Task<bool> IsIpBlockedAsync(string clientIp)
+    private Task<bool> IsIpBlockedAsync(string clientIp)
     {
         if (_blockedIps.TryGetValue(clientIp, out var blockUntil))
         {
             if (DateTime.UtcNow < blockUntil)
             {
-                return true;
+                return Task.FromResult(true);
             }
             else
             {
@@ -397,12 +398,13 @@ public class AdvancedRateLimitService : IRateLimitService
                 _blockedIps.TryRemove(clientIp, out _);
             }
         }
-        return false;
+        return Task.FromResult(false);
     }
 
-    private async Task BlockIpAsync(string clientIp, DateTime blockUntil)
+    private Task BlockIpAsync(string clientIp, DateTime blockUntil)
     {
         _blockedIps[clientIp] = blockUntil;
+        return Task.CompletedTask;
     }
 
     private RateLimitResult CreateBlockedResult(string key, string reason, RateLimitOptions options)
@@ -478,73 +480,3 @@ public class AdvancedRateLimitService : IRateLimitService
         _loadMonitoringTimer?.Dispose();
     }
 }
-
-#region Supporting Classes
-
-/// <summary>
-/// Token bucket for rate limiting
-/// </summary>
-public class TokenBucket
-{
-    public string Key { get; set; } = string.Empty;
-    public int Capacity { get; set; }
-    public double Tokens { get; set; }
-    public DateTime LastRefillTime { get; set; }
-    public double RefillRate { get; set; }
-}
-
-/// <summary>
-/// Fixed window for rate limiting
-/// </summary>
-public class FixedWindow
-{
-    public string Key { get; set; } = string.Empty;
-    public DateTime StartTime { get; set; }
-    public int Count { get; set; }
-}
-
-/// <summary>
-/// Sliding window for rate limiting
-/// </summary>
-public class SlidingWindow
-{
-    private readonly List<DateTime> _requests = new();
-    private readonly int _windowSizeSeconds;
-
-    public SlidingWindow(int windowSizeSeconds)
-    {
-        _windowSizeSeconds = windowSizeSeconds;
-    }
-
-    public int RequestCount => _requests.Count;
-
-    public void AddRequest(DateTime timestamp)
-    {
-        _requests.Add(timestamp);
-    }
-
-    public void RemoveOldRequests(DateTime cutoff)
-    {
-        _requests.RemoveAll(r => r < cutoff);
-    }
-
-    public int GetRequestCount(DateTime now)
-    {
-        var cutoff = now.AddSeconds(-_windowSizeSeconds);
-        return _requests.Count(r => r >= cutoff);
-    }
-}
-
-/// <summary>
-/// Leaky bucket for rate limiting
-/// </summary>
-public class LeakyBucket
-{
-    public string Key { get; set; } = string.Empty;
-    public int Capacity { get; set; }
-    public double Level { get; set; }
-    public DateTime LastLeakTime { get; set; }
-    public double LeakRate { get; set; }
-}
-
-#endregion

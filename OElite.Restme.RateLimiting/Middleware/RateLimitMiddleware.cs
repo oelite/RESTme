@@ -14,7 +14,7 @@ public class RateLimitMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<RateLimitMiddleware> _logger;
-    private readonly IRateLimitStore _store;
+    private readonly IRateLimitService _rateLimitService;
     private readonly IRateLimitKeyGenerator _keyGenerator;
     private readonly IRateLimitResponseBuilder _responseBuilder;
     private readonly RateLimitOptions _globalOptions;
@@ -22,14 +22,14 @@ public class RateLimitMiddleware
     public RateLimitMiddleware(
         RequestDelegate next,
         ILogger<RateLimitMiddleware> logger,
-        IRateLimitStore store,
+        IRateLimitService rateLimitService,
         IRateLimitKeyGenerator keyGenerator,
         IRateLimitResponseBuilder responseBuilder,
         IOptions<RateLimitOptions> globalOptions)
     {
         _next = next ?? throw new ArgumentNullException(nameof(next));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _rateLimitService = rateLimitService ?? throw new ArgumentNullException(nameof(rateLimitService));
         _keyGenerator = keyGenerator ?? throw new ArgumentNullException(nameof(keyGenerator));
         _responseBuilder = responseBuilder ?? throw new ArgumentNullException(nameof(responseBuilder));
         _globalOptions = globalOptions?.Value ?? throw new ArgumentNullException(nameof(globalOptions));
@@ -57,11 +57,8 @@ public class RateLimitMiddleware
 
         try
         {
-            // Generate rate limit key
-            var key = _keyGenerator.GenerateKey(context, endpointOptions);
-
-            // Check and increment rate limit
-            var result = await _store.CheckAndIncrementAsync(key, endpointOptions, context.RequestAborted);
+            // Check rate limit using the service
+            var result = await _rateLimitService.CheckRateLimitAsync(context, endpointOptions);
 
             // Add rate limit headers if enabled
             if (endpointOptions.IncludeHeaders)
@@ -71,13 +68,13 @@ public class RateLimitMiddleware
 
             // Log rate limit check
             _logger.LogDebug("Rate limit check for key {Key}: {CurrentCount}/{Limit}, Allowed: {IsAllowed}",
-                key, result.CurrentCount, result.Limit, result.IsAllowed);
+                result.Key, result.CurrentCount, result.Limit, result.IsAllowed);
 
             if (!result.IsAllowed)
             {
                 // Rate limit exceeded
                 _logger.LogWarning("Rate limit exceeded for key {Key}: {CurrentCount}/{Limit}",
-                    key, result.CurrentCount, result.Limit);
+                    result.Key, result.CurrentCount, result.Limit);
 
                 await _responseBuilder.BuildResponseAsync(context, result, endpointOptions, context.RequestAborted);
                 return;

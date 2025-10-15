@@ -7,38 +7,21 @@ namespace OElite.Restme.RateLimiting.Interfaces;
 /// </summary>
 public interface IRateLimitStore
 {
-    /// <summary>
-    /// Check and increment the rate limit for a given key
-    /// </summary>
-    /// <param name="key">The rate limit key</param>
-    /// <param name="options">Rate limit options</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Rate limit result</returns>
-    Task<RateLimitResult> CheckAndIncrementAsync(string key, RateLimitOptions options, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Get the current rate limit status for a given key
-    /// </summary>
-    /// <param name="key">The rate limit key</param>
-    /// <param name="options">Rate limit options</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Rate limit result</returns>
-    Task<RateLimitResult> GetStatusAsync(string key, RateLimitOptions options, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Clear the rate limit for a given key
-    /// </summary>
-    /// <param name="key">The rate limit key</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if the key was cleared, false if it didn't exist</returns>
-    Task<bool> ClearAsync(string key, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Clear all rate limit data (use with caution)
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Number of keys cleared</returns>
-    Task<long> ClearAllAsync(CancellationToken cancellationToken = default);
+    // Token Bucket methods
+    Task<TokenBucket?> GetTokenBucketAsync(string key);
+    Task SetTokenBucketAsync(TokenBucket bucket);
+    
+    // Fixed Window methods
+    Task<FixedWindow?> GetFixedWindowAsync(string key);
+    Task SetFixedWindowAsync(FixedWindow window);
+    
+    // Sliding Window methods
+    Task<SlidingWindow?> GetSlidingWindowAsync(string key);
+    Task SetSlidingWindowAsync(string key, SlidingWindow window);
+    
+    // Leaky Bucket methods
+    Task<LeakyBucket?> GetLeakyBucketAsync(string key);
+    Task SetLeakyBucketAsync(LeakyBucket bucket);
 }
 
 /// <summary>
