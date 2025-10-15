@@ -27,6 +27,7 @@ public class AdvancedRateLimitService : IRateLimitService
 
     // Server load monitoring for adaptive limiting
     private readonly Timer _loadMonitoringTimer;
+    private readonly Timer _cleanupTimer;
     private double _currentServerLoad = 0.0;
 
     public AdvancedRateLimitService(
@@ -41,6 +42,9 @@ public class AdvancedRateLimitService : IRateLimitService
 
         // Monitor server load every 30 seconds for adaptive limiting
         _loadMonitoringTimer = new Timer(MonitorServerLoad, null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+        
+        // Cleanup expired entries every 5 minutes to prevent memory leaks
+        _cleanupTimer = new Timer(CleanupExpiredEntries, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
     }
 
     public async Task<RateLimitResult> CheckRateLimitAsync(HttpContext context, RateLimitOptions options)
@@ -475,9 +479,55 @@ public class AdvancedRateLimitService : IRateLimitService
         }
     }
 
+    /// <summary>
+    /// Cleanup expired entries from DDoS detection and blocked IPs collections
+    /// Prevents memory leaks by removing old entries
+    /// </summary>
+    private void CleanupExpiredEntries(object? state)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var cutoffTime = now.AddHours(-1); // Remove entries older than 1 hour
+            
+            // Cleanup expired blocked IPs
+            var expiredBlockedIps = _blockedIps
+                .Where(kvp => kvp.Value < cutoffTime)
+                .Select(kvp => kvp.Key)
+                .ToList();
+                
+            foreach (var ip in expiredBlockedIps)
+            {
+                _blockedIps.TryRemove(ip, out _);
+            }
+            
+            // Cleanup expired DDoS windows (remove windows with no recent activity)
+            var expiredDdosWindows = _ddosWindows
+                .Where(kvp => kvp.Value.GetRequestCount(now) == 0)
+                .Select(kvp => kvp.Key)
+                .ToList();
+                
+            foreach (var key in expiredDdosWindows)
+            {
+                _ddosWindows.TryRemove(key, out _);
+            }
+            
+            if (expiredBlockedIps.Count > 0 || expiredDdosWindows.Count > 0)
+            {
+                _logger.LogDebug("Cleaned up {BlockedIps} blocked IPs and {DdosWindows} DDoS windows", 
+                    expiredBlockedIps.Count, expiredDdosWindows.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error during cleanup of expired entries");
+        }
+    }
+
     public void Dispose()
     {
         _loadMonitoringTimer?.Dispose();
+        _cleanupTimer?.Dispose();
         _cacheProvider?.Dispose();
     }
 }
