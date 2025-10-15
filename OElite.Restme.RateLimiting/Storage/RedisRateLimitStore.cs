@@ -1,39 +1,33 @@
 using Microsoft.Extensions.Logging;
+using OElite.Abstractions;
+using OElite.Providers;
 using OElite.Restme.RateLimiting.Interfaces;
 using OElite.Restme.RateLimiting.Models;
-using StackExchange.Redis;
-using System.Text.Json;
+using OElite.Restme.Utils;
 
 namespace OElite.Restme.RateLimiting.Storage;
 
 /// <summary>
-/// Redis implementation of rate limit storage for distributed scenarios
+/// Redis implementation of rate limit storage using OElite.Restme RedisCacheProvider
 /// </summary>
 public class RedisRateLimitStore : IRateLimitStore
 {
-    private readonly IDatabase _database;
+    private readonly ICacheProvider _cacheProvider;
     private readonly ILogger<RedisRateLimitStore> _logger;
-    private readonly JsonSerializerOptions _jsonOptions;
 
-    public RedisRateLimitStore(IConnectionMultiplexer connectionMultiplexer, ILogger<RedisRateLimitStore> logger)
+    public RedisRateLimitStore(string connectionString, ILogger<RedisRateLimitStore> logger)
     {
-        _database = connectionMultiplexer?.GetDatabase() ?? throw new ArgumentNullException(nameof(connectionMultiplexer));
+        var config = new RestConfig();
+        _cacheProvider = new RedisCacheProvider(connectionString, config);
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
     }
 
     public async Task<TokenBucket?> GetTokenBucketAsync(string key)
     {
         try
         {
-            var value = await _database.StringGetAsync(key);
-            if (!value.HasValue)
-                return null;
-
-            return JsonSerializer.Deserialize<TokenBucket>((string)value!, _jsonOptions);
+            var bucket = await _cacheProvider.GetAsync<TokenBucket>(key);
+            return bucket;
         }
         catch (Exception ex)
         {
@@ -46,8 +40,7 @@ public class RedisRateLimitStore : IRateLimitStore
     {
         try
         {
-            var json = JsonSerializer.Serialize(bucket, _jsonOptions);
-            await _database.StringSetAsync(bucket.Key, json, TimeSpan.FromMinutes(10));
+            await _cacheProvider.SetAsync(bucket.Key, bucket, TimeSpan.FromMinutes(10));
         }
         catch (Exception ex)
         {
@@ -60,11 +53,8 @@ public class RedisRateLimitStore : IRateLimitStore
     {
         try
         {
-            var value = await _database.StringGetAsync(key);
-            if (!value.HasValue)
-                return null;
-
-            return JsonSerializer.Deserialize<FixedWindow>((string)value!, _jsonOptions);
+            var window = await _cacheProvider.GetAsync<FixedWindow>(key);
+            return window;
         }
         catch (Exception ex)
         {
@@ -77,8 +67,7 @@ public class RedisRateLimitStore : IRateLimitStore
     {
         try
         {
-            var json = JsonSerializer.Serialize(window, _jsonOptions);
-            await _database.StringSetAsync(window.Key, json, TimeSpan.FromMinutes(10));
+            await _cacheProvider.SetAsync(window.Key, window, TimeSpan.FromMinutes(10));
         }
         catch (Exception ex)
         {
@@ -91,11 +80,8 @@ public class RedisRateLimitStore : IRateLimitStore
     {
         try
         {
-            var value = await _database.StringGetAsync(key);
-            if (!value.HasValue)
-                return null;
-
-            return JsonSerializer.Deserialize<SlidingWindow>((string)value!, _jsonOptions);
+            var window = await _cacheProvider.GetAsync<SlidingWindow>(key);
+            return window;
         }
         catch (Exception ex)
         {
@@ -108,8 +94,7 @@ public class RedisRateLimitStore : IRateLimitStore
     {
         try
         {
-            var json = JsonSerializer.Serialize(window, _jsonOptions);
-            await _database.StringSetAsync(key, json, TimeSpan.FromMinutes(10));
+            await _cacheProvider.SetAsync(key, window, TimeSpan.FromMinutes(10));
         }
         catch (Exception ex)
         {
@@ -122,11 +107,8 @@ public class RedisRateLimitStore : IRateLimitStore
     {
         try
         {
-            var value = await _database.StringGetAsync(key);
-            if (!value.HasValue)
-                return null;
-
-            return JsonSerializer.Deserialize<LeakyBucket>((string)value!, _jsonOptions);
+            var bucket = await _cacheProvider.GetAsync<LeakyBucket>(key);
+            return bucket;
         }
         catch (Exception ex)
         {
@@ -139,13 +121,17 @@ public class RedisRateLimitStore : IRateLimitStore
     {
         try
         {
-            var json = JsonSerializer.Serialize(bucket, _jsonOptions);
-            await _database.StringSetAsync(bucket.Key, json, TimeSpan.FromMinutes(10));
+            await _cacheProvider.SetAsync(bucket.Key, bucket, TimeSpan.FromMinutes(10));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting leaky bucket for key {Key}", bucket.Key);
             throw;
         }
+    }
+
+    public void Dispose()
+    {
+        _cacheProvider?.Dispose();
     }
 }

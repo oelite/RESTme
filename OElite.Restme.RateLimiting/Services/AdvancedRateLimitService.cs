@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Caching.Memory;
+using OElite.Abstractions;
+using OElite.Base;
 using OElite.Restme.RateLimiting.Interfaces;
 using OElite.Restme.RateLimiting.Models;
 using OElite.Restme.RateLimiting.Storage;
@@ -18,7 +19,7 @@ public class AdvancedRateLimitService : IRateLimitService
 {
     private readonly IRateLimitStore _store;
     private readonly ILogger<AdvancedRateLimitService> _logger;
-    private readonly IMemoryCache _memoryCache;
+    private readonly ICacheProvider _cacheProvider;
 
     // DDoS detection using sliding windows
     private readonly ConcurrentDictionary<string, SlidingWindow> _ddosWindows;
@@ -30,12 +31,11 @@ public class AdvancedRateLimitService : IRateLimitService
 
     public AdvancedRateLimitService(
         IRateLimitStore store,
-        ILogger<AdvancedRateLimitService> logger,
-        IMemoryCache memoryCache)
+        ILogger<AdvancedRateLimitService> logger)
     {
         _store = store;
         _logger = logger;
-        _memoryCache = memoryCache;
+        _cacheProvider = new MemoryCacheProvider();
         _ddosWindows = new ConcurrentDictionary<string, SlidingWindow>();
         _blockedIps = new ConcurrentDictionary<string, DateTime>();
 
@@ -478,5 +478,6 @@ public class AdvancedRateLimitService : IRateLimitService
     public void Dispose()
     {
         _loadMonitoringTimer?.Dispose();
+        _cacheProvider?.Dispose();
     }
 }

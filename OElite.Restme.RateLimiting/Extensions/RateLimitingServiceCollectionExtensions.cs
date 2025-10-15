@@ -1,11 +1,10 @@
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using OElite.Restme.RateLimiting.Interfaces;
 using OElite.Restme.RateLimiting.Models;
 using OElite.Restme.RateLimiting.Services;
 using OElite.Restme.RateLimiting.Storage;
-using StackExchange.Redis;
 
 namespace OElite.Restme.RateLimiting.Extensions;
 
@@ -33,9 +32,6 @@ public static class RateLimitingServiceCollectionExtensions
     /// <returns>The IServiceCollection so that additional calls can be chained</returns>
     public static IServiceCollection AddRateLimitingWithMemoryStorage(this IServiceCollection services, Action<RateLimitOptions>? configureOptions = null)
     {
-        // Add required services
-        services.AddMemoryCache();
-
         // Configure options
         if (configureOptions != null)
         {
@@ -48,6 +44,7 @@ public static class RateLimitingServiceCollectionExtensions
 
         // Register rate limiting services
         services.TryAddSingleton<IRateLimitStore, MemoryRateLimitStore>();
+        services.TryAddSingleton<IRateLimitService, AdvancedRateLimitService>();
         services.TryAddSingleton<IRateLimitKeyGenerator, DefaultRateLimitKeyGenerator>();
         services.TryAddSingleton<IRateLimitResponseBuilder, DefaultRateLimitResponseBuilder>();
 
@@ -63,10 +60,6 @@ public static class RateLimitingServiceCollectionExtensions
     /// <returns>The IServiceCollection so that additional calls can be chained</returns>
     public static IServiceCollection AddRateLimitingWithRedisStorage(this IServiceCollection services, string redisConnectionString, Action<RateLimitOptions>? configureOptions = null)
     {
-        // Add Redis connection
-        services.AddSingleton<IConnectionMultiplexer>(provider =>
-            ConnectionMultiplexer.Connect(redisConnectionString));
-
         // Configure options with Redis settings
         services.Configure<RateLimitOptions>(options =>
         {
@@ -75,31 +68,13 @@ public static class RateLimitingServiceCollectionExtensions
             configureOptions?.Invoke(options);
         });
 
-        // Register rate limiting services
-        services.TryAddSingleton<IRateLimitStore, RedisRateLimitStore>();
-        services.TryAddSingleton<IRateLimitKeyGenerator, DefaultRateLimitKeyGenerator>();
-        services.TryAddSingleton<IRateLimitResponseBuilder, DefaultRateLimitResponseBuilder>();
-
-        return services;
-    }
-
-    /// <summary>
-    /// Adds rate limiting services with Redis storage using an existing IConnectionMultiplexer
-    /// </summary>
-    /// <param name="services">The IServiceCollection to add services to</param>
-    /// <param name="configureOptions">The action used to configure the rate limiting options</param>
-    /// <returns>The IServiceCollection so that additional calls can be chained</returns>
-    public static IServiceCollection AddRateLimitingWithRedisStorage(this IServiceCollection services, Action<RateLimitOptions>? configureOptions = null)
-    {
-        // Configure options
-        services.Configure<RateLimitOptions>(options =>
+        // Register rate limiting services with Redis store factory
+        services.TryAddSingleton<IRateLimitStore>(provider =>
         {
-            options.StorageType = RateLimitStorageType.Redis;
-            configureOptions?.Invoke(options);
+            var logger = provider.GetRequiredService<ILogger<RedisRateLimitStore>>();
+            return new RedisRateLimitStore(redisConnectionString, logger);
         });
-
-        // Register rate limiting services (assumes IConnectionMultiplexer is already registered)
-        services.TryAddSingleton<IRateLimitStore, RedisRateLimitStore>();
+        services.TryAddSingleton<IRateLimitService, AdvancedRateLimitService>();
         services.TryAddSingleton<IRateLimitKeyGenerator, DefaultRateLimitKeyGenerator>();
         services.TryAddSingleton<IRateLimitResponseBuilder, DefaultRateLimitResponseBuilder>();
 
@@ -131,6 +106,7 @@ public static class RateLimitingServiceCollectionExtensions
 
         // Register custom implementations
         services.TryAddSingleton<IRateLimitStore, TStore>();
+        services.TryAddSingleton<IRateLimitService, AdvancedRateLimitService>();
         services.TryAddSingleton<IRateLimitKeyGenerator, TKeyGenerator>();
         services.TryAddSingleton<IRateLimitResponseBuilder, TResponseBuilder>();
 
