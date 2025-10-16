@@ -10,18 +10,30 @@ public interface IRateLimitStore
     // Token Bucket methods
     Task<TokenBucket?> GetTokenBucketAsync(string key);
     Task SetTokenBucketAsync(TokenBucket bucket);
-    
+
     // Fixed Window methods
     Task<FixedWindow?> GetFixedWindowAsync(string key);
     Task SetFixedWindowAsync(FixedWindow window);
-    
+
     // Sliding Window methods
     Task<SlidingWindow?> GetSlidingWindowAsync(string key);
     Task SetSlidingWindowAsync(string key, SlidingWindow window);
-    
+
     // Leaky Bucket methods
     Task<LeakyBucket?> GetLeakyBucketAsync(string key);
     Task SetLeakyBucketAsync(LeakyBucket bucket);
+}
+
+/// <summary>
+/// Extended interface for high-performance atomic operations
+/// </summary>
+public interface IAtomicRateLimitStore : IRateLimitStore
+{
+    // Atomic operations for Redis - single round-trip with Lua scripts
+    Task<(bool allowed, double tokens, double used)> CheckAndUpdateTokenBucketAsync(string key, int capacity, double refillRate, int windowSeconds);
+    Task<(bool allowed, long count, long remaining)> CheckAndUpdateFixedWindowAsync(string key, int limit, int windowSeconds);
+    Task<(bool allowed, long count, long remaining)> CheckAndUpdateSlidingWindowAsync(string key, int limit, int windowSeconds);
+    Task<(bool allowed, double level, double remaining)> CheckAndUpdateLeakyBucketAsync(string key, int capacity, double leakRate, int windowSeconds);
 }
 
 /// <summary>

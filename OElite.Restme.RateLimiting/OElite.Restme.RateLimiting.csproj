@@ -8,11 +8,11 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OElite.Restme.RateLimiting</PackageId>
     <PackageVersion>2.0.9</PackageVersion>
-    <Authors>OElite Development Team</Authors>
-    <Company>Phanes</Company>
+    <Authors>OElite Limited</Authors>
+    <Copyright>OElite Limited</Copyright>
     <Description>Production-grade rate limiting middleware for ASP.NET Core applications with support for distributed scenarios, memory and Redis storage, and flexible configuration.</Description>
     <PackageTags>aspnetcore;middleware;ratelimiting;redis;distributed;security</PackageTags>
-    <RepositoryUrl>https://github.com/PhanesDigital/oelite</RepositoryUrl>
+    <RepositoryUrl>https://github.com/oelite/restme</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
