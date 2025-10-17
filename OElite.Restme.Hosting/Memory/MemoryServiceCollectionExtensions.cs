@@ -93,7 +93,7 @@ namespace OElite.Restme.Hosting.Memory
             var options = new MemoryOptions();
             setupAction(options);
 
-            return AddOEliteMemoryCache(services, options.InstanceName);
+            return AddRestmeMemoryCache(services, options.InstanceName);
         }
     }
 

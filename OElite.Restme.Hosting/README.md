@@ -69,13 +69,13 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Option 1: IMemoryCache only
-        builder.Services.AddOEliteMemoryCache("myapp:");
+        builder.Services.AddRestmeMemoryCache("myapp:");
 
         // Option 2: Both IMemoryCache and IDistributedCache (in-memory)
-        builder.Services.AddOEliteMemoryCacheWithDistributed("myapp:");
+        builder.Services.AddRestmeMemoryCacheWithDistributed("myapp:");
 
         // Option 3: Configuration-based setup
-        builder.Services.AddOEliteMemoryCache(options =>
+        builder.Services.AddRestmeMemoryCache(options =>
         {
             options.InstanceName = "myapp:";
         });
@@ -241,33 +241,36 @@ var redisConnectionString = configuration.GetValue<string>("oelite:data:redis:ob
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  ASP.NET Core Application                                    │
-│  - Uses IDistributedCache (framework abstraction)           │
-└──────────────┬──────────────────────────────────────────────┘
-               │
-               ▼
+│  - Uses IDistributedCache/IMemoryCache (framework abstractions) │
+└─────────────┬───────────────────────────────────────────────┘
+              │
+              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  OElite.Restme.Hosting (This Package)                    │
 │  - RedisDistributedCache (IDistributedCache adapter)        │
+│  - RestmeMemoryCache (IMemoryCache adapter)                 │
+│  - MemoryDistributedCache (in-memory IDistributedCache)     │
 │  - ServiceCollectionExtensions (DI registration)            │
-└──────────────┬──────────────────────────────────────────────┘
-               │
-               ▼
+└─────────────┬───────────────────────────────────────────────┘
+              │
+              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  OElite.Restme.Redis                                         │
+│  OElite.Restme.Redis / OElite.Restme (Memory)               │
 │  - RedisCacheProvider (ICacheProvider implementation)       │
-└──────────────┬──────────────────────────────────────────────┘
-               │
-               ▼
+│  - MemoryCacheProvider (ICacheProvider implementation)      │
+└─────────────┬───────────────────────────────────────────────┘
+              │
+              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  OElite.Restme (Core)                                        │
 │  - ICacheProvider (abstraction)                              │
 │  - RestConfig (configuration)                                │
-└──────────────┬──────────────────────────────────────────────┘
-               │
-               ▼
+└─────────────┬───────────────────────────────────────────────┘
+              │
+              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  StackExchange.Redis                                         │
-│  - Low-level Redis client                                    │
+│  StackExchange.Redis / In-Memory                             │
+│  - Low-level Redis client / .NET Dictionary                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -296,6 +299,28 @@ services.AddOEliteRedisCache(options =>
 ```
 
 **No other code changes required!** `IDistributedCache` works exactly the same.
+
+## Migration from Microsoft.Extensions.Caching.Memory
+
+### Before (Microsoft):
+
+```csharp
+services.AddMemoryCache();
+```
+
+### After (OElite):
+
+```csharp
+using OElite.Restme.Hosting.Memory;
+
+// Option 1: IMemoryCache only
+services.AddRestmeMemoryCache("myapp:");
+
+// Option 2: Both IMemoryCache and IDistributedCache
+services.AddRestmeMemoryCacheWithDistributed("myapp:");
+```
+
+**No other code changes required!** `IMemoryCache` works exactly the same.
 
 ## Future Extensions
 
