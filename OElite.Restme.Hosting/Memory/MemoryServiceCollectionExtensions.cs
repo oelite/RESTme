@@ -21,7 +21,7 @@ namespace OElite.Restme.Hosting.Memory
         /// <param name="services">Service collection</param>
         /// <param name="instanceName">Optional instance prefix for cache keys (e.g., "oelite:")</param>
         /// <returns>Service collection for chaining</returns>
-        public static IServiceCollection AddOEliteMemoryCache(
+        public static IServiceCollection AddRestmeMemoryCache(
             this IServiceCollection services,
             string? instanceName = null)
         {
@@ -48,7 +48,7 @@ namespace OElite.Restme.Hosting.Memory
         /// <param name="services">Service collection</param>
         /// <param name="instanceName">Optional instance prefix for cache keys (e.g., "oelite:")</param>
         /// <returns>Service collection for chaining</returns>
-        public static IServiceCollection AddOEliteMemoryCacheWithDistributed(
+        public static IServiceCollection AddRestmeMemoryCacheWithDistributed(
             this IServiceCollection services,
             string? instanceName = null)
         {
@@ -81,7 +81,7 @@ namespace OElite.Restme.Hosting.Memory
         /// <param name="services">Service collection</param>
         /// <param name="setupAction">Configuration action for memory cache options</param>
         /// <returns>Service collection for chaining</returns>
-        public static IServiceCollection AddOEliteMemoryCache(
+        public static IServiceCollection AddRestmeMemoryCache(
             this IServiceCollection services,
             Action<MemoryOptions> setupAction)
         {
