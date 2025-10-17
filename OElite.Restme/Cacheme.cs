@@ -18,8 +18,8 @@ public static class RestmeCacheExtensions
 
     public static async Task<bool> ExpiremeAsync(this Rest rest, string? uid, bool invalidateGracePeriod = true, CancellationToken cancellationToken = default)
     {
-        if (rest.CurrentMode != RestMode.RedisAsCache)
-            throw new OEliteException("Cacheme currently only support Redis mode");
+        if (rest.CurrentMode != RestMode.RedisAsCache && rest.CurrentMode != RestMode.MemoryAsCache)
+            throw new OEliteException("Cacheme currently only support Redis and Memory cache modes");
 
         if (rest.CacheProvider == null)
             throw new OEliteException("Cache provider not initialized");
@@ -50,8 +50,8 @@ public static class RestmeCacheExtensions
         int expiryInSeconds = -1,
         int graceInSeconds = -1, CancellationToken cancellationToken = default)
     {
-        if (rest?.CurrentMode != RestMode.RedisAsCache)
-            throw new OEliteException("Cacheme currently only support Redis mode");
+        if (rest?.CurrentMode != RestMode.RedisAsCache && rest?.CurrentMode != RestMode.MemoryAsCache)
+            throw new OEliteException("Cacheme currently only support Redis and Memory cache modes");
 
         if (rest.CacheProvider == null)
             throw new OEliteException("Cache provider not initialized");
@@ -102,8 +102,8 @@ public static class RestmeCacheExtensions
         Func<T, Task<bool>>? additionalValidation = null,
         Func<Task<T>>? refreshAction = null, CancellationToken cancellationToken = default) where T : class?
     {
-        if (rest?.CurrentMode != RestMode.RedisAsCache)
-            throw new OEliteException("Cacheme currently only support Redis mode");
+        if (rest?.CurrentMode != RestMode.RedisAsCache && rest?.CurrentMode != RestMode.MemoryAsCache)
+            throw new OEliteException("Cacheme currently only support Redis and Memory cache modes");
 
         if (rest.CacheProvider == null)
             throw new OEliteException("Cache provider not initialized");
