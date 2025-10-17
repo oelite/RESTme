@@ -1,10 +1,10 @@
-# OElite.Restme.AspNetCore
+# OElite.Restme.Hosting
 
-ASP.NET Core integration extensions for **OElite.Restme** - provides dependency injection, IDistributedCache adapters, and middleware for seamless integration with ASP.NET Core applications.
+ASP.NET Core integration extensions for **OElite.Restme** - provides dependency injection, IDistributedCache adapters, and middleware for seamless integration with Hosting/ASP.NET Core applications.
 
 ## Purpose
 
-This package decouples ASP.NET Core-specific extensions from the core Restme packages, keeping the core libraries framework-agnostic while providing first-class ASP.NET Core support.
+This package decouples Hosting/ASP.NET Core-specific extensions from the core Restme packages, keeping the core libraries framework-agnostic while providing first-class Hositng/ASP.NET Core support.
 
 ## Features
 
@@ -16,7 +16,7 @@ This package decouples ASP.NET Core-specific extensions from the core Restme pac
 ## Installation
 
 ```bash
-dotnet add package OElite.Restme.AspNetCore
+dotnet add package OElite.Restme.Hosting
 ```
 
 ## Usage
@@ -26,7 +26,7 @@ dotnet add package OElite.Restme.AspNetCore
 Replace `Microsoft.Extensions.Caching.StackExchangeRedis` with OElite's Redis provider:
 
 ```csharp
-using OElite.Restme.AspNetCore.Redis;
+using OElite.Restme.Hosting.Redis;
 
 public class Program
 {
@@ -150,7 +150,7 @@ var redisConnectionString = configuration.GetValue<string>("oelite:data:redis:ob
 
 ## Benefits Over Microsoft Packages
 
-| Feature | Microsoft.Extensions.Caching.StackExchangeRedis | OElite.Restme.AspNetCore |
+| Feature | Microsoft.Extensions.Caching.StackExchangeRedis | OElite.Restme.Hosting |
 |---------|------------------------------------------------|--------------------------|
 | **Abstraction Layer** | Direct StackExchange.Redis dependency | OElite.Restme abstraction |
 | **Provider Swapping** | Requires code changes | Config-based provider switching |
@@ -168,7 +168,7 @@ var redisConnectionString = configuration.GetValue<string>("oelite:data:redis:ob
                │
                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  OElite.Restme.AspNetCore (This Package)                    │
+│  OElite.Restme.Hosting (This Package)                    │
 │  - RedisDistributedCache (IDistributedCache adapter)        │
 │  - ServiceCollectionExtensions (DI registration)            │
 └──────────────┬──────────────────────────────────────────────┘
@@ -208,7 +208,7 @@ services.AddStackExchangeRedisCache(options =>
 ### After (OElite):
 
 ```csharp
-using OElite.Restme.AspNetCore.Redis;
+using OElite.Restme.Hosting.Redis;
 
 services.AddOEliteRedisCache(options =>
 {

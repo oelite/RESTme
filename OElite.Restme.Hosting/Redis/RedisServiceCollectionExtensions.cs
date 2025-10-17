@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using OElite.Abstractions;
 using OElite.Providers;
 
-namespace OElite.Restme.AspNetCore.Redis
+namespace OElite.Restme.Hosting.Redis
 {
     /// <summary>
     /// ASP.NET Core DI extension methods for OElite.Restme.Redis

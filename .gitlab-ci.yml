@@ -10,7 +10,7 @@ variables:
     OElite.Restme.Utils
     OElite.Restme.MongoDb
     OElite.Restme.RateLimiting
-    OElite.Restme.AspNetCore
+    OElite.Restme.Hosting
 
 stages:
   - version

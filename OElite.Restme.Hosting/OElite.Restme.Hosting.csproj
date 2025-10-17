@@ -4,18 +4,17 @@
         <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
         <AssemblyVersion>2.0.9</AssemblyVersion>
         <VersionPrefix>2.0.9</VersionPrefix>
-        <AssemblyName>OElite.Restme.AspNetCore</AssemblyName>
         <PackageTags>OElite;Restme;AspNetCore;DependencyInjection;Cache;Redis</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
         <Authors>OElite Limited</Authors>
         <Copyright>OElite Limited</Copyright>
         <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
-        <Title>OElite.Restme.AspNetCore</Title>
+        <Title>OElite.Restme.Hosting</Title>
         <Nullable>enable</Nullable>
+        <PackageId>OElite.Restme.Hosting</PackageId>
     </PropertyGroup>
 
     <ItemGroup>
-        <FrameworkReference Include="Microsoft.AspNetCore.App" />
         <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
     </ItemGroup>

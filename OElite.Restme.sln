@@ -29,7 +29,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.MongoDb", "OE
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.RateLimiting", "OElite.Restme.RateLimiting\OElite.Restme.RateLimiting.csproj", "{234AEB69-50CF-4D93-AEFD-D3C62FB09674}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.AspNetCore", "OElite.Restme.AspNetCore\OElite.Restme.AspNetCore.csproj", "{0312F186-0FAD-4772-8D0C-9BA705694810}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.Hosting", "OElite.Restme.Hosting\OElite.Restme.Hosting.csproj", "{0312F186-0FAD-4772-8D0C-9BA705694810}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
 using OElite.Abstractions;
 
-namespace OElite.Restme.AspNetCore.Redis
+namespace OElite.Restme.Hosting.Redis
 {
     /// <summary>
     /// IDistributedCache implementation using OElite.Restme.Redis
