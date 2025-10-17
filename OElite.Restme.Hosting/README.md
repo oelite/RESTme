@@ -37,13 +37,13 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Option 1: Simple configuration
-        builder.Services.AddOEliteRedisCache(
+        builder.Services.AddRestmeRedisCache(
             connectionString: "localhost:6379",
             instanceName: "myapp:"
         );
 
         // Option 2: Configuration-based setup
-        builder.Services.AddOEliteRedisCache(options =>
+        builder.Services.AddRestmeRedisCache(options =>
         {
             options.ConnectionString = builder.Configuration["oelite:data:redis:platform"];
             options.InstanceName = "myapp:";
@@ -291,7 +291,7 @@ services.AddStackExchangeRedisCache(options =>
 ```csharp
 using OElite.Restme.Hosting.Redis;
 
-services.AddOEliteRedisCache(options =>
+services.AddRestmeRedisCache(options =>
 {
     options.ConnectionString = "localhost:6379";
     options.InstanceName = "myapp:";

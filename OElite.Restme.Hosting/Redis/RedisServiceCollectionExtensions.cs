@@ -21,7 +21,7 @@ namespace OElite.Restme.Hosting.Redis
         /// <param name="connectionString">Redis connection string (e.g., "localhost:6379")</param>
         /// <param name="instanceName">Optional instance prefix for cache keys (e.g., "kortex:")</param>
         /// <returns>Service collection for chaining</returns>
-        public static IServiceCollection AddOEliteRedisCache(
+        public static IServiceCollection AddRestmeRedisCache(
             this IServiceCollection services,
             string connectionString,
             string? instanceName = null)
@@ -55,7 +55,7 @@ namespace OElite.Restme.Hosting.Redis
         /// <param name="services">Service collection</param>
         /// <param name="setupAction">Configuration action for Redis options</param>
         /// <returns>Service collection for chaining</returns>
-        public static IServiceCollection AddOEliteRedisCache(
+        public static IServiceCollection AddRestmeRedisCache(
             this IServiceCollection services,
             Action<RedisOptions> setupAction)
         {
@@ -70,7 +70,7 @@ namespace OElite.Restme.Hosting.Redis
             if (string.IsNullOrEmpty(options.ConnectionString))
                 throw new InvalidOperationException("Redis connection string must be configured");
 
-            return AddOEliteRedisCache(services, options.ConnectionString, options.InstanceName);
+            return AddRestmeRedisCache(services, options.ConnectionString, options.InstanceName);
         }
     }
 
