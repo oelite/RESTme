@@ -9,6 +9,8 @@ This package decouples Hosting/ASP.NET Core-specific extensions from the core Re
 ## Features
 
 - ✅ **IDistributedCache adapter** for OElite.Restme.Redis
+- ✅ **IMemoryCache adapter** for OElite.Restme memory provider
+- ✅ **Memory distributed cache** for in-memory IDistributedCache implementations
 - ✅ **Dependency injection extensions** for all Restme providers
 - ✅ **Clean separation** between core abstractions and framework integrations
 - ✅ **Multi-framework support** (net8.0, net9.0, net10.0)
@@ -53,6 +55,37 @@ public class Program
 }
 ```
 
+### Memory Cache
+
+Replace `Microsoft.Extensions.Caching.Memory` with OElite's memory provider:
+
+```csharp
+using OElite.Restme.Hosting.Memory;
+
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
+
+        // Option 1: IMemoryCache only
+        builder.Services.AddOEliteMemoryCache("myapp:");
+
+        // Option 2: Both IMemoryCache and IDistributedCache (in-memory)
+        builder.Services.AddOEliteMemoryCacheWithDistributed("myapp:");
+
+        // Option 3: Configuration-based setup
+        builder.Services.AddOEliteMemoryCache(options =>
+        {
+            options.InstanceName = "myapp:";
+        });
+
+        var app = builder.Build();
+        app.Run();
+    }
+}
+```
+
 ### Using IDistributedCache
 
 Once registered, `IDistributedCache` is available for dependency injection:
@@ -84,6 +117,41 @@ public class MyService
         };
 
         await _cache.SetAsync(key, bytes, options);
+    }
+}
+```
+
+### Using IMemoryCache
+
+Once registered, `IMemoryCache` is available for dependency injection:
+
+```csharp
+public class MyService
+{
+    private readonly IMemoryCache _cache;
+
+    public MyService(IMemoryCache cache)
+    {
+        _cache = cache;
+    }
+
+    public string? GetCachedValue(string key)
+    {
+        if (_cache.TryGetValue(key, out var value))
+        {
+            return value?.ToString();
+        }
+        return null;
+    }
+
+    public void SetCachedValue(string key, string value, TimeSpan expiry)
+    {
+        var options = new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = expiry
+        };
+
+        _cache.Set(key, value, options);
     }
 }
 ```
@@ -150,12 +218,22 @@ var redisConnectionString = configuration.GetValue<string>("oelite:data:redis:ob
 
 ## Benefits Over Microsoft Packages
 
+### Redis Cache
 | Feature | Microsoft.Extensions.Caching.StackExchangeRedis | OElite.Restme.Hosting |
 |---------|------------------------------------------------|--------------------------|
 | **Abstraction Layer** | Direct StackExchange.Redis dependency | OElite.Restme abstraction |
 | **Provider Swapping** | Requires code changes | Config-based provider switching |
 | **JSON Serialization** | Manual | Automatic with `ICacheProvider` |
 | **Framework Coupling** | Tightly coupled | Decoupled (core packages are framework-agnostic) |
+| **OElite Ecosystem** | Not integrated | First-class OElite integration |
+
+### Memory Cache
+| Feature | Microsoft.Extensions.Caching.Memory | OElite.Restme.Hosting |
+|---------|-------------------------------------|--------------------------|
+| **Provider Interface** | IMemoryCache only | Both IMemoryCache + ICacheProvider |
+| **JSON Serialization** | Manual object conversion | Automatic with ICacheProvider |
+| **Distributed Option** | Separate registration required | Single registration for both |
+| **Instance Isolation** | Global instance | Instance-prefixed keys |
 | **OElite Ecosystem** | Not integrated | First-class OElite integration |
 
 ## Architecture
