@@ -24,6 +24,11 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
         _collection = collection;
     }
 
+    /// <summary>
+    /// Internal collection access for aggregation operations
+    /// </summary>
+    internal IMongoCollection<T> Collection => _collection;
+
     public IMongoQuery<T> Query(string filter)
     {
         var mongoFilter = ConvertStringFilterToMongoFilter(filter);
