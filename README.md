@@ -377,15 +377,17 @@ AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:90
 
 ### OElite.Restme.MongoDb
 
-Advanced MongoDB library with comprehensive query capabilities, aggregation pipelines, and denormalization system.
+Advanced MongoDB library with comprehensive query capabilities, high-performance updates, aggregation pipelines, and denormalization system.
 
 **Key Features:**
-- Type-safe MongoDB operations with full IntelliSense support
-- Advanced aggregation pipelines for complex queries
-- Automatic denormalization for efficient data relationships
-- Enhanced LINQ expression support with nested documents
-- Performance-optimized aggregation methods
-- MongoDB class mapping with conflict resolution
+- **High-Performance UpdateBuilder**: 2-3x faster updates with fluent API and BSON optimization
+- **Enhanced LINQ Extensions**: Complete LINQ support with advanced aggregation operations
+- **Type-safe MongoDB operations** with full IntelliSense support
+- **Advanced aggregation pipelines** for complex queries with expression-to-pipeline conversion
+- **Automatic denormalization** for efficient data relationships
+- **Enhanced LINQ expression support** with nested documents and extension methods
+- **Performance-optimized aggregation methods** using MongoDB's native capabilities
+- **MongoDB class mapping** with conflict resolution
 
 **Quick Example:**
 ```csharp
@@ -402,11 +404,12 @@ public class Product : BaseEntity
     public string CategoryName { get; set; } = string.Empty;
 }
 
-// Repository with LINQ support
+// Repository with enhanced LINQ support and high-performance updates
 public class ProductRepository : DataRepository
 {
     public MongoQuery<Product> ProductStock => new(_adapter.GetCollection<Product>());
 
+    // Enhanced LINQ queries with extension method support
     public async Task<List<Product>> GetExpensiveProductsAsync(decimal minPrice)
     {
         return await ProductStock
@@ -415,6 +418,40 @@ public class ProductRepository : DataRepository
             .OrderByDescending(p => p.Price)
             .Take(10)
             .ToListAsync();
+    }
+
+    // High-performance updates with fluent API
+    public async Task UpdateProductAsync(DbObjectId productId, string newName, decimal newPrice)
+    {
+        await ProductStock
+            .Where(p => p.Id == productId)
+            .UpdateAsync(u => u
+                .Set(p => p.Name, newName)
+                .Set(p => p.Price, newPrice)
+                .Inc(p => p.ViewCount, 1)
+                .CurrentDate(p => p.UpdatedAt));
+    }
+
+    // Advanced aggregation operations
+    public async Task<List<ProductSummary>> GetProductSummariesAsync()
+    {
+        return await ProductStock
+            .Where(p => p.Status == EntityStatus.Active)
+            .SelectAsync(p => new ProductSummary
+            {
+                Name = p.Name,
+                Price = p.Price,
+                CategoryName = p.Category.Name // Nested property support
+            });
+    }
+
+    // Performance-optimized collection fetching
+    public async Task<ProductCollection> GetActiveProductsAsync(int pageIndex, int pageSize)
+    {
+        return await ProductStock
+            .Where(p => p.Status == EntityStatus.Active)
+            .OrderBy(p => p.Name)
+            .FetchAsync<Product, ProductCollection>(pageIndex, pageSize, returnTotalCount: false);
     }
 }
 ```
@@ -614,7 +651,7 @@ public class ProductController : ControllerBase
 }
 ```
 
-### Scenario 2: Enterprise API with Rate Limiting and MongoDB
+### Scenario 2: Enterprise API with Rate Limiting and High-Performance MongoDB
 ```bash
 # Install packages
 dotnet add package OElite.Restme.MongoDb
@@ -633,19 +670,53 @@ builder.Services.AddRateLimiting(options =>
 
 builder.Services.AddRestmeRedisCache("localhost:6379", "api:");
 
-// Repository with MongoDB
+// Repository with enhanced MongoDB operations
 public class ProductRepository : DataRepository
 {
     public MongoQuery<Product> Products => new(_adapter.GetCollection<Product>());
 
-    public async Task<List<Product>> GetPopularProductsAsync()
+    // High-performance LINQ queries with aggregation
+    public async Task<ProductCollection> GetPopularProductsAsync(int pageIndex, int pageSize)
     {
         return await Products
             .Where(p => p.Status == EntityStatus.Active)
             .Where(p => p.Rating > 4.0)
             .OrderByDescending(p => p.SalesCount)
-            .Take(20)
-            .FetchAsync<Product, ProductCollection>();
+            .FetchAsync<Product, ProductCollection>(pageIndex, pageSize, returnTotalCount: true);
+    }
+
+    // Advanced aggregation operations
+    public async Task<List<CategorySummary>> GetCategoryStatisticsAsync()
+    {
+        return await Products
+            .Where(p => p.Status == EntityStatus.Active)
+            .SelectAsync(p => new CategorySummary
+            {
+                CategoryId = p.CategoryId,
+                CategoryName = p.Category.Name,
+                TotalProducts = 1,
+                AveragePrice = p.Price
+            });
+    }
+
+    // High-performance batch updates
+    public async Task UpdateProductPricesAsync(decimal categoryId, decimal priceMultiplier)
+    {
+        await Products
+            .Where(p => p.CategoryId == categoryId)
+            .UpdateAsync(u => u
+                .Mul(p => p.Price, priceMultiplier)
+                .Inc(p => p.UpdateCount, 1)
+                .CurrentDate(p => p.UpdatedAt));
+    }
+
+    // Server-side mathematical operations
+    public async Task<decimal> GetCategoryTotalValueAsync(DbObjectId categoryId)
+    {
+        return await Products
+            .Where(p => p.CategoryId == categoryId)
+            .Where(p => p.Status == EntityStatus.Active)
+            .SumAsync(p => p.Price);
     }
 }
 ```
