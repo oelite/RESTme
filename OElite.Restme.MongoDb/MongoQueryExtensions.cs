@@ -802,6 +802,9 @@ public static class MongoQueryExtensions
         return await query.UpdateAsync(u => u.Set(field, value));
     }
 
+    // Note: UpdateManyAsync and ReplaceOneAsync methods removed to avoid exposing MongoDB.Driver types
+    // These operations can be performed using the existing UpdateAsync and ReplaceAsync methods
+
     /// <summary>
     /// Convenience method for incrementing a numeric field with high performance
     /// </summary>
