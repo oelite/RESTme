@@ -325,4 +325,445 @@ var file = await rest.RetrievemeAsync<byte[]>("documents/file.pdf"); // Retrieve
 ```
 
 **Connection String Parameters:**
-- `
+- `AccessKeyId` - S3 access key ID
+- `SecretAccessKey` - S3 secret access key
+- `ServiceUrl` - S3 endpoint URL (for non-AWS providers)
+- `BucketName` - S3 bucket name
+- `Region` - AWS region (for AWS S3)
+- `ForcePathStyle` - Use path-style URLs (required for most non-AWS providers)
+- `UseHttp` - Use HTTP instead of HTTPS (for local development)
+- `RootPath` - Logical prefix for all operations
+
+**Examples:**
+```
+# AWS S3
+AccessKeyId=AKIAIOSFODNN7EXAMPLE;SecretAccessKey=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY;Region=us-west-2
+
+# Backblaze B2
+AccessKeyId=your_key_id;SecretAccessKey=your_secret;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true;RootPath=myapp/data
+
+# MinIO (Local)
+AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true;RootPath=dev/cache
+```
+
+## 📦 Complete Package Reference
+
+### Core Packages
+
+| Package | Description | Latest Version |
+|---------|-------------|----------------|
+| **OElite.Restme** | Core abstractions and HTTP client | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.svg)](https://www.nuget.org/packages/OElite.Restme/) |
+| **OElite.Restme.Utils** | Utility extensions and helpers | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.Utils.svg)](https://www.nuget.org/packages/OElite.Restme.Utils/) |
+
+### Backend Providers
+
+| Package | Description | Latest Version |
+|---------|-------------|----------------|
+| **OElite.Restme.Redis** | Redis cache and queue provider | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.Redis.svg)](https://www.nuget.org/packages/OElite.Restme.Redis/) |
+| **OElite.Restme.RabbitMQ** | RabbitMQ message queue provider | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.RabbitMQ.svg)](https://www.nuget.org/packages/OElite.Restme.RabbitMQ/) |
+| **OElite.Restme.Azure** | Azure Blob Storage provider | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.Azure.svg)](https://www.nuget.org/packages/OElite.Restme.Azure/) |
+| **OElite.Restme.S3** | S3-compatible storage provider | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.S3.svg)](https://www.nuget.org/packages/OElite.Restme.S3/) |
+| **OElite.Restme.MongoDb** | MongoDB operations and aggregation | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.MongoDb.svg)](https://www.nuget.org/packages/OElite.Restme.MongoDb/) |
+
+### Integration Packages
+
+| Package | Description | Latest Version |
+|---------|-------------|----------------|
+| **OElite.Restme.Hosting** | ASP.NET Core integration extensions | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.Hosting.svg)](https://www.nuget.org/packages/OElite.Restme.Hosting/) |
+| **OElite.Restme.RateLimiting** | Advanced rate limiting middleware | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.RateLimiting.svg)](https://www.nuget.org/packages/OElite.Restme.RateLimiting/) |
+| **OElite.Restme.GoogleUtils** | Google Cloud integrations | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.GoogleUtils.svg)](https://www.nuget.org/packages/OElite.Restme.GoogleUtils/) |
+
+## 🏗️ Package Details
+
+### OElite.Restme.MongoDb
+
+Advanced MongoDB library with comprehensive query capabilities, aggregation pipelines, and denormalization system.
+
+**Key Features:**
+- Type-safe MongoDB operations with full IntelliSense support
+- Advanced aggregation pipelines for complex queries
+- Automatic denormalization for efficient data relationships
+- Enhanced LINQ expression support with nested documents
+- Performance-optimized aggregation methods
+- MongoDB class mapping with conflict resolution
+
+**Quick Example:**
+```csharp
+// Entity with denormalized fields
+[DbCollection("products", DbNamingConvention.SnakeCase)]
+public class Product : BaseEntity
+{
+    [DbId] public DbObjectId Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public DbObjectId CategoryId { get; set; }
+
+    [DenormalizedField("categories", "name", "@CategoryId")]
+    public string CategoryName { get; set; } = string.Empty;
+}
+
+// Repository with LINQ support
+public class ProductRepository : DataRepository
+{
+    public MongoQuery<Product> ProductStock => new(_adapter.GetCollection<Product>());
+
+    public async Task<List<Product>> GetExpensiveProductsAsync(decimal minPrice)
+    {
+        return await ProductStock
+            .Where(p => p.Price > minPrice)
+            .Where(p => p.Name.IsNotNullOrEmpty()) // Extension method support
+            .OrderByDescending(p => p.Price)
+            .Take(10)
+            .ToListAsync();
+    }
+}
+```
+
+### OElite.Restme.Hosting
+
+ASP.NET Core integration extensions providing dependency injection, cache adapters, and middleware.
+
+**Key Features:**
+- IDistributedCache and IMemoryCache adapters
+- Dependency injection extensions for all providers
+- Clean separation between core and framework integrations
+- Multi-framework support (.NET 8+)
+- Redis and Memory cache implementations
+
+**Quick Example:**
+```csharp
+// Replace Microsoft.Extensions.Caching.StackExchangeRedis
+builder.Services.AddRestmeRedisCache(options =>
+{
+    options.ConnectionString = "localhost:6379";
+    options.InstanceName = "myapp:";
+});
+
+// Or use memory cache with both IMemoryCache and IDistributedCache
+builder.Services.AddRestmeMemoryCacheWithDistributed("myapp:");
+
+// Use in controllers exactly like Microsoft's caching
+public class ProductController : ControllerBase
+{
+    private readonly IDistributedCache _cache;
+
+    public ProductController(IDistributedCache cache) => _cache = cache;
+
+    public async Task<Product> GetAsync(int id)
+    {
+        var cached = await _cache.GetStringAsync($"product:{id}");
+        if (cached != null) return JsonSerializer.Deserialize<Product>(cached);
+
+        // Fetch and cache...
+    }
+}
+```
+
+### OElite.Restme.RateLimiting
+
+Enterprise-grade rate limiting middleware with advanced DDoS protection and adaptive limiting.
+
+**Key Features:**
+- Multiple algorithms: Fixed Window, Token Bucket, Sliding Window, Leaky Bucket
+- DDoS protection with progressive blocking
+- Emergency mode for severe attacks
+- Adaptive limiting based on server load
+- Distributed Redis storage for multi-instance deployments
+- RFC 6585 compliant with proper HTTP headers
+
+**Quick Example:**
+```csharp
+builder.Services.AddRateLimiting(options =>
+{
+    options.Limit = 1000;
+    options.WindowInSeconds = 60;
+    options.EnableDDoSProtection = true;
+    options.DDoSThreshold = 5000;
+    options.EmergencyMode.Enabled = true;
+    options.Algorithm = RateLimitAlgorithm.TokenBucket;
+    options.StorageType = RateLimitStorageType.Redis;
+});
+
+app.UseRateLimiting();
+```
+
+### OElite.Restme.Utils
+
+Utility extensions and helper methods for common operations.
+
+**Key Features:**
+- String extension methods (`IsNotNullOrEmpty()`, etc.)
+- Collection helpers and LINQ extensions
+- Validation utilities
+- Data transformation helpers
+
+### OElite.Restme.GoogleUtils
+
+Google Cloud Platform integrations and utilities.
+
+**Key Features:**
+- Google Cloud Storage integration
+- Google Authentication helpers
+- Firebase utilities
+- Google API client extensions
+
+## 🔧 Advanced Integration Patterns
+
+### ASP.NET Core Cache Extensions
+
+The Hosting package provides powerful cache extensions that work with both IDistributedCache and IMemoryCache:
+
+```csharp
+// Enhanced cache methods with Rest-style API
+public static class CacheExtensions
+{
+    // Find cached data with advanced features
+    public static async Task<T?> FindmeAsync<T>(this IDistributedCache cache,
+        string key,
+        bool returnExpired = false,
+        bool returnInGrace = true,
+        Func<T, Task<bool>>? additionalValidation = null,
+        Func<Task<T>>? refreshAction = null,
+        CancellationToken cancellationToken = default) where T : class;
+
+    // Cache data with expiry and grace period
+    public static async Task CachemeAsync<T>(this IDistributedCache cache,
+        string key,
+        T data,
+        int expiryInSeconds = -1,
+        int graceInSeconds = -1,
+        CancellationToken cancellationToken = default) where T : class;
+
+    // Expire cached data with grace period options
+    public static async Task<bool> ExpiremeAsync(this IDistributedCache cache,
+        string key,
+        bool invalidateGracePeriod = true,
+        CancellationToken cancellationToken = default);
+
+    // Query object-based caching with MD5 key generation
+    public static async Task<T?> FindmeAsync<T>(this IDistributedCache cache,
+        object queryObject,
+        bool returnExpired = false,
+        bool returnInGrace = true,
+        Func<T, Task<bool>>? additionalValidation = null,
+        Func<Task<T>>? refreshAction = null,
+        CancellationToken cancellationToken = default) where T : class;
+}
+```
+
+**Usage Example:**
+```csharp
+public class ProductService
+{
+    private readonly IDistributedCache _cache;
+
+    public ProductService(IDistributedCache cache) => _cache = cache;
+
+    public async Task<Product?> GetProductAsync(int productId)
+    {
+        // Try cache first with refresh callback
+        return await _cache.FindmeAsync<Product>(
+            key: $"product:{productId}",
+            refreshAction: async () => await FetchProductFromDatabase(productId)
+        );
+    }
+
+    public async Task<List<Product>> SearchProductsAsync(ProductSearchQuery query)
+    {
+        // Use query object for automatic MD5 key generation
+        return await _cache.FindmeAsync<List<Product>>(
+            queryObject: query,
+            refreshAction: async () => await ExecuteProductSearch(query)
+        );
+    }
+
+    public async Task InvalidateProductCacheAsync(int productId)
+    {
+        // Expire with grace period (allows stale data during refresh)
+        await _cache.ExpiremeAsync($"product:{productId}", invalidateGracePeriod: false);
+    }
+}
+```
+
+## 🚀 Getting Started Scenarios
+
+### Scenario 1: Simple Web API with Caching
+```bash
+# Install packages
+dotnet add package OElite.Restme.Hosting
+dotnet add package OElite.Restme.Redis
+```
+
+```csharp
+// Program.cs
+builder.Services.AddRestmeRedisCache("localhost:6379", "myapi:");
+
+// Controller
+public class ProductController : ControllerBase
+{
+    private readonly IDistributedCache _cache;
+
+    [HttpGet("{id}")]
+    public async Task<Product?> Get(int id)
+    {
+        return await _cache.FindmeAsync<Product>(
+            $"product:{id}",
+            refreshAction: () => _repository.GetByIdAsync(id)
+        );
+    }
+}
+```
+
+### Scenario 2: Enterprise API with Rate Limiting and MongoDB
+```bash
+# Install packages
+dotnet add package OElite.Restme.MongoDb
+dotnet add package OElite.Restme.RateLimiting
+dotnet add package OElite.Restme.Hosting
+```
+
+```csharp
+// Program.cs
+builder.Services.AddRateLimiting(options =>
+{
+    options.Limit = 1000;
+    options.EnableDDoSProtection = true;
+    options.StorageType = RateLimitStorageType.Redis;
+});
+
+builder.Services.AddRestmeRedisCache("localhost:6379", "api:");
+
+// Repository with MongoDB
+public class ProductRepository : DataRepository
+{
+    public MongoQuery<Product> Products => new(_adapter.GetCollection<Product>());
+
+    public async Task<List<Product>> GetPopularProductsAsync()
+    {
+        return await Products
+            .Where(p => p.Status == EntityStatus.Active)
+            .Where(p => p.Rating > 4.0)
+            .OrderByDescending(p => p.SalesCount)
+            .Take(20)
+            .FetchAsync<Product, ProductCollection>();
+    }
+}
+```
+
+### Scenario 3: Microservice with Multiple Storage Backends
+```bash
+# Install packages
+dotnet add package OElite.Restme
+dotnet add package OElite.Restme.S3
+dotnet add package OElite.Restme.RabbitMQ
+dotnet add package OElite.Restme.Redis
+```
+
+```csharp
+public class DocumentService
+{
+    private readonly Rest _storage;   // S3 for file storage
+    private readonly Rest _cache;     // Redis for caching
+    private readonly Rest _queue;     // RabbitMQ for events
+
+    public DocumentService()
+    {
+        _storage = new Rest("AccessKeyId=...;ServiceUrl=https://s3.amazonaws.com", RestMode.S3Client);
+        _cache = new Rest("localhost:6379", RestMode.RedisCacheClient);
+        _queue = new Rest("amqp://localhost", RestMode.RabbitMq);
+    }
+
+    public async Task<byte[]> GetDocumentAsync(string documentId)
+    {
+        // Try cache first
+        var cached = await _cache.FindmeAsync<byte[]>($"doc:{documentId}");
+        if (cached != null) return cached;
+
+        // Fetch from storage
+        var document = await _storage.RetrievemeAsync<byte[]>($"documents/{documentId}");
+
+        // Cache for future requests
+        await _cache.CachemeAsync($"doc:{documentId}", document, TimeSpan.FromHours(1));
+
+        return document;
+    }
+
+    public async Task SaveDocumentAsync(string documentId, byte[] data)
+    {
+        // Save to storage
+        await _storage.StoremAsync($"documents/{documentId}", data);
+
+        // Invalidate cache
+        await _cache.RemovemeAsync($"doc:{documentId}");
+
+        // Publish event
+        await _queue.QueuemeAsync("document.saved", new { DocumentId = documentId });
+    }
+}
+```
+
+## 🏆 Best Practices
+
+### 1. Package Selection
+- **Core only**: Use `OElite.Restme` for HTTP clients
+- **ASP.NET Core**: Add `OElite.Restme.Hosting` for DI integration
+- **Caching**: Use `OElite.Restme.Redis` or memory providers
+- **Database**: Add `OElite.Restme.MongoDb` for MongoDB operations
+- **Security**: Include `OElite.Restme.RateLimiting` for protection
+
+### 2. Configuration Management
+```csharp
+// Use configuration sections
+builder.Services.Configure<RedisOptions>(
+    builder.Configuration.GetSection("Redis")
+);
+
+// Environment-based configuration
+var redisConnection = builder.Configuration.GetConnectionString("Redis")
+    ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
+```
+
+### 3. Error Handling and Resilience
+```csharp
+// Graceful degradation for cache failures
+public async Task<Product?> GetProductAsync(int id)
+{
+    try
+    {
+        return await _cache.FindmeAsync<Product>($"product:{id}");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Cache error for product {ProductId}", id);
+        return await _repository.GetByIdAsync(id); // Fallback to database
+    }
+}
+```
+
+### 4. Performance Optimization
+```csharp
+// Use appropriate data structures
+public async Task<ProductCollection> GetProductsByCategoryAsync(int categoryId)
+{
+    return await Products
+        .Where(p => p.CategoryId == categoryId)
+        .Where(p => p.Status == EntityStatus.Active)
+        .OrderBy(p => p.Name)
+        .FetchAsync<Product, ProductCollection>(returnTotalCount: false); // Skip count for better performance
+}
+```
+
+## 🔗 Related Resources
+
+- **Documentation**: [OElite Platform Wiki](https://wiki.oelite.com)
+- **Examples**: [GitHub Examples Repository](https://github.com/oelite/examples)
+- **API Reference**: [API Documentation](https://docs.oelite.com/restme)
+- **Support**: [GitHub Issues](https://github.com/oelite/uranus/restme/issues)
+
+## 📄 License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) file for details.
+
+---
+
+**OElite.Restme** - *Unifying your data operations across HTTP, caching, storage, and messaging*

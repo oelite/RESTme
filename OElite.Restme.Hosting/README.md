@@ -322,6 +322,279 @@ services.AddRestmeMemoryCacheWithDistributed("myapp:");
 
 **No other code changes required!** `IMemoryCache` works exactly the same.
 
+## 🔧 Enhanced Cache Extension Methods
+
+The package provides powerful extension methods that work with both `IDistributedCache` and `IMemoryCache`, offering Rest-style API with advanced features:
+
+### DistributedCacheExtensions
+
+Enhanced methods for `IDistributedCache` with grace period support and query object caching:
+
+#### FindmeAsync Methods
+
+```csharp
+// Basic find with refresh action
+public static async Task<T?> FindmeAsync<T>(this IDistributedCache cache,
+    string key,
+    bool returnExpired = false,
+    bool returnInGrace = true,
+    Func<T, Task<bool>>? additionalValidation = null,
+    Func<Task<T>>? refreshAction = null,
+    CancellationToken cancellationToken = default) where T : class;
+
+// Query object-based find with MD5 key generation
+public static async Task<T?> FindmeAsync<T>(this IDistributedCache cache,
+    object queryObject,
+    bool returnExpired = false,
+    bool returnInGrace = true,
+    Func<T, Task<bool>>? additionalValidation = null,
+    Func<Task<T>>? refreshAction = null,
+    CancellationToken cancellationToken = default) where T : class;
+```
+
+#### CachemeAsync Methods
+
+```csharp
+// Basic cache with expiry and grace period
+public static async Task CachemeAsync<T>(this IDistributedCache cache,
+    string key,
+    T data,
+    int expiryInSeconds = -1,
+    int graceInSeconds = -1,
+    CancellationToken cancellationToken = default) where T : class;
+
+// Query object-based cache with MD5 key generation
+public static async Task CachemeAsync<T>(this IDistributedCache cache,
+    object queryObject,
+    T data,
+    int expiryInSeconds = -1,
+    int graceInSeconds = -1,
+    CancellationToken cancellationToken = default) where T : class;
+```
+
+#### ExpiremeAsync Methods
+
+```csharp
+// Basic expiry with grace period options
+public static async Task<bool> ExpiremeAsync(this IDistributedCache cache,
+    string key,
+    bool invalidateGracePeriod = true,
+    CancellationToken cancellationToken = default);
+
+// Query object-based expiry with MD5 key generation
+public static async Task<bool> ExpiremeAsync<T>(this IDistributedCache cache,
+    object queryObject,
+    bool invalidateGracePeriod = true,
+    CancellationToken cancellationToken = default);
+```
+
+### MemoryCacheExtensions
+
+Enhanced methods for `IMemoryCache` with similar functionality:
+
+#### FindmeAsync Methods
+
+```csharp
+// Basic find with refresh action
+public static async Task<T?> FindmeAsync<T>(this IMemoryCache cache,
+    string key,
+    bool returnExpired = false,
+    bool returnInGrace = true,
+    Func<T, Task<bool>>? additionalValidation = null,
+    Func<Task<T>>? refreshAction = null,
+    CancellationToken cancellationToken = default) where T : class;
+
+// Query object-based find with MD5 key generation
+public static async Task<T?> FindmeAsync<T>(this IMemoryCache cache,
+    object queryObject,
+    bool returnExpired = false,
+    bool returnInGrace = true,
+    Func<T, Task<bool>>? additionalValidation = null,
+    Func<Task<T>>? refreshAction = null,
+    CancellationToken cancellationToken = default) where T : class;
+```
+
+#### CachemeAsync Methods
+
+```csharp
+// Basic cache with expiry and grace period
+public static void CachemeAsync<T>(this IMemoryCache cache,
+    string key,
+    T data,
+    int expiryInSeconds = -1,
+    int graceInSeconds = -1) where T : class;
+
+// Query object-based cache with MD5 key generation
+public static void CachemeAsync<T>(this IMemoryCache cache,
+    object queryObject,
+    T data,
+    int expiryInSeconds = -1,
+    int graceInSeconds = -1) where T : class;
+```
+
+#### ExpiremeAsync Methods
+
+```csharp
+// Basic expiry with grace period options
+public static bool ExpiremeAsync(this IMemoryCache cache,
+    string key,
+    bool invalidateGracePeriod = true);
+
+// Query object-based expiry with MD5 key generation
+public static bool ExpiremeAsync<T>(this IMemoryCache cache,
+    object queryObject,
+    bool invalidateGracePeriod = true);
+```
+
+### 🎯 Advanced Usage Examples
+
+#### Basic Cache Operations
+
+```csharp
+public class ProductService
+{
+    private readonly IDistributedCache _cache;
+
+    public ProductService(IDistributedCache cache) => _cache = cache;
+
+    public async Task<Product?> GetProductAsync(int productId)
+    {
+        // Try cache first with automatic refresh
+        return await _cache.FindmeAsync<Product>(
+            key: $"product:{productId}",
+            refreshAction: async () => await FetchProductFromDatabase(productId)
+        );
+    }
+
+    public async Task CacheProductAsync(Product product)
+    {
+        // Cache with 1 hour expiry and 30 minute grace period
+        await _cache.CachemeAsync($"product:{product.Id}", product, 3600, 1800);
+    }
+
+    public async Task InvalidateProductAsync(int productId)
+    {
+        // Expire immediately
+        await _cache.ExpiremeAsync($"product:{productId}", invalidateGracePeriod: true);
+    }
+}
+```
+
+#### Query Object Caching
+
+```csharp
+public class ProductSearchService
+{
+    private readonly IDistributedCache _cache;
+
+    public ProductSearchService(IDistributedCache cache) => _cache = cache;
+
+    public async Task<List<Product>> SearchProductsAsync(ProductSearchQuery query)
+    {
+        // Use query object for automatic MD5 key generation
+        return await _cache.FindmeAsync<List<Product>>(
+            queryObject: query,
+            refreshAction: async () => await ExecuteProductSearch(query)
+        );
+    }
+
+    public async Task CacheSearchResultsAsync(ProductSearchQuery query, List<Product> results)
+    {
+        // Cache search results using query object
+        await _cache.CachemeAsync(query, results, expiryInSeconds: 1800); // 30 minutes
+    }
+
+    public async Task InvalidateSearchAsync<T>(ProductSearchQuery query)
+    {
+        // Invalidate specific search results
+        await _cache.ExpiremeAsync<T>(query, invalidateGracePeriod: true);
+    }
+}
+```
+
+#### Grace Period and Validation
+
+```csharp
+public class UserService
+{
+    private readonly IMemoryCache _cache;
+
+    public UserService(IMemoryCache cache) => _cache = cache;
+
+    public async Task<User?> GetUserAsync(int userId)
+    {
+        return await _cache.FindmeAsync<User>(
+            key: $"user:{userId}",
+            returnInGrace: true, // Allow stale data during refresh
+            additionalValidation: async (user) =>
+            {
+                // Custom validation logic
+                return user.IsActive && !user.IsDeleted;
+            },
+            refreshAction: async () => await FetchUserFromDatabase(userId)
+        );
+    }
+
+    public async Task ExpireUserWithGraceAsync(int userId)
+    {
+        // Expire but allow grace period for smooth refresh
+        _cache.ExpiremeAsync($"user:{userId}", invalidateGracePeriod: false);
+    }
+}
+```
+
+### 🔑 Key Features
+
+#### 1. Grace Period Support
+- **Expiry vs Grace**: Items can be expired but still served during grace period
+- **Background Refresh**: Automatic refresh triggers when items expire but are still in grace
+- **Smooth UX**: Users never experience cache misses during refresh
+
+#### 2. Query Object Caching
+- **Automatic MD5 Keys**: Complex query objects automatically generate consistent cache keys
+- **Type Safety**: Generic constraints ensure proper type handling
+- **Serialization**: JSON serialization of query objects for key generation
+
+#### 3. Validation and Refresh
+- **Custom Validation**: Optional validation functions for cached data
+- **Automatic Refresh**: Background refresh actions when cache misses or validation fails
+- **Fallback Strategy**: Graceful degradation when refresh actions fail
+
+#### 4. Rest-Style API Consistency
+- **Familiar Methods**: `FindmeAsync`, `CachemeAsync`, `ExpiremeAsync` match Rest patterns
+- **Consistent Parameters**: Same parameter patterns across all cache providers
+- **Type Safety**: Generic constraints ensure only Rest implementation types
+
+### 🚀 Performance Benefits
+
+- **Reduced Database Load**: Grace period reduces database hits during refresh
+- **Better User Experience**: Stale data served instantly while fresh data loads in background
+- **Efficient Key Management**: MD5 hashing ensures consistent, collision-resistant keys
+- **Memory Efficient**: Proper expiry handling prevents memory leaks
+
+### 🛡️ Error Handling
+
+The extension methods include comprehensive error handling:
+
+```csharp
+// Automatic fallback on cache failures
+public async Task<Product?> GetProductSafelyAsync(int productId)
+{
+    try
+    {
+        return await _cache.FindmeAsync<Product>(
+            $"product:{productId}",
+            refreshAction: () => _repository.GetByIdAsync(productId)
+        );
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Cache operation failed for product {ProductId}", productId);
+        return await _repository.GetByIdAsync(productId); // Direct fallback
+    }
+}
+```
+
 ## Future Extensions
 
 This package will be expanded to include:
