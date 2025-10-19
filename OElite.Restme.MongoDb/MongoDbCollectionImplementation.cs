@@ -34,7 +34,7 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task<List<Dictionary<string, object>>> FindAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
     {
-        var bsonFilter = new BsonDocument(filter);
+        var bsonFilter = ConvertDictionaryToBsonDocument(filter);
         var cursor = await _collection.FindAsync(bsonFilter, cancellationToken: cancellationToken);
         var results = await cursor.ToListAsync(cancellationToken);
         return results.Select(ConvertBsonToDict).ToList();
@@ -42,7 +42,7 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task<Dictionary<string, object>?> FindOneAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
     {
-        var bsonFilter = new BsonDocument(filter);
+        var bsonFilter = ConvertDictionaryToBsonDocument(filter);
         var result = await _collection.Find(bsonFilter).FirstOrDefaultAsync(cancellationToken);
         return result != null ? ConvertBsonToDict(result) : null;
     }
@@ -57,8 +57,8 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task<bool> ReplaceOneAsync(Dictionary<string, object> filter, Dictionary<string, object> replacement, CancellationToken cancellationToken = default)
     {
-        var bsonFilter = new BsonDocument(filter);
-        var bsonReplacement = new BsonDocument(replacement);
+        var bsonFilter = ConvertDictionaryToBsonDocument(filter);
+        var bsonReplacement = ConvertDictionaryToBsonDocument(replacement);
         var result = await _collection.ReplaceOneAsync(bsonFilter, bsonReplacement, cancellationToken: cancellationToken);
         return result.ModifiedCount > 0;
     }
@@ -73,8 +73,8 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task<long> UpdateManyAsync(Dictionary<string, object> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default)
     {
-        var bsonFilter = new BsonDocument(filter);
-        var bsonUpdate = new BsonDocument(update);
+        var bsonFilter = ConvertDictionaryToBsonDocument(filter);
+        var bsonUpdate = ConvertDictionaryToBsonDocument(update);
         var result = await _collection.UpdateManyAsync(bsonFilter, bsonUpdate, cancellationToken: cancellationToken);
         return result.ModifiedCount;
     }
@@ -88,7 +88,7 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task<long> DeleteManyAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
     {
-        var bsonFilter = new BsonDocument(filter);
+        var bsonFilter = ConvertDictionaryToBsonDocument(filter);
         var result = await _collection.DeleteManyAsync(bsonFilter, cancellationToken);
         return result.DeletedCount;
     }
@@ -101,7 +101,7 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task InsertOneAsync(Dictionary<string, object> document, CancellationToken cancellationToken = default)
     {
-        var bsonDocument = new BsonDocument(document);
+        var bsonDocument = ConvertDictionaryToBsonDocument(document);
         await _collection.InsertOneAsync(bsonDocument, cancellationToken: cancellationToken);
     }
 
@@ -113,7 +113,7 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task<long> CountDocumentsAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
     {
-        var bsonFilter = new BsonDocument(filter);
+        var bsonFilter = ConvertDictionaryToBsonDocument(filter);
         return await _collection.CountDocumentsAsync(bsonFilter, cancellationToken: cancellationToken);
     }
 
@@ -139,7 +139,7 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task<List<Dictionary<string, object>>> AggregateAsync(List<Dictionary<string, object>> pipeline, CancellationToken cancellationToken = default)
     {
-        var bsonPipeline = pipeline.Select(dict => new BsonDocument(dict)).ToArray();
+        var bsonPipeline = pipeline.Select(ConvertDictionaryToBsonDocument).ToArray();
         var cursor = await _collection.AggregateAsync<BsonDocument>(bsonPipeline, cancellationToken: cancellationToken);
         var results = await cursor.ToListAsync(cancellationToken);
         return results.Select(ConvertBsonToDict).ToList();
@@ -169,7 +169,7 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
     /// <summary>
     /// Converts .NET object to BsonValue
     /// </summary>
-    private static BsonValue ConvertToBsonValue(object? value)
+    internal static BsonValue ConvertToBsonValue(object? value)
     {
         return value switch
         {
@@ -181,11 +181,25 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
             decimal dec => new BsonDecimal128(dec),
             bool b => new BsonBoolean(b),
             DateTime dt => new BsonDateTime(dt),
+            DbObjectId objectId => new BsonObjectId(new ObjectId(objectId.ToString())),
             MongoDbDocument doc => ConvertToMongoDocument(doc),
-            Dictionary<string, object> dict => new BsonDocument(dict),
+            Dictionary<string, object> dict => ConvertDictionaryToBsonDocument(dict),
             IEnumerable<object> array => new BsonArray(array.Select(ConvertToBsonValue)),
             _ => BsonValue.Create(value)
         };
+    }
+
+    /// <summary>
+    /// Converts Dictionary to BsonDocument using proper type conversion
+    /// </summary>
+    internal static BsonDocument ConvertDictionaryToBsonDocument(Dictionary<string, object> dict)
+    {
+        var bsonDoc = new BsonDocument();
+        foreach (var kvp in dict)
+        {
+            bsonDoc[kvp.Key] = ConvertToBsonValue(kvp.Value);
+        }
+        return bsonDoc;
     }
 
     /// <summary>
@@ -266,14 +280,14 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
 
     public async Task<List<T>> FindAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
     {
-        var bsonFilter = new BsonDocument(filter);
+        var bsonFilter = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(filter);
         var cursor = await _collection.FindAsync(bsonFilter, cancellationToken: cancellationToken);
         return await cursor.ToListAsync(cancellationToken);
     }
 
     public async Task<T?> FindOneAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
     {
-        var bsonFilter = new BsonDocument(filter);
+        var bsonFilter = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(filter);
         return await _collection.Find(bsonFilter).FirstOrDefaultAsync(cancellationToken);
     }
 
