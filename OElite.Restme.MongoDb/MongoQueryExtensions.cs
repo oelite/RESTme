@@ -821,54 +821,8 @@ public static class MongoQueryExtensions
         return await query.UpdateAsync(u => u.Set(timestampField, DateTime.UtcNow));
     }
 
-    /// <summary>
-    /// MongoDB-free aggregation API that returns Dictionary results without exposing MongoDB types
-    /// </summary>
-    public static async Task<List<Dictionary<string, object>>> AggregateToDictionaryAsync<T>(this IMongoQuery<T> query, Dictionary<string, object>[] pipeline) where T : BaseEntity
-    {
-        var collection = ((MongoQuery<T>)query).Collection;
-        var bsonDocuments = pipeline.Select(dict => new MongoDB.Bson.BsonDocument(dict)).ToArray();
-        var cursor = await collection.AggregateAsync<MongoDB.Bson.BsonDocument>(bsonDocuments);
-        var bsonResults = await cursor.ToListAsync();
 
-        // Convert BsonDocument to Dictionary<string, object> to avoid exposing MongoDB types
-        return bsonResults.Select(ConvertBsonToDict).ToList();
-    }
 
-    /// <summary>
-    /// Converts BsonDocument to Dictionary without exposing MongoDB types (internal use only)
-    /// </summary>
-    private static Dictionary<string, object> ConvertBsonToDict(MongoDB.Bson.BsonDocument bsonDoc)
-    {
-        var dict = new Dictionary<string, object>();
-        foreach (var element in bsonDoc.Elements)
-        {
-            dict[element.Name] = ConvertBsonValue(element.Value);
-        }
-        return dict;
-    }
-
-    /// <summary>
-    /// Converts BsonValue to standard .NET object (internal use only)
-    /// </summary>
-    private static object ConvertBsonValue(MongoDB.Bson.BsonValue bsonValue)
-    {
-        return bsonValue.BsonType switch
-        {
-            MongoDB.Bson.BsonType.String => bsonValue.AsString,
-            MongoDB.Bson.BsonType.Int32 => bsonValue.AsInt32,
-            MongoDB.Bson.BsonType.Int64 => bsonValue.AsInt64,
-            MongoDB.Bson.BsonType.Double => bsonValue.AsDouble,
-            MongoDB.Bson.BsonType.Decimal128 => bsonValue.AsDecimal,
-            MongoDB.Bson.BsonType.Boolean => bsonValue.AsBoolean,
-            MongoDB.Bson.BsonType.DateTime => bsonValue.ToUniversalTime(),
-            MongoDB.Bson.BsonType.ObjectId => bsonValue.AsObjectId.ToString(),
-            MongoDB.Bson.BsonType.Array => bsonValue.AsBsonArray.Select(ConvertBsonValue).ToArray(),
-            MongoDB.Bson.BsonType.Document => ConvertBsonToDict(bsonValue.AsBsonDocument),
-            MongoDB.Bson.BsonType.Null => null!,
-            _ => bsonValue.ToString()
-        };
-    }
 
     /// <summary>
     /// Convenience method for batch field updates with optimal performance
