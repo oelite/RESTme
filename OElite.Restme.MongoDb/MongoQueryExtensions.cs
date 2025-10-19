@@ -824,7 +824,7 @@ public static class MongoQueryExtensions
     /// <summary>
     /// MongoDB-free aggregation API that returns Dictionary results without exposing MongoDB types
     /// </summary>
-    public static async Task<List<Dictionary<string, object>>> AggregateAsync<T>(this IMongoQuery<T> query, Dictionary<string, object>[] pipeline) where T : BaseEntity
+    public static async Task<List<Dictionary<string, object>>> AggregateToDictionaryAsync<T>(this IMongoQuery<T> query, Dictionary<string, object>[] pipeline) where T : BaseEntity
     {
         var collection = ((MongoQuery<T>)query).Collection;
         var bsonDocuments = pipeline.Select(dict => new MongoDB.Bson.BsonDocument(dict)).ToArray();
