@@ -64,6 +64,26 @@ public abstract class MongoDbCentre : IDisposable
     }
 
     /// <summary>
+    /// Get a MongoDB-free collection interface for document operations
+    /// This completely abstracts away MongoDB types and provides clean Dictionary/MongoDbDocument operations
+    /// </summary>
+    public IMongoDbCollection GetMongoDbCollection(string collectionName)
+    {
+        var bsonCollection = _adapter.Database.GetCollection<BsonDocument>(collectionName);
+        return new MongoDbCollectionImplementation(bsonCollection);
+    }
+
+    /// <summary>
+    /// Get a MongoDB-free typed collection interface for entity operations
+    /// This provides strongly-typed operations without exposing MongoDB types
+    /// </summary>
+    public IMongoDbCollection<T> GetMongoDbCollection<T>(string collectionName = null) where T : BaseEntity
+    {
+        var mongoCollection = _adapter.GetCollection<T>(collectionName);
+        return new MongoDbCollectionImplementation<T>(mongoCollection);
+    }
+
+    /// <summary>
     /// Get the MongoDB database instance
     /// </summary>
     public IMongoDatabase GetDatabase()

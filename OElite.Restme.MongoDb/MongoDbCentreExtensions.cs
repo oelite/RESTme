@@ -19,6 +19,73 @@ public static class MongoDbCentreExtensions
         var collection = database.GetCollection<MongoDB.Bson.BsonDocument>(collectionName);
         return new MongoCollectionQuery(collection);
     }
+
+    /// <summary>
+    /// Find one document using Dictionary-based filter (extension method for direct collection access)
+    /// </summary>
+    public static async Task<Dictionary<string, object>?> FindOneAsync(this IMongoCollection<MongoDB.Bson.BsonDocument> collection, Dictionary<string, object> filter, CancellationToken cancellationToken = default)
+    {
+        var query = new MongoCollectionQuery(collection);
+        return await query.FindOneAsync(filter, cancellationToken);
+    }
+
+    /// <summary>
+    /// Find many documents using Dictionary-based filter (extension method for direct collection access)
+    /// </summary>
+    public static async Task<List<Dictionary<string, object>>> FindManyAsync(this IMongoCollection<MongoDB.Bson.BsonDocument> collection, Dictionary<string, object> filter, CancellationToken cancellationToken = default)
+    {
+        var query = new MongoCollectionQuery(collection);
+        return await query.FindManyAsync(filter, cancellationToken);
+    }
+
+    /// <summary>
+    /// Aggregate using Dictionary-based pipeline (extension method for direct collection access)
+    /// </summary>
+    public static async Task<List<Dictionary<string, object>>> AggregateAsync(this IMongoCollection<MongoDB.Bson.BsonDocument> collection, List<Dictionary<string, object>> pipeline, CancellationToken cancellationToken = default)
+    {
+        var query = new MongoCollectionQuery(collection);
+        return await query.AggregateAsync(pipeline, cancellationToken);
+    }
+
+    /// <summary>
+    /// Find one entity using Dictionary-based filter (extension method for typed collections)
+    /// </summary>
+    public static async Task<TEntity?> FindOneAsync<TEntity>(this IMongoCollection<TEntity> collection, Dictionary<string, object> filter, CancellationToken cancellationToken = default) where TEntity : class
+    {
+        // Convert Dictionary filter to MongoDB filter
+        var bsonFilter = new MongoDB.Bson.BsonDocument(filter);
+        var result = await collection.Find(bsonFilter).FirstOrDefaultAsync(cancellationToken);
+        return result;
+    }
+
+    /// <summary>
+    /// Find many entities using Dictionary-based filter (extension method for typed collections)
+    /// </summary>
+    public static async Task<List<TEntity>> FindManyAsync<TEntity>(this IMongoCollection<TEntity> collection, Dictionary<string, object> filter, CancellationToken cancellationToken = default) where TEntity : class
+    {
+        // Convert Dictionary filter to MongoDB filter
+        var bsonFilter = new MongoDB.Bson.BsonDocument(filter);
+        var cursor = await collection.FindAsync(bsonFilter, cancellationToken: cancellationToken);
+        return await cursor.ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Find one entity using lambda expression filter (extension method for typed collections)
+    /// </summary>
+    public static async Task<TEntity?> FindOneAsync<TEntity>(this IMongoCollection<TEntity> collection, System.Linq.Expressions.Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default) where TEntity : class
+    {
+        var result = await collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
+        return result;
+    }
+
+    /// <summary>
+    /// Find many entities using lambda expression filter (extension method for typed collections)
+    /// </summary>
+    public static async Task<List<TEntity>> FindManyAsync<TEntity>(this IMongoCollection<TEntity> collection, System.Linq.Expressions.Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default) where TEntity : class
+    {
+        var cursor = await collection.FindAsync(filter, cancellationToken: cancellationToken);
+        return await cursor.ToListAsync(cancellationToken);
+    }
 }
 
 /// <summary>
@@ -36,6 +103,16 @@ public interface IMongoCollectionQuery
     /// Find first document using Dictionary-based filter
     /// </summary>
     Task<Dictionary<string, object>?> FindFirstAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Find one document using Dictionary-based filter (alias for FindFirstAsync)
+    /// </summary>
+    Task<Dictionary<string, object>?> FindOneAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Find many documents using Dictionary-based filter (alias for FindAsync)
+    /// </summary>
+    Task<List<Dictionary<string, object>>> FindManyAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Replace document using Dictionary-based filter and replacement
@@ -68,7 +145,12 @@ public interface IMongoCollectionQuery
     Task<bool> ExistsAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Aggregate using Dictionary-based pipeline
+    /// Aggregate using Dictionary-based pipeline (List overload)
+    /// </summary>
+    Task<List<Dictionary<string, object>>> AggregateAsync(List<Dictionary<string, object>> pipeline, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Aggregate using Dictionary-based pipeline (Array overload)
     /// </summary>
     Task<List<Dictionary<string, object>>> AggregateAsync(Dictionary<string, object>[] pipeline, CancellationToken cancellationToken = default);
 }
@@ -99,6 +181,16 @@ internal class MongoCollectionQuery : IMongoCollectionQuery
         var bsonFilter = new MongoDB.Bson.BsonDocument(filter);
         var result = await _collection.Find(bsonFilter).FirstOrDefaultAsync(cancellationToken);
         return result != null ? ConvertBsonToDict(result) : null;
+    }
+
+    public async Task<Dictionary<string, object>?> FindOneAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
+    {
+        return await FindFirstAsync(filter, cancellationToken);
+    }
+
+    public async Task<List<Dictionary<string, object>>> FindManyAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
+    {
+        return await FindAsync(filter, cancellationToken);
     }
 
     public async Task<bool> ReplaceOneAsync(Dictionary<string, object> filter, Dictionary<string, object> replacement, CancellationToken cancellationToken = default)
@@ -140,6 +232,14 @@ internal class MongoCollectionQuery : IMongoCollectionQuery
     {
         var count = await CountDocumentsAsync(filter, cancellationToken);
         return count > 0;
+    }
+
+    public async Task<List<Dictionary<string, object>>> AggregateAsync(List<Dictionary<string, object>> pipeline, CancellationToken cancellationToken = default)
+    {
+        var bsonPipeline = pipeline.Select(dict => new MongoDB.Bson.BsonDocument(dict)).ToArray();
+        var cursor = await _collection.AggregateAsync<MongoDB.Bson.BsonDocument>(bsonPipeline, cancellationToken: cancellationToken);
+        var results = await cursor.ToListAsync(cancellationToken);
+        return results.Select(ConvertBsonToDict).ToList();
     }
 
     public async Task<List<Dictionary<string, object>>> AggregateAsync(Dictionary<string, object>[] pipeline, CancellationToken cancellationToken = default)

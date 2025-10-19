@@ -391,6 +391,9 @@ Advanced MongoDB library with comprehensive query capabilities, high-performance
 - ⭐ **MongoDB-Free Application Layer**: Complete abstraction eliminates MongoDB dependencies from application code
 - **Zero Vendor Lock-in**: Application developers work with pure .NET types and collections
 - **Clean Architecture**: Perfect separation between business logic and database implementation
+- 🆕 **MongoDbDocument API**: Replace BsonDocument with pure .NET Dictionary-based operations
+- 🆕 **IMongoDbCollection Interface**: MongoDB-free collection operations with Dictionary and lambda support
+- 🆕 **Seamless Type Conversion**: Internal MongoDB type conversion while exposing clean .NET APIs
 
 **Quick Example:**
 ```csharp
@@ -492,6 +495,46 @@ public class ProductRepository : DataRepository
             Count: (int)doc["count"]
         )).ToList();
     }
+
+    // 🆕 MongoDB-Free Collection Operations: New API for zero-dependency database operations
+    public async Task<List<Product>> GetProductsWithMongoDbFreeAPI(string categoryName)
+    {
+        // Get MongoDB-free collection interface - no MongoDB types exposed
+        var productsCollection = DbCentre.GetMongoDbCollection<Product>();
+
+        // Use strongly-typed operations with lambda expressions
+        var activeProducts = await productsCollection.FindAsync(p => p.Status == EntityStatus.Active);
+
+        // Or use Dictionary-based filters for dynamic queries
+        var categoryFilter = new Dictionary<string, object>
+        {
+            ["categoryName"] = categoryName,
+            ["status"] = (int)EntityStatus.Active
+        };
+
+        var categoryProducts = await productsCollection.FindAsync(categoryFilter);
+
+        return categoryProducts;
+    }
+
+    // 🆕 MongoDbDocument API: Direct document operations without MongoDB dependencies
+    public async Task<List<MongoDbDocument>> GetProductDocuments(string searchTerm)
+    {
+        // Get raw MongoDB-free collection for document operations
+        var collection = DbCentre.GetMongoDbCollection("products");
+
+        // Create filter using MongoDbDocument (replaces BsonDocument)
+        var filter = new MongoDbDocument
+        {
+            ["name"] = new MongoDbDocument { ["$regex"] = searchTerm, ["$options"] = "i" },
+            ["status"] = 1
+        };
+
+        // Returns List<MongoDbDocument> - pure .NET types, no MongoDB dependencies
+        var results = await collection.FindAsync(filter);
+
+        return results;
+    }
 }
 ```
 
@@ -522,12 +565,15 @@ public async Task<List<BsonDocument>> GetReports()  // ❌ MongoDB types in retu
 }
 ```
 
-**After (OElite.Restme.MongoDb):**
+**After (OElite.Restme.MongoDb with MongoDB-Free API):**
 ```csharp
 // ✅ Zero MongoDB dependencies - clean application code
 
 public async Task<List<(string Category, int Count)>> GetReports()  // ✅ Pure .NET return types
 {
+    // Get MongoDB-free collection interface
+    var reportsCollection = DbCentre.GetMongoDbCollection("reports");
+
     var pipeline = new Dictionary<string, object>[]  // ✅ Standard .NET collections
     {
         new Dictionary<string, object> {
@@ -542,13 +588,49 @@ public async Task<List<(string Category, int Count)>> GetReports()  // ✅ Pure 
     };
 
     // ✅ Returns List<Dictionary<string, object>> - no MongoDB types
-    var results = await DbCentre.Reports.AggregateAsync<Dictionary<string, object>>(pipeline);
+    var results = await reportsCollection.AggregateAsync(pipeline);
 
     // ✅ Application code works with standard .NET types
     return results.Select(doc => (
         Category: (string)doc["_id"],
         Count: (int)doc["count"]
     )).ToList();
+}
+
+// 🆕 NEW: MongoDbDocument API (replaces BsonDocument)
+public async Task<List<MongoDbDocument>> GetActiveReportsAsync()
+{
+    var reportsCollection = DbCentre.GetMongoDbCollection("reports");
+
+    // Create filter using MongoDbDocument instead of BsonDocument
+    var filter = new MongoDbDocument
+    {
+        ["status"] = "active",
+        ["createdAt"] = new MongoDbDocument { ["$gte"] = DateTime.UtcNow.AddDays(-30) }
+    };
+
+    // ✅ Returns List<MongoDbDocument> - pure .NET types
+    return await reportsCollection.FindAsync(filter);
+}
+
+// 🆕 NEW: Strongly-typed MongoDB-free operations
+public async Task<List<Report>> GetReportsWithTypedAPI()
+{
+    var reportsCollection = DbCentre.GetMongoDbCollection<Report>();
+
+    // Lambda expressions - no MongoDB types needed
+    var reports = await reportsCollection.FindAsync(r => r.Status == "active");
+
+    // Dictionary filters for dynamic queries
+    var dynamicFilter = new Dictionary<string, object>
+    {
+        ["status"] = "active",
+        ["priority"] = new Dictionary<string, object> { ["$in"] = new[] { "high", "urgent" } }
+    };
+
+    var priorityReports = await reportsCollection.FindAsync(dynamicFilter);
+
+    return reports;
 }
 ```
 

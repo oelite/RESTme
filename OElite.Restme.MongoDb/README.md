@@ -37,6 +37,34 @@ Add the package reference to your project:
 
 ## Core Features
 
+### 🆕 MongoDB-Free Application Layer
+
+⭐ **Zero MongoDB Dependencies**: Complete abstraction eliminates MongoDB.Driver dependencies from application code
+- **MongoDbDocument API**: Replace BsonDocument with pure .NET Dictionary-based operations
+- **IMongoDbCollection Interface**: MongoDB-free collection operations with Dictionary and lambda support
+- **Seamless Type Conversion**: Internal MongoDB type conversion while exposing clean .NET APIs
+- **Zero Vendor Lock-in**: Application developers work with pure .NET types and collections
+- **Clean Architecture**: Perfect separation between business logic and database implementation
+
+```csharp
+// MongoDB-Free collection operations - no MongoDB.Driver dependencies
+var collection = DbCentre.GetMongoDbCollection("products");
+var typedCollection = DbCentre.GetMongoDbCollection<Product>();
+
+// Use MongoDbDocument instead of BsonDocument
+var filter = new MongoDbDocument
+{
+    ["status"] = "active",
+    ["price"] = new MongoDbDocument { ["$gte"] = 100 }
+};
+
+// Returns pure .NET types - List<MongoDbDocument>
+var results = await collection.FindAsync(filter);
+
+// Strongly-typed operations with lambda expressions
+var products = await typedCollection.FindAsync(p => p.Price > 100);
+```
+
 ### 1. Entity Configuration
 - Automatic collection mapping with naming conventions
 - Custom field mapping and serialization
