@@ -388,6 +388,9 @@ Advanced MongoDB library with comprehensive query capabilities, high-performance
 - **Enhanced LINQ expression support** with nested documents and extension methods
 - **Performance-optimized aggregation methods** using MongoDB's native capabilities
 - **MongoDB class mapping** with conflict resolution
+- ⭐ **MongoDB-Free Application Layer**: Complete abstraction eliminates MongoDB dependencies from application code
+- **Zero Vendor Lock-in**: Application developers work with pure .NET types and collections
+- **Clean Architecture**: Perfect separation between business logic and database implementation
 
 **Quick Example:**
 ```csharp
@@ -453,8 +456,108 @@ public class ProductRepository : DataRepository
             .OrderBy(p => p.Name)
             .FetchAsync<Product, ProductCollection>(pageIndex, pageSize, returnTotalCount: false);
     }
+
+    // ⭐ MongoDB-Free Aggregation: Zero MongoDB dependencies in application code
+    public async Task<List<(string Query, int Count)>> GetPopularSearchTermsAsync(DbObjectId merchantId)
+    {
+        // Complex aggregation pipeline using pure Dictionary<string, object>
+        var pipeline = new Dictionary<string, object>[]
+        {
+            new Dictionary<string, object> {
+                ["$match"] = new Dictionary<string, object> {
+                    ["ownerMerchantId"] = merchantId.ToString(),
+                    ["searchedOnUtc"] = new Dictionary<string, object> { ["$gte"] = DateTime.UtcNow.AddDays(-7) }
+                }
+            },
+            new Dictionary<string, object> {
+                ["$group"] = new Dictionary<string, object> {
+                    ["_id"] = "$normalizedQuery",
+                    ["count"] = new Dictionary<string, object> { ["$sum"] = 1 }
+                }
+            },
+            new Dictionary<string, object> {
+                ["$sort"] = new Dictionary<string, object> { ["count"] = -1 }
+            },
+            new Dictionary<string, object> {
+                ["$limit"] = 10
+            }
+        };
+
+        // Returns List<Dictionary<string, object>> - no MongoDB types exposed
+        var results = await DbCentre.SearchHistory.AggregateAsync<Dictionary<string, object>>(pipeline);
+
+        // Application code uses standard .NET types
+        return results.Select(doc => (
+            Query: (string)doc["_id"],
+            Count: (int)doc["count"]
+        )).ToList();
+    }
 }
 ```
+
+#### 🏗️ Clean Architecture: Zero MongoDB Dependencies
+
+OElite.Restme.MongoDb provides complete abstraction from MongoDB specifics, ensuring your application code remains vendor-neutral and testable.
+
+**Before (Traditional MongoDB.Driver usage):**
+```csharp
+using MongoDB.Driver;  // ❌ Direct MongoDB dependency
+using MongoDB.Bson;    // ❌ Exposes internal types
+
+public async Task<List<BsonDocument>> GetReports()  // ❌ MongoDB types in return signature
+{
+    var collection = _database.GetCollection<BsonDocument>("reports");
+    var pipeline = new BsonDocument[]  // ❌ MongoDB-specific pipeline format
+    {
+        new BsonDocument("$match", new BsonDocument("status", "active")),
+        new BsonDocument("$group", new BsonDocument
+        {
+            { "_id", "$category" },
+            { "count", new BsonDocument("$sum", 1) }
+        })
+    };
+
+    var cursor = await collection.AggregateAsync(pipeline);
+    return await cursor.ToListAsync();  // ❌ Returns MongoDB-specific types
+}
+```
+
+**After (OElite.Restme.MongoDb):**
+```csharp
+// ✅ Zero MongoDB dependencies - clean application code
+
+public async Task<List<(string Category, int Count)>> GetReports()  // ✅ Pure .NET return types
+{
+    var pipeline = new Dictionary<string, object>[]  // ✅ Standard .NET collections
+    {
+        new Dictionary<string, object> {
+            ["$match"] = new Dictionary<string, object> { ["status"] = "active" }
+        },
+        new Dictionary<string, object> {
+            ["$group"] = new Dictionary<string, object> {
+                ["_id"] = "$category",
+                ["count"] = new Dictionary<string, object> { ["$sum"] = 1 }
+            }
+        }
+    };
+
+    // ✅ Returns List<Dictionary<string, object>> - no MongoDB types
+    var results = await DbCentre.Reports.AggregateAsync<Dictionary<string, object>>(pipeline);
+
+    // ✅ Application code works with standard .NET types
+    return results.Select(doc => (
+        Category: (string)doc["_id"],
+        Count: (int)doc["count"]
+    )).ToList();
+}
+```
+
+**Architecture Benefits:**
+- 🎯 **Zero Vendor Lock-in**: Switch databases without changing application logic
+- 🧪 **Enhanced Testability**: Mock with standard .NET interfaces and collections
+- 📚 **Clean Domain Models**: Business logic free from infrastructure concerns
+- 🔄 **Future-Proof**: Database implementation changes don't affect application code
+- 👥 **Developer Experience**: Team members don't need MongoDB expertise for application development
 
 ### OElite.Restme.Hosting
 
