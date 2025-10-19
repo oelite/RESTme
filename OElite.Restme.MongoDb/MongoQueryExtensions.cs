@@ -727,6 +727,17 @@ public static class MongoQueryExtensions
     }
 
     /// <summary>
+    /// Updates entities matching the query filters using a fluent UpdateBuilder for high performance
+    /// </summary>
+    public static async Task<UpdateResult> UpdateAsync<T>(this IMongoQuery<T> query, Func<UpdateBuilder<T>, UpdateBuilder<T>> updateBuilder) where T : BaseEntity
+    {
+        var builder = new UpdateBuilder<T>();
+        var configuredBuilder = updateBuilder(builder);
+        var update = configuredBuilder.Build();
+        return await query.UpdateAsync(update);
+    }
+
+    /// <summary>
     /// Updates entities matching the query filters with the specified update definition
     /// </summary>
     public static async Task<UpdateResult> UpdateAsync<T>(this IMongoQuery<T> query, UpdateDefinition<T> update) where T : BaseEntity
@@ -781,6 +792,38 @@ public static class MongoQueryExtensions
     {
         var collection = GetCollectionFromQuery(query);
         return await collection.DeleteOneAsync(e => e.Id == id);
+    }
+
+    /// <summary>
+    /// Convenience method for setting a single field value with high performance
+    /// </summary>
+    public static async Task<UpdateResult> SetAsync<T, TField>(this IMongoQuery<T> query, Expression<Func<T, TField>> field, TField value) where T : BaseEntity
+    {
+        return await query.UpdateAsync(u => u.Set(field, value));
+    }
+
+    /// <summary>
+    /// Convenience method for incrementing a numeric field with high performance
+    /// </summary>
+    public static async Task<UpdateResult> IncrementAsync<T, TField>(this IMongoQuery<T> query, Expression<Func<T, TField>> field, TField value) where T : BaseEntity where TField : struct
+    {
+        return await query.UpdateAsync(u => u.Inc(field, value));
+    }
+
+    /// <summary>
+    /// Convenience method for updating timestamp fields
+    /// </summary>
+    public static async Task<UpdateResult> TouchAsync<T>(this IMongoQuery<T> query, Expression<Func<T, DateTime>> timestampField) where T : BaseEntity
+    {
+        return await query.UpdateAsync(u => u.Set(timestampField, DateTime.UtcNow));
+    }
+
+    /// <summary>
+    /// Convenience method for batch field updates with optimal performance
+    /// </summary>
+    public static async Task<UpdateResult> SetFieldsAsync<T>(this IMongoQuery<T> query, params (Expression<Func<T, object>> field, object value)[] updates) where T : BaseEntity
+    {
+        return await query.UpdateAsync(u => u.Set(updates));
     }
 
     #endregion
