@@ -161,5 +161,73 @@ namespace OElite.Restme.Hosting.Extensions
 
             cache.CachemeAsync(md5, data, expiryInSeconds, graceInSeconds);
         }
+
+        public static bool ExpiremeAsync(this IMemoryCache cache,
+            string key,
+            bool invalidateGracePeriod = true)
+        {
+            if (cache == null) throw new ArgumentNullException(nameof(cache));
+            if (string.IsNullOrEmpty(key)) throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
+            var found = cache.TryGetValue(key, out var cachedValue);
+            if (!found || cachedValue == null) return false;
+
+            try
+            {
+                ResponseMessage? responseMessage = null;
+
+                if (cachedValue is ResponseMessage rm)
+                {
+                    responseMessage = rm;
+                }
+                else if (cachedValue is string jsonString)
+                {
+                    responseMessage = JsonSerializer.Deserialize<ResponseMessage>(jsonString);
+                }
+                else
+                {
+                    return false;
+                }
+
+                if (responseMessage?.Data == null) return false;
+
+                if (invalidateGracePeriod)
+                {
+                    cache.Remove(key);
+                }
+                else
+                {
+                    responseMessage.ExpiryOnUtc = DateTime.UtcNow.AddMilliseconds(-1);
+                    if (invalidateGracePeriod)
+                    {
+                        responseMessage.GraceTillUtc = responseMessage.ExpiryOnUtc;
+                    }
+
+                    var options = new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = responseMessage.GraceTillUtc - DateTime.UtcNow
+                    };
+                    cache.Set(key, responseMessage, options);
+                }
+
+                return true;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+
+        public static bool ExpiremeAsync<T>(this IMemoryCache cache,
+            object queryObject,
+            bool invalidateGracePeriod = true)
+        {
+            if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
+
+            var json = JsonSerializer.Serialize(queryObject);
+            var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
+
+            return cache.ExpiremeAsync(md5, invalidateGracePeriod);
+        }
     }
 }

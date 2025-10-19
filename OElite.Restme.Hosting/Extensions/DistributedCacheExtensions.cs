@@ -136,5 +136,62 @@ namespace OElite.Restme.Hosting.Extensions
 
             await cache.CachemeAsync(md5, data, expiryInSeconds, graceInSeconds, cancellationToken);
         }
+
+        public static async Task<bool> ExpiremeAsync(this IDistributedCache cache,
+            string key,
+            bool invalidateGracePeriod = true,
+            CancellationToken cancellationToken = default)
+        {
+            if (cache == null) throw new ArgumentNullException(nameof(cache));
+            if (string.IsNullOrEmpty(key)) throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
+            var cachedData = await cache.GetStringAsync(key, cancellationToken);
+            if (string.IsNullOrEmpty(cachedData)) return false;
+
+            try
+            {
+                var responseMessage = JsonSerializer.Deserialize<ResponseMessage>(cachedData);
+                if (responseMessage?.Data == null) return false;
+
+                if (invalidateGracePeriod)
+                {
+                    await cache.RemoveAsync(key, cancellationToken);
+                }
+                else
+                {
+                    responseMessage.ExpiryOnUtc = DateTime.UtcNow.AddMilliseconds(-1);
+                    if (invalidateGracePeriod)
+                    {
+                        responseMessage.GraceTillUtc = responseMessage.ExpiryOnUtc;
+                    }
+
+                    var serializedData = JsonSerializer.Serialize(responseMessage);
+                    var options = new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = responseMessage.GraceTillUtc - DateTime.UtcNow
+                    };
+                    await cache.SetStringAsync(key, serializedData, options, cancellationToken);
+                }
+
+                return true;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+
+        public static async Task<bool> ExpiremeAsync<T>(this IDistributedCache cache,
+            object queryObject,
+            bool invalidateGracePeriod = true,
+            CancellationToken cancellationToken = default)
+        {
+            if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
+
+            var json = JsonSerializer.Serialize(queryObject);
+            var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
+
+            return await cache.ExpiremeAsync(md5, invalidateGracePeriod, cancellationToken);
+        }
     }
 }
