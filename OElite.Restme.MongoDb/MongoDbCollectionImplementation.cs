@@ -229,10 +229,30 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
         var bsonDoc = new BsonDocument();
         foreach (var kvp in dict)
         {
-            bsonDoc[kvp.Key] = ConvertToBsonValue(kvp.Value);
+            // Special handling for _id fields that contain ObjectId strings
+            if (kvp.Key == "_id" && kvp.Value is string stringValue && IsValidObjectIdString(stringValue))
+            {
+                var objectId = new ObjectId(stringValue);
+                bsonDoc[kvp.Key] = new BsonObjectId(objectId);
+            }
+            else
+            {
+                bsonDoc[kvp.Key] = ConvertToBsonValue(kvp.Value);
+            }
         }
         return bsonDoc;
     }
+
+    /// <summary>
+    /// Checks if a string is a valid MongoDB ObjectId format
+    /// </summary>
+    private static bool IsValidObjectIdString(string value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+               value.Length == 24 &&
+               System.Text.RegularExpressions.Regex.IsMatch(value, "^[0-9a-fA-F]{24}$");
+    }
+
 
     /// <summary>
     /// Converts BsonDocument to MongoDbDocument
