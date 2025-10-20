@@ -626,7 +626,7 @@ public static class MongoQueryExtensions
             var bsonDoc = new BsonDocument();
             foreach (var kvp in dict)
             {
-                bsonDoc[kvp.Key] = BsonValue.Create(kvp.Value);
+                bsonDoc[kvp.Key] = MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value);
             }
             return BsonSerializer.Deserialize<TResult>(bsonDoc);
         }

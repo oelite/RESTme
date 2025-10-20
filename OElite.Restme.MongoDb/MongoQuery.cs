@@ -213,7 +213,7 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
     public async Task<List<TResult>> AggregateAsync<TResult>(Dictionary<string, object>[] pipeline)
     {
         var bsonPipeline = pipeline.Select(stage =>
-            new BsonDocument(stage.Select(kvp => new BsonElement(kvp.Key, BsonValue.Create(kvp.Value))))).ToArray();
+            new BsonDocument(stage.Select(kvp => new BsonElement(kvp.Key, MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value))))).ToArray();
         var aggregationPipeline = PipelineDefinition<T, TResult>.Create(bsonPipeline);
 
         if (_session != null)

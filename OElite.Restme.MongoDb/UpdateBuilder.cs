@@ -27,7 +27,7 @@ public class UpdateBuilder<T> where T : BaseEntity
     public UpdateBuilder<T> Set<TField>(Expression<Func<T, TField>> field, TField value)
     {
         var fieldName = GetFieldName(field);
-        _setOperations[fieldName] = BsonValue.Create(value);
+        _setOperations[fieldName] = MongoDbCollectionImplementation.ConvertToBsonValue(value);
         return this;
     }
 
@@ -39,7 +39,7 @@ public class UpdateBuilder<T> where T : BaseEntity
         foreach (var (field, value) in updates)
         {
             var fieldName = GetFieldName(field);
-            _setOperations[fieldName] = BsonValue.Create(value);
+            _setOperations[fieldName] = MongoDbCollectionImplementation.ConvertToBsonValue(value);
         }
         return this;
     }
@@ -50,7 +50,7 @@ public class UpdateBuilder<T> where T : BaseEntity
     public UpdateBuilder<T> Inc<TField>(Expression<Func<T, TField>> field, TField value) where TField : struct
     {
         var fieldName = GetFieldName(field);
-        _incOperations[fieldName] = BsonValue.Create(value);
+        _incOperations[fieldName] = MongoDbCollectionImplementation.ConvertToBsonValue(value);
         return this;
     }
 
@@ -71,7 +71,7 @@ public class UpdateBuilder<T> where T : BaseEntity
     public UpdateBuilder<T> CurrentDate(Expression<Func<T, DateTime>> field)
     {
         var fieldName = GetFieldName(field);
-        _setOperations[fieldName] = BsonValue.Create(DateTime.UtcNow);
+        _setOperations[fieldName] = MongoDbCollectionImplementation.ConvertToBsonValue(DateTime.UtcNow);
         return this;
     }
 
@@ -91,7 +91,7 @@ public class UpdateBuilder<T> where T : BaseEntity
     public UpdateBuilder<T> Push<TField>(Expression<Func<T, IEnumerable<TField>>> field, TField value)
     {
         var fieldName = GetFieldName(field);
-        _pushOperations[fieldName] = BsonValue.Create(value);
+        _pushOperations[fieldName] = MongoDbCollectionImplementation.ConvertToBsonValue(value);
         return this;
     }
 
@@ -101,7 +101,7 @@ public class UpdateBuilder<T> where T : BaseEntity
     public UpdateBuilder<T> PushEach<TField>(Expression<Func<T, IEnumerable<TField>>> field, IEnumerable<TField> values)
     {
         var fieldName = GetFieldName(field);
-        var bsonArray = new BsonArray(values.Select(v => BsonValue.Create(v)));
+        var bsonArray = new BsonArray(values.Select(v => MongoDbCollectionImplementation.ConvertToBsonValue(v)));
         _pushOperations[fieldName] = new BsonDocument("$each", bsonArray);
         return this;
     }
@@ -112,7 +112,7 @@ public class UpdateBuilder<T> where T : BaseEntity
     public UpdateBuilder<T> Pull<TField>(Expression<Func<T, IEnumerable<TField>>> field, TField value)
     {
         var fieldName = GetFieldName(field);
-        _pullOperations[fieldName] = BsonValue.Create(value);
+        _pullOperations[fieldName] = MongoDbCollectionImplementation.ConvertToBsonValue(value);
         return this;
     }
 
@@ -122,7 +122,7 @@ public class UpdateBuilder<T> where T : BaseEntity
     public UpdateBuilder<T> PullAll<TField>(Expression<Func<T, IEnumerable<TField>>> field, IEnumerable<TField> values)
     {
         var fieldName = GetFieldName(field);
-        var bsonArray = new BsonArray(values.Select(v => BsonValue.Create(v)));
+        var bsonArray = new BsonArray(values.Select(v => MongoDbCollectionImplementation.ConvertToBsonValue(v)));
         _pullOperations[fieldName] = bsonArray;
         return this;
     }

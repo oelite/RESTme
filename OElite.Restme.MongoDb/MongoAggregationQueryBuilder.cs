@@ -62,7 +62,7 @@ public class MongoAggregationQueryBuilder<T> where T : BaseEntity
             var bsonFilter = new BsonDocument();
             foreach (var kvp in filter)
             {
-                bsonFilter[kvp.Key] = BsonValue.Create(kvp.Value);
+                bsonFilter[kvp.Key] = MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value);
             }
             _pipeline.Add(new BsonDocument("$match", bsonFilter));
         }
