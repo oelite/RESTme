@@ -268,15 +268,6 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
     }
 
     /// <summary>
-    /// Version check method to verify our fix is loaded
-    /// </summary>
-    public static string GetFixVersion()
-    {
-        return "ObjectId-Fix-v2.0.9-develop.255";
-    }
-
-
-    /// <summary>
     /// Converts BsonDocument to MongoDbDocument
     /// </summary>
     private static MongoDbDocument ConvertToMongoDbDocument(BsonDocument bsonDoc)
