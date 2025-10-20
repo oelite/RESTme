@@ -229,10 +229,24 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
         var bsonDoc = new BsonDocument();
         foreach (var kvp in dict)
         {
-            // Special handling for _id fields that contain ObjectId strings
-            if (kvp.Key == "_id" && kvp.Value is string stringValue && IsValidObjectIdString(stringValue))
+            // Special handling for _id fields that contain ObjectId strings or JsonElement ObjectIds
+            string? objectIdString = null;
+
+            if (kvp.Key == "_id")
             {
-                var objectId = new ObjectId(stringValue);
+                if (kvp.Value is string stringValue)
+                {
+                    objectIdString = stringValue;
+                }
+                else if (kvp.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.String)
+                {
+                    objectIdString = jsonElement.GetString();
+                }
+            }
+
+            if (kvp.Key == "_id" && objectIdString != null && IsValidObjectIdString(objectIdString))
+            {
+                var objectId = new ObjectId(objectIdString);
                 bsonDoc[kvp.Key] = new BsonObjectId(objectId);
             }
             else
@@ -251,6 +265,14 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
         return !string.IsNullOrWhiteSpace(value) &&
                value.Length == 24 &&
                System.Text.RegularExpressions.Regex.IsMatch(value, "^[0-9a-fA-F]{24}$");
+    }
+
+    /// <summary>
+    /// Version check method to verify our fix is loaded
+    /// </summary>
+    public static string GetFixVersion()
+    {
+        return "ObjectId-Fix-v2.0.9-develop.255";
     }
 
 
