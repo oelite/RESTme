@@ -1,6 +1,7 @@
 using MongoDB.Driver;
 using MongoDB.Bson;
 using OElite.Common;
+using System.Text.Json;
 
 namespace OElite.Restme.MongoDb;
 
@@ -182,10 +183,35 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
             bool b => new BsonBoolean(b),
             DateTime dt => new BsonDateTime(dt),
             DbObjectId objectId => new BsonObjectId(new ObjectId(objectId.ToString())),
+            JsonElement jsonElement => ConvertJsonElementToBsonValue(jsonElement),
             MongoDbDocument doc => ConvertToMongoDocument(doc),
             Dictionary<string, object> dict => ConvertDictionaryToBsonDocument(dict),
             IEnumerable<object> array => new BsonArray(array.Select(ConvertToBsonValue)),
-            _ => BsonValue.Create(value)
+            _ => new BsonString(value?.ToString() ?? "")
+        };
+    }
+
+    /// <summary>
+    /// Converts JsonElement to BsonValue based on its ValueKind
+    /// </summary>
+    private static BsonValue ConvertJsonElementToBsonValue(JsonElement jsonElement)
+    {
+        return jsonElement.ValueKind switch
+        {
+            JsonValueKind.String => new BsonString(jsonElement.GetString() ?? ""),
+            JsonValueKind.Number => jsonElement.TryGetInt32(out var intValue) ? new BsonInt32(intValue) :
+                                   jsonElement.TryGetInt64(out var longValue) ? new BsonInt64(longValue) :
+                                   new BsonDouble(jsonElement.GetDouble()),
+            JsonValueKind.True => new BsonBoolean(true),
+            JsonValueKind.False => new BsonBoolean(false),
+            JsonValueKind.Null => BsonNull.Value,
+            JsonValueKind.Object => new BsonDocument(
+                jsonElement.EnumerateObject()
+                    .ToDictionary(prop => prop.Name, prop => ConvertJsonElementToBsonValue(prop.Value))),
+            JsonValueKind.Array => new BsonArray(
+                jsonElement.EnumerateArray()
+                    .Select(ConvertJsonElementToBsonValue)),
+            _ => BsonNull.Value
         };
     }
 
