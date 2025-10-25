@@ -102,32 +102,59 @@ namespace OElite.Abstractions
                 // Get all loaded assemblies that might contain providers
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies()
                     .Where(a => !a.IsDynamic && a.FullName != null)
-                    .Where(a => a.FullName.Contains("OElite.Restme") && 
+                    .Where(a => a.FullName.Contains("OElite.Restme") &&
                                !a.FullName.Contains("OElite.Restme.Utils") &&
                                !a.FullName.EndsWith("OElite.Restme"))
                     .ToList();
 
-                // Also try to load assemblies from the current directory
+                // Try multiple directory paths for assembly discovery
+                var searchPaths = new List<string>();
+
+                // Current executing assembly location
                 var currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 if (currentDirectory != null)
-                {
-                    var providerFiles = Directory.GetFiles(currentDirectory, "OElite.Restme.*.dll", SearchOption.TopDirectoryOnly)
-                        .Where(f => !f.EndsWith("OElite.Restme.Utils.dll") && !f.EndsWith("OElite.Restme.dll"));
+                    searchPaths.Add(currentDirectory);
 
-                    foreach (var file in providerFiles)
+                // Entry assembly location (for when used as NuGet package)
+                var entryAssembly = Assembly.GetEntryAssembly();
+                if (entryAssembly != null)
+                {
+                    var entryDirectory = Path.GetDirectoryName(entryAssembly.Location);
+                    if (entryDirectory != null && !searchPaths.Contains(entryDirectory))
+                        searchPaths.Add(entryDirectory);
+                }
+
+                // Current domain base directory
+                if (!string.IsNullOrEmpty(AppDomain.CurrentDomain.BaseDirectory) &&
+                    !searchPaths.Contains(AppDomain.CurrentDomain.BaseDirectory))
+                    searchPaths.Add(AppDomain.CurrentDomain.BaseDirectory);
+
+                foreach (var searchPath in searchPaths)
+                {
+                    try
                     {
-                        try
+                        var providerFiles = Directory.GetFiles(searchPath, "OElite.Restme.*.dll", SearchOption.TopDirectoryOnly)
+                            .Where(f => !f.EndsWith("OElite.Restme.Utils.dll") && !f.EndsWith("OElite.Restme.dll"));
+
+                        foreach (var file in providerFiles)
                         {
-                            var assembly = Assembly.LoadFrom(file);
-                            if (!assemblies.Contains(assembly))
+                            try
                             {
-                                assemblies.Add(assembly);
+                                var assembly = Assembly.LoadFrom(file);
+                                if (!assemblies.Any(a => a.FullName == assembly.FullName))
+                                {
+                                    assemblies.Add(assembly);
+                                }
+                            }
+                            catch
+                            {
+                                // Ignore failed assembly loads
                             }
                         }
-                        catch
-                        {
-                            // Ignore failed assembly loads
-                        }
+                    }
+                    catch
+                    {
+                        // Ignore directory access failures
                     }
                 }
 

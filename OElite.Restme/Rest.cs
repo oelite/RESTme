@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.Extensions.Logging;
@@ -168,16 +170,95 @@ namespace OElite
         {
             try
             {
-                var assembly = System.Reflection.Assembly.Load(assemblyName);
-                // Force static constructors to run by accessing a type
-                var types = assembly.GetTypes();
+                Assembly? assembly = null;
+
+                // Try different assembly loading strategies
+                try
+                {
+                    // Strategy 1: Load by name (works for GAC and referenced assemblies)
+                    assembly = Assembly.Load(assemblyName);
+                }
+                catch (FileNotFoundException)
+                {
+                    // Strategy 2: Try to find and load from file path
+                    assembly = TryLoadAssemblyFromFile(assemblyName);
+                }
+
+                if (assembly != null)
+                {
+                    // Force static constructors to run by getting and accessing types
+                    var types = assembly.GetTypes();
+
+                    // Specifically look for service factory types and trigger their static constructors
+                    var factoryTypes = types.Where(t =>
+                        typeof(IServiceFactory).IsAssignableFrom(t) &&
+                        !t.IsInterface && !t.IsAbstract).ToList();
+
+                    foreach (var factoryType in factoryTypes)
+                    {
+                        try
+                        {
+                            // Trigger static constructor
+                            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(factoryType.TypeHandle);
+                            Logger?.LogDebug("Triggered static constructor for {FactoryType}", factoryType.Name);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger?.LogWarning(ex, "Failed to trigger static constructor for {FactoryType}", factoryType.Name);
+                        }
+                    }
+                }
             }
-            catch (System.IO.FileNotFoundException)
+            catch (Exception ex)
             {
                 // Assembly not found - this is expected if the backend package isn't referenced
-                Logger?.LogDebug("Provider assembly {AssemblyName} not found - backend package may not be referenced",
-                    assemblyName);
+                Logger?.LogDebug(ex, "Provider assembly {AssemblyName} not found - backend package may not be referenced", assemblyName);
             }
+        }
+
+        /// <summary>
+        /// Try to load assembly from file in various search paths
+        /// </summary>
+        private Assembly? TryLoadAssemblyFromFile(string assemblyName)
+        {
+            var searchPaths = new List<string>();
+
+            // Add current directory
+            var currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (currentDirectory != null)
+                searchPaths.Add(currentDirectory);
+
+            // Add entry assembly directory (for when used as NuGet package)
+            var entryAssembly = Assembly.GetEntryAssembly();
+            if (entryAssembly != null)
+            {
+                var entryDirectory = Path.GetDirectoryName(entryAssembly.Location);
+                if (entryDirectory != null && !searchPaths.Contains(entryDirectory))
+                    searchPaths.Add(entryDirectory);
+            }
+
+            // Add base directory
+            if (!string.IsNullOrEmpty(AppDomain.CurrentDomain.BaseDirectory) &&
+                !searchPaths.Contains(AppDomain.CurrentDomain.BaseDirectory))
+                searchPaths.Add(AppDomain.CurrentDomain.BaseDirectory);
+
+            foreach (var searchPath in searchPaths)
+            {
+                try
+                {
+                    var assemblyPath = Path.Combine(searchPath, $"{assemblyName}.dll");
+                    if (File.Exists(assemblyPath))
+                    {
+                        return Assembly.LoadFrom(assemblyPath);
+                    }
+                }
+                catch
+                {
+                    // Continue to next path
+                }
+            }
+
+            return null;
         }
 
         /// <summary>

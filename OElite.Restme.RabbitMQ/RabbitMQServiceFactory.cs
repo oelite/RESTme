@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using OElite.Abstractions;
 
 namespace OElite.Providers
@@ -11,6 +12,16 @@ namespace OElite.Providers
         static RabbitMQServiceFactory()
         {
             // Auto-register this factory when the assembly is loaded
+            ServiceLocator.RegisterFactory("rabbitmq", new RabbitMQServiceFactory());
+        }
+
+        /// <summary>
+        /// Module initializer to ensure registration happens when assembly is loaded
+        /// </summary>
+        [ModuleInitializer]
+        public static void Initialize()
+        {
+            // Force static constructor to run
             ServiceLocator.RegisterFactory("rabbitmq", new RabbitMQServiceFactory());
         }
         public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
