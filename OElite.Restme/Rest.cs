@@ -141,22 +141,44 @@ namespace OElite
         {
             try
             {
-                switch (Configuration.OperationMode)
+                string? assemblyName = Configuration.OperationMode switch
                 {
-                    case RestMode.RedisAsCache:
-                        LoadAssembly("OElite.Restme.Redis");
-                        break;
-                    case RestMode.RabbitMq:
-                        LoadAssembly("OElite.Restme.RabbitMQ");
-                        break;
-                    case RestMode.AzureAsStorage:
-                    case RestMode.AzureAsCache:
-                        LoadAssembly("OElite.Restme.Azure");
-                        break;
-                    case RestMode.S3AsStorage:
-                    case RestMode.S3AsCache:
-                        LoadAssembly("OElite.Restme.S3");
-                        break;
+                    RestMode.RedisAsCache => "OElite.Restme.Redis",
+                    RestMode.RabbitMq => "OElite.Restme.RabbitMQ",
+                    RestMode.AzureAsStorage or RestMode.AzureAsCache => "OElite.Restme.Azure",
+                    RestMode.S3AsStorage or RestMode.S3AsCache => "OElite.Restme.S3",
+                    _ => null
+                };
+
+                if (!string.IsNullOrEmpty(assemblyName))
+                {
+                    Logger?.LogDebug("Attempting to load provider assembly: {AssemblyName}", assemblyName);
+                    var loaded = LoadAssembly(assemblyName);
+                    if (loaded)
+                    {
+                        Logger?.LogDebug("Successfully loaded provider assembly: {AssemblyName}", assemblyName);
+                    }
+                    else
+                    {
+                        Logger?.LogWarning("Failed to load provider assembly: {AssemblyName}", assemblyName);
+
+                        // Try discovery as a fallback
+                        Logger?.LogDebug("Attempting provider auto-discovery as fallback");
+                        ServiceLocator.Clear(); // Clear cache to force discovery
+                        var factory = ServiceLocator.GetFactory(Configuration.OperationMode switch
+                        {
+                            RestMode.RedisAsCache => "redis",
+                            RestMode.RabbitMq => "rabbitmq",
+                            RestMode.AzureAsStorage or RestMode.AzureAsCache => "azure",
+                            RestMode.S3AsStorage or RestMode.S3AsCache => "s3",
+                            _ => ""
+                        });
+
+                        if (factory != null)
+                        {
+                            Logger?.LogDebug("Provider discovered through auto-discovery");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -169,22 +191,38 @@ namespace OElite
         /// <summary>
         /// Load an assembly by name to trigger static constructors
         /// </summary>
-        private void LoadAssembly(string assemblyName)
+        private bool LoadAssembly(string assemblyName)
         {
             try
             {
                 Assembly? assembly = null;
 
-                // Try different assembly loading strategies
-                try
+                // Check if assembly is already loaded first
+                var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+                assembly = loadedAssemblies.FirstOrDefault(a => a.GetName().Name == assemblyName);
+
+                if (assembly == null)
                 {
-                    // Strategy 1: Load by name (works for GAC and referenced assemblies)
-                    assembly = Assembly.Load(assemblyName);
+                    // Try different assembly loading strategies
+                    try
+                    {
+                        // Strategy 1: Load by name (works for GAC and referenced assemblies)
+                        assembly = Assembly.Load(assemblyName);
+                        Logger?.LogDebug("Loaded assembly {AssemblyName} using Assembly.Load", assemblyName);
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        // Strategy 2: Try to find and load from file path
+                        assembly = TryLoadAssemblyFromFile(assemblyName);
+                        if (assembly != null)
+                        {
+                            Logger?.LogDebug("Loaded assembly {AssemblyName} from file path", assemblyName);
+                        }
+                    }
                 }
-                catch (FileNotFoundException)
+                else
                 {
-                    // Strategy 2: Try to find and load from file path
-                    assembly = TryLoadAssemblyFromFile(assemblyName);
+                    Logger?.LogDebug("Assembly {AssemblyName} already loaded", assemblyName);
                 }
 
                 if (assembly != null)
@@ -211,13 +249,18 @@ namespace OElite
                                 factoryType.Name);
                         }
                     }
+
+                    return true;
                 }
+
+                return false;
             }
             catch (Exception ex)
             {
                 // Assembly not found - this is expected if the backend package isn't referenced
                 Logger?.LogDebug(ex,
                     "Provider assembly {AssemblyName} not found - backend package may not be referenced", assemblyName);
+                return false;
             }
         }
 
@@ -247,22 +290,70 @@ namespace OElite
                 !searchPaths.Contains(AppDomain.CurrentDomain.BaseDirectory))
                 searchPaths.Add(AppDomain.CurrentDomain.BaseDirectory);
 
+            // Add additional common deployment paths
+            var additionalPaths = new List<string>
+            {
+                // Current working directory
+                Environment.CurrentDirectory,
+
+                // Bin directory (common in ASP.NET deployments)
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin"),
+
+                // Refs directory (for .NET Core self-contained deployments)
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "refs"),
+
+                // Runtime directory
+                Path.GetDirectoryName(typeof(object).Assembly.Location) ?? "",
+
+                // NuGet package directories in user profile
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages"),
+
+                // Global NuGet packages (Windows)
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared")
+            };
+
+            foreach (var path in additionalPaths)
+            {
+                if (!string.IsNullOrEmpty(path) && Directory.Exists(path) && !searchPaths.Contains(path))
+                    searchPaths.Add(path);
+            }
+
+            Logger?.LogDebug("Searching for assembly {AssemblyName} in {PathCount} paths", assemblyName, searchPaths.Count);
+
             foreach (var searchPath in searchPaths)
             {
                 try
                 {
                     var assemblyPath = Path.Combine(searchPath, $"{assemblyName}.dll");
+                    Logger?.LogDebug("Checking path: {AssemblyPath}", assemblyPath);
+
                     if (File.Exists(assemblyPath))
                     {
+                        Logger?.LogDebug("Found assembly at: {AssemblyPath}", assemblyPath);
                         return Assembly.LoadFrom(assemblyPath);
                     }
+
+                    // Also try recursive search in subdirectories for NuGet packages
+                    if (searchPath.Contains(".nuget") || searchPath.Contains("packages"))
+                    {
+                        var foundFiles = Directory.GetFiles(searchPath, $"{assemblyName}.dll", SearchOption.AllDirectories);
+
+                        if (foundFiles.Length > 0)
+                        {
+                            var assemblyFile = foundFiles.First();
+                            Logger?.LogDebug("Found assembly in NuGet location: {AssemblyPath}", assemblyFile);
+                            return Assembly.LoadFrom(assemblyFile);
+                        }
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Logger?.LogDebug(ex, "Failed to load assembly from {SearchPath}", searchPath);
                     // Continue to next path
                 }
             }
 
+            Logger?.LogDebug("Assembly {AssemblyName} not found in any search paths", assemblyName);
             return null;
         }
 
@@ -313,20 +404,20 @@ namespace OElite
         /// </summary>
         private void InitializeQueueProvider()
         {
+            // For RabbitMQ, include VHost in connection string if provided
+            var connectionStringWithVHost = ConnectionString ?? "";
+            if (!string.IsNullOrEmpty(RequestUrlPath))
+            {
+                // Append VHost info to connection string for RabbitMQ
+                connectionStringWithVHost += $"|vhost={RequestUrlPath}";
+            }
+
             try
             {
                 // Try to load RabbitMQ provider dynamically
                 var factory = ServiceLocator.GetFactory("rabbitmq");
                 if (factory != null)
                 {
-                    // For RabbitMQ, include VHost in connection string if provided
-                    var connectionStringWithVHost = ConnectionString ?? "";
-                    if (!string.IsNullOrEmpty(RequestUrlPath))
-                    {
-                        // Append VHost info to connection string for RabbitMQ
-                        connectionStringWithVHost += $"|vhost={RequestUrlPath}";
-                    }
-
                     QueueProvider = factory.CreateQueueProvider(connectionStringWithVHost, Configuration);
                 }
                 else
@@ -337,7 +428,7 @@ namespace OElite
             }
             catch (Exception ex)
             {
-                Logger?.LogError(ex, "Failed to initialize queue provider");
+                Logger?.LogError(ex, "Failed to initialize queue provider with connection string of: {ConnectionString}", connectionStringWithVHost);
                 throw new OEliteException(
                     "RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.", ex);
             }
