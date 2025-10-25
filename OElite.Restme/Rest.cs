@@ -40,6 +40,7 @@ namespace OElite
             Params = @params ?? new Dictionary<string, string>();
             Headers = headers ?? new Dictionary<string, List<string>>();
             BaseUri = baseUri!;
+            ConnectionString = $"{baseUri.Scheme}://{baseUri.Host}{(baseUri.Port > 0 ? ":" + baseUri : null)}";
             RequestUrlPath = urlPath;
             Logger = logger;
             Configuration = config!;
@@ -204,7 +205,8 @@ namespace OElite
                         }
                         catch (Exception ex)
                         {
-                            Logger?.LogWarning(ex, "Failed to trigger static constructor for {FactoryType}", factoryType.Name);
+                            Logger?.LogWarning(ex, "Failed to trigger static constructor for {FactoryType}",
+                                factoryType.Name);
                         }
                     }
                 }
@@ -212,7 +214,8 @@ namespace OElite
             catch (Exception ex)
             {
                 // Assembly not found - this is expected if the backend package isn't referenced
-                Logger?.LogDebug(ex, "Provider assembly {AssemblyName} not found - backend package may not be referenced", assemblyName);
+                Logger?.LogDebug(ex,
+                    "Provider assembly {AssemblyName} not found - backend package may not be referenced", assemblyName);
             }
         }
 
