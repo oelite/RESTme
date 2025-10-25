@@ -40,7 +40,9 @@ namespace OElite
             Params = @params ?? new Dictionary<string, string>();
             Headers = headers ?? new Dictionary<string, List<string>>();
             BaseUri = baseUri!;
-            ConnectionString = $"{baseUri.Scheme}://{baseUri.Host}{(baseUri.Port > 0 ? ":" + baseUri : null)}";
+            ConnectionString = baseUri?.Host?.IsNotNullOrEmpty() == true
+                ? $"{baseUri.Scheme}://{baseUri.Host}{(baseUri.Port > 0 ? ":" + baseUri : null)}"
+                : null;
             RequestUrlPath = urlPath;
             Logger = logger;
             Configuration = config!;
