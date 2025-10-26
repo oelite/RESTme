@@ -68,8 +68,21 @@ namespace OElite.Providers
                 factory.VirtualHost = vhost;
             }
 
-            _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
-            _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
+            // Use safer connection creation with timeout and cancellation support
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                _connection = factory.CreateConnectionAsync(cancellationToken: cts.Token).GetAwaiter().GetResult();
+                _channel = _connection.CreateChannelAsync(cancellationToken: cts.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                throw new OEliteException("Connection to RabbitMQ timed out after 30 seconds");
+            }
+            catch (System.Threading.ThreadAbortException ex)
+            {
+                throw new OEliteException("RabbitMQ connection was aborted due to threading issue. This may be caused by compatibility issues with the current .NET version.", ex);
+            }
         }
 
 

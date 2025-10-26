@@ -416,12 +416,29 @@ namespace OElite
             {
                 // Try to load RabbitMQ provider dynamically
                 var factory = ServiceLocator.GetFactory("rabbitmq");
+
+                // If factory not found, try more aggressive loading
+                if (factory == null)
+                {
+                    Logger?.LogDebug("RabbitMQ factory not found, attempting aggressive assembly loading");
+
+                    // Force assembly loading specifically for RabbitMQ
+                    LoadAssembly("OElite.Restme.RabbitMQ");
+
+                    // Force discovery after assembly load
+                    ServiceLocator.Clear();
+                    factory = ServiceLocator.GetFactory("rabbitmq");
+                }
+
                 if (factory != null)
                 {
+                    Logger?.LogDebug("Creating RabbitMQ queue provider with connection: {Connection}", connectionStringWithVHost);
                     QueueProvider = factory.CreateQueueProvider(connectionStringWithVHost, Configuration);
+                    Logger?.LogInformation("Successfully initialized RabbitMQ queue provider");
                 }
                 else
                 {
+                    Logger?.LogError("RabbitMQ factory not found after assembly loading attempts");
                     // Fallback to default implementation that throws helpful error
                     QueueProvider = new DefaultQueueProvider();
                 }
