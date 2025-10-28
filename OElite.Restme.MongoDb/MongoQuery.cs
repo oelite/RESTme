@@ -566,6 +566,10 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
                             var regex = new BsonRegularExpression(operatorVal.ToString(), regexOptions);
                             mongoFilters.Add(Builders<T>.Filter.Regex(field, regex));
                             break;
+                        case "$options":
+                            // $options is handled as part of $regex processing
+                            // Skip this iteration to avoid creating duplicate filters
+                            break;
                         case "$exists":
                             if (operatorVal is bool existsValue)
                                 mongoFilters.Add(Builders<T>.Filter.Exists(field, existsValue));
