@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Linq.Expressions;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -590,11 +591,13 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
                     }
                 }
             }
-            else if (field == "$or" && value is object[] orArray)
+            else if (field == "$or" && (value is object[] orArray || value is IEnumerable orEnumerable))
             {
                 // Handle $or operator
                 var orFilters = new List<FilterDefinition<T>>();
-                foreach (var orItem in orArray)
+                var items = value is object[] arr ? arr : ((IEnumerable)value).Cast<object>().ToArray();
+
+                foreach (var orItem in items)
                 {
                     if (orItem is Dictionary<string, object> orDict)
                     {
@@ -606,6 +609,26 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
                 if (orFilters.Count > 0)
                 {
                     mongoFilters.Add(Builders<T>.Filter.Or((IEnumerable<FilterDefinition<T>>)orFilters));
+                }
+            }
+            else if (field == "$and" && (value is object[] andArray || value is IEnumerable andEnumerable))
+            {
+                // Handle $and operator
+                var andFilters = new List<FilterDefinition<T>>();
+                var items = value is object[] arr ? arr : ((IEnumerable)value).Cast<object>().ToArray();
+
+                foreach (var andItem in items)
+                {
+                    if (andItem is Dictionary<string, object> andDict)
+                    {
+                        var andMongoFilters = ConvertDictionaryToMongoFilters(andDict);
+                        andFilters.AddRange(andMongoFilters);
+                    }
+                }
+
+                if (andFilters.Count > 0)
+                {
+                    mongoFilters.Add(Builders<T>.Filter.And((IEnumerable<FilterDefinition<T>>)andFilters));
                 }
             }
             else

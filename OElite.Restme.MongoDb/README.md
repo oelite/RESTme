@@ -32,7 +32,7 @@ A comprehensive MongoDB library for the OElite platform that provides efficient 
 Add the package reference to your project:
 
 ```xml
-<PackageReference Include="OElite.Restme.MongoDb" Version="2.0.9" />
+<PackageReference Include="OElite.Restme.MongoDb" Version="2.0.10" />
 ```
 
 ## Core Features
@@ -388,14 +388,14 @@ await collection.UpdateManyAsync(
 ```csharp
 // Multiple conditions
 var products = await collection
-    .Find(p => p.Price > 100 && 
-               p.CategoryId == categoryId && 
+    .Find(p => p.Price > 100 &&
+               p.CategoryId == categoryId &&
                p.Name.Contains("Premium"))
     .ToListAsync();
 
 // Array operations
 var products = await collection
-    .Find(p => p.Tags.Contains("electronics") && 
+    .Find(p => p.Tags.Contains("electronics") &&
                p.Tags.Contains("sale"))
     .ToListAsync();
 
@@ -404,6 +404,60 @@ var recentProducts = await collection
     .Find(p => p.CreatedAt >= DateTime.UtcNow.AddDays(-30))
     .ToListAsync();
 ```
+
+### MongoDB Query Operators Support
+
+The library provides comprehensive support for MongoDB query operators, including logical operators for complex filtering:
+
+#### Logical Operators
+
+```csharp
+// $and operator - combines multiple conditions (all must be true)
+var filter = new Dictionary<string, object>
+{
+    ["$and"] = new List<Dictionary<string, object>>
+    {
+        new() { ["price"] = new Dictionary<string, object> { ["$gt"] = 100 } },
+        new() { ["status"] = "active" },
+        new() { ["categoryId"] = categoryId }
+    }
+};
+
+// $or operator - combines multiple conditions (any can be true)
+var filter = new Dictionary<string, object>
+{
+    ["$or"] = new List<Dictionary<string, object>>
+    {
+        new() { ["price"] = new Dictionary<string, object> { ["$lt"] = 50 } },
+        new() { ["onSale"] = true }
+    }
+};
+
+// Complex nested queries with both $and and $or
+var complexFilter = new Dictionary<string, object>
+{
+    ["$and"] = new List<Dictionary<string, object>>
+    {
+        new() { ["status"] = "active" },
+        new()
+        {
+            ["$or"] = new List<Dictionary<string, object>>
+            {
+                new() { ["price"] = new Dictionary<string, object> { ["$lt"] = 100 } },
+                new() { ["featured"] = true }
+            }
+        }
+    }
+};
+```
+
+#### Enhanced Query Processing
+
+- **`$and` Operator Support**: Efficiently processes logical AND operations with proper array handling
+- **`$or` Operator Support**: Handles logical OR operations with collection and array compatibility
+- **Flexible Array Types**: Supports both `List<>` collections and `object[]` arrays for operator values
+- **Nested Operators**: Allows complex nesting of logical operators for sophisticated queries
+- **Performance Optimized**: Converts to native MongoDB FilterDefinitions for optimal query performance
 
 ### Sorting and Pagination
 
