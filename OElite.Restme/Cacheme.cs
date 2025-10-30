@@ -156,7 +156,7 @@ public static class RestmeCacheExtensions
     }
 
 
-    public static Task<T?> FindmeAsync<T>(this Rest rest, object queryObject, bool returnExpired = false,
+    public static Task<T?> FindmeAsync<T>(this IRestme rest, object queryObject, bool returnExpired = false,
         bool returnInGrace = true,
         Func<T, Task<bool>>? additionalValidation = null,
         Func<Task<T>>? refreshAction = null) where T : class?
@@ -172,7 +172,7 @@ public static class RestmeCacheExtensions
         return rest.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction);
     }
 
-    public static Task<ResponseMessage?> CachemeAsync(this Rest rest, object queryObject, object data,
+    public static Task<ResponseMessage?> CachemeAsync(this IRestme rest, object queryObject, object data,
         int expiryInSeconds = -1,
         int graceInSeconds = -1)
     {
@@ -183,7 +183,7 @@ public static class RestmeCacheExtensions
         return rest.CachemeAsync(md5, data, expiryInSeconds, graceInSeconds);
     }
 
-    public static Task<bool> ExpiremeAsync<T>(this Rest rest, object queryObject, bool invalidateGracePeriod = true)
+    public static Task<bool> ExpiremeAsync<T>(this IRestme rest, object queryObject, bool invalidateGracePeriod = true)
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
         var json = queryObject.JsonSerialize();
