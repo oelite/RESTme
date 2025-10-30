@@ -44,17 +44,31 @@ public static class MongoPropertyConflictResolver
                 classMap.MapMember(conflict.DerivedProperty);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // If unmapping/remapping fails, try to map the derived property directly
+            // Enhanced error handling with proper logging instead of silent Console.WriteLine
+            var errorMessage = $"MongoDB property conflict resolution failed for property '{conflict.PropertyName}' " +
+                $"in class '{classMap.ClassType.Name}': {ex.Message}";
+
+            // Try to map the derived property directly as fallback
             try
             {
                 classMap.MapMember(conflict.DerivedProperty);
             }
-            catch
+            catch (Exception fallbackEx)
             {
-                // Ignore mapping errors for conflicting properties
-                Console.WriteLine($"Warning: Could not resolve property conflict for {conflict.PropertyName}");
+                // Log detailed error information and throw to prevent silent failures
+                var detailedError = $"Critical MongoDB mapping failure: Could not resolve property conflict for '{conflict.PropertyName}' " +
+                    $"in class '{classMap.ClassType.Name}'. Primary error: {ex.Message}. " +
+                    $"Fallback error: {fallbackEx.Message}. This may cause serialization issues.";
+
+                Console.WriteLine($"ERROR: {detailedError}");
+
+                // For critical properties like Status, we need to ensure the mapping doesn't silently fail
+                if (conflict.PropertyName == "Status")
+                {
+                    throw new InvalidOperationException(detailedError, ex);
+                }
             }
         }
     }

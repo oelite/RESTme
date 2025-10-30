@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using OElite.Abstractions;
 using OElite.Restme.Utils;
 
 namespace OElite
@@ -32,7 +33,8 @@ namespace OElite
         string? Get(string? keyOrRelativePath = null, object? dataObject = null);
         Task<string?> GetAsync(string? keyOrRelativePath = null, object? dataObject = null);
 
-        T? Put<T>(string? keyOrRelativePath = null, object? dataObject = null, TimeSpan? expiryInMinutes = null) where T : class;
+        T? Put<T>(string? keyOrRelativePath = null, object? dataObject = null, TimeSpan? expiryInMinutes = null)
+            where T : class;
 
         Task<T?> PutAsync<T>(string? keyOrRelativePath = null, object? dataObject = null,
             TimeSpan? expiryInMinutes = null) where T : class;
@@ -43,7 +45,8 @@ namespace OElite
             TimeSpan? expiryInMinutes = null);
 
 
-        T? Post<T>(string? keyOrRelativePath = null, object? dataObject = null, TimeSpan? expiryInMinutes = null) where T : class;
+        T? Post<T>(string? keyOrRelativePath = null, object? dataObject = null, TimeSpan? expiryInMinutes = null)
+            where T : class;
 
         Task<T?> PostAsync<T>(string? keyOrRelativePath = null, object? dataObject = null,
             TimeSpan? expiryInMinutes = null) where T : class;
@@ -57,5 +60,24 @@ namespace OElite
         Task<T?> DeleteAsync<T>(string? keyOrRelativePath = null, object? dataObject = null) where T : class;
         string? Delete(string? keyOrRelativePath = null, object? dataObject = null);
         Task<string?> DeleteAsync(string? keyOrRelativePath = null, object? dataObject = null);
+
+        #region Logging
+
+        void LogError(string? errorMessage, Exception? ex = null, int eventId = 0);
+        void LogWarning(string? errorMessage, Exception? ex = null, int eventId = 0);
+        void LogInfo(string? info, Exception? ex = null, int eventId = 0);
+        void LogDebug(string? debugInfo, Exception? ex = null, int eventId = 0);
+        void LogFatal(string? fatalInfo, Exception? ex = null, int eventId = 0);
+
+        #endregion
+
+
+        RestMode CurrentMode { get; }
+
+        ICacheProvider? CacheProvider { get; }
+        IQueueProvider? QueueProvider { get; }
+        IStorageProvider? StorageProvider { get; }
+        IHttpProvider? HttpProvider { get; }
+        ILogProvider? LogProvider { get; }
     }
 }

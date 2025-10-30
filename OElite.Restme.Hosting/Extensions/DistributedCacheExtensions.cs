@@ -56,7 +56,7 @@ namespace OElite.Restme.Hosting.Extensions
                 {
                     if (responseMessage.ExpiryOnUtc <= DateTime.UtcNow && refreshAction != null)
                     {
-                        refreshAction().ConfigureAwait(false);
+                        await refreshAction().ConfigureAwait(false);
                     }
                     return result;
                 }

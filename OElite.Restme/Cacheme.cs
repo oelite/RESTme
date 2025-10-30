@@ -16,7 +16,7 @@ public static class RestmeCacheExtensions
     /// </summary>
     private const int DefaultCacheExpiryInSeconds = 60;
 
-    public static async Task<bool> ExpiremeAsync(this Rest rest, string? uid, bool invalidateGracePeriod = true, CancellationToken cancellationToken = default)
+    public static async Task<bool> ExpiremeAsync(this IRestme rest, string? uid, bool invalidateGracePeriod = true, CancellationToken cancellationToken = default)
     {
         if (rest.CurrentMode != RestMode.RedisAsCache && rest.CurrentMode != RestMode.MemoryAsCache)
             throw new OEliteException("Cacheme currently only support Redis and Memory cache modes");
@@ -46,7 +46,7 @@ public static class RestmeCacheExtensions
     }
 
 
-    public static async Task<ResponseMessage?> CachemeAsync(this Rest? rest, string? uid, object data,
+    public static async Task<ResponseMessage?> CachemeAsync(this IRestme rest, string? uid, object data,
         int expiryInSeconds = -1,
         int graceInSeconds = -1, CancellationToken cancellationToken = default)
     {
@@ -97,7 +97,7 @@ public static class RestmeCacheExtensions
         }
     }
 
-    public static async Task<T?> FindmeAsync<T>(this Rest? rest, string? uid, bool returnExpired = false,
+    public static async Task<T?> FindmeAsync<T>(this IRestme rest, string? uid, bool returnExpired = false,
         bool returnInGrace = true,
         Func<T, Task<bool>>? additionalValidation = null,
         Func<Task<T>>? refreshAction = null, CancellationToken cancellationToken = default) where T : class?

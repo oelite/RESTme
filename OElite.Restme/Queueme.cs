@@ -6,7 +6,7 @@ namespace OElite;
 
 public static class RestmeMessageQueueExtensions
 {
-    public static bool Queueme(this Rest rest,
+    public static bool Queueme(this IRestme rest,
         object message,
         string? queueName = null, string? key = null,
         string? exchangeName = null,
@@ -35,7 +35,7 @@ public static class RestmeMessageQueueExtensions
         }
     }
 
-    public static async Task<bool> QueuemeAsync(this Rest rest,
+    public static async Task<bool> QueuemeAsync(this IRestme rest,
         object message,
         string? queueName = null, string? key = null,
         string? exchangeName = null,
@@ -65,7 +65,7 @@ public static class RestmeMessageQueueExtensions
         }
     }
 
-    public static void Dome<T>(this Rest rest,
+    public static void Dome<T>(this IRestme rest,
         Func<T, Task<bool>>? queueTask,
         Func<Task<bool>>? deliverCompleteCondition,
         string? exchangeName = null,
@@ -94,7 +94,7 @@ public static class RestmeMessageQueueExtensions
         }
     }
 
-    public static void Dome<T>(this Rest rest,
+    public static void Dome<T>(this IRestme rest,
         Func<T, bool>? queueTask,
         Func<bool>? deliverCompleteCondition,
         string? exchangeName = null,
@@ -127,7 +127,7 @@ public static class RestmeMessageQueueExtensions
         }
     }
 
-    public static async Task DomeAsync<T>(this Rest rest,
+    public static async Task DomeAsync<T>(this IRestme rest,
         Func<T, Task<bool>>? queueTask,
         Func<Task<bool>>? deliverCompleteCondition,
         string? exchangeName = null,
@@ -156,7 +156,7 @@ public static class RestmeMessageQueueExtensions
         }
     }
 
-    public static async Task DomeAsync<T>(this Rest rest,
+    public static async Task DomeAsync<T>(this IRestme rest,
         Func<T, bool>? queueTask,
         Func<bool>? deliverCompleteCondition,
         string? exchangeName = null,
