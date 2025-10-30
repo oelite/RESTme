@@ -11,6 +11,7 @@ public static class MongoClassMapConfigurator
 {
     private static bool _isConfigured = false;
     private static readonly object _lock = new object();
+    private static readonly HashSet<Type> _registeredTypes = new HashSet<Type>();
 
     /// <summary>
     /// Configures MongoDB class mappings for all BaseEntity types
@@ -37,40 +38,63 @@ public static class MongoClassMapConfigurator
     /// </summary>
     public static void RegisterClassMapping<T>() where T : BaseEntity
     {
-        if (!BsonClassMap.IsClassMapRegistered(typeof(T)))
+        lock (_lock)
         {
+            if (_registeredTypes.Contains(typeof(T)) || BsonClassMap.IsClassMapRegistered(typeof(T)))
+                return;
+
             // First, ensure all base classes are mapped
             EnsureBaseClassesMapped<T>();
 
-            BsonClassMap.RegisterClassMap<T>(cm =>
+            try
             {
-                // Use AutoMap first to handle inheritance properly
-                cm.AutoMap();
+                BsonClassMap.RegisterClassMap<T>(cm =>
+                {
+                    // Use AutoMap first to handle inheritance properly
+                    cm.AutoMap();
 
-                // Then apply our custom attribute mappings
-                var convention = new RestmeDbAttributeConvention();
-                convention.Apply(cm);
+                    // Then apply our custom attribute mappings
+                    var convention = new RestmeDbAttributeConvention();
+                    convention.Apply(cm);
 
-                // Finally, resolve property conflicts
-                MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, typeof(T));
-            });
+                    // Finally, resolve property conflicts
+                    MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, typeof(T));
+                });
+
+                _registeredTypes.Add(typeof(T));
+            }
+            catch (ArgumentException ex) when (ex.Message.Contains("An item with the same key has already been added"))
+            {
+                // Another thread already registered this type - this is fine
+                _registeredTypes.Add(typeof(T));
+            }
         }
     }
 
     /// <summary>
     /// Ensures all base classes are mapped before mapping the derived class
+    /// This method should only be called from within a lock
     /// </summary>
     private static void EnsureBaseClassesMapped<T>() where T : BaseEntity
     {
         // First, ensure BaseEntity itself is mapped
-        if (!BsonClassMap.IsClassMapRegistered(typeof(BaseEntity)))
+        if (!_registeredTypes.Contains(typeof(BaseEntity)) && !BsonClassMap.IsClassMapRegistered(typeof(BaseEntity)))
         {
-            BsonClassMap.RegisterClassMap<BaseEntity>(cm =>
+            try
             {
-                cm.AutoMap();
-                var convention = new RestmeDbAttributeConvention();
-                convention.Apply(cm);
-            });
+                BsonClassMap.RegisterClassMap<BaseEntity>(cm =>
+                {
+                    cm.AutoMap();
+                    var convention = new RestmeDbAttributeConvention();
+                    convention.Apply(cm);
+                });
+                _registeredTypes.Add(typeof(BaseEntity));
+            }
+            catch (ArgumentException ex) when (ex.Message.Contains("An item with the same key has already been added"))
+            {
+                // Another thread already registered BaseEntity - this is fine
+                _registeredTypes.Add(typeof(BaseEntity));
+            }
         }
 
         var currentType = typeof(T);
@@ -92,19 +116,28 @@ public static class MongoClassMapConfigurator
         baseTypes.Reverse();
         foreach (var baseType in baseTypes)
         {
-            if (!BsonClassMap.IsClassMapRegistered(baseType))
+            if (!_registeredTypes.Contains(baseType) && !BsonClassMap.IsClassMapRegistered(baseType))
             {
-                // Use reflection to call the generic RegisterClassMap method
-                var registerMethod = typeof(BsonClassMap).GetMethod("RegisterClassMap", new[] { typeof(Action<>) });
-                var genericMethod = registerMethod.MakeGenericMethod(baseType);
-                var action = new Action<BsonClassMap>(cm =>
+                try
                 {
-                    cm.AutoMap();
-                    var convention = new RestmeDbAttributeConvention();
-                    convention.Apply(cm);
-                    MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, baseType);
-                });
-                genericMethod.Invoke(null, new object[] { action });
+                    // Use reflection to call the generic RegisterClassMap method
+                    var registerMethod = typeof(BsonClassMap).GetMethod("RegisterClassMap", new[] { typeof(Action<BsonClassMap>) });
+                    var genericMethod = registerMethod.MakeGenericMethod(baseType);
+                    var action = new Action<BsonClassMap>(cm =>
+                    {
+                        cm.AutoMap();
+                        var convention = new RestmeDbAttributeConvention();
+                        convention.Apply(cm);
+                        MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, baseType);
+                    });
+                    genericMethod.Invoke(null, new object[] { action });
+                    _registeredTypes.Add(baseType);
+                }
+                catch (ArgumentException ex) when (ex.Message.Contains("An item with the same key has already been added"))
+                {
+                    // Another thread already registered this type - this is fine
+                    _registeredTypes.Add(baseType);
+                }
             }
         }
     }
@@ -117,31 +150,41 @@ public static class MongoClassMapConfigurator
     /// <param name="configuredTypes">Set of already configured types to avoid duplicate work</param>
     public static void ConfigureClassMappingForType(Type type, HashSet<Type> configuredTypes)
     {
-        if (configuredTypes.Contains(type))
-            return;
-
-        // Ensure all base classes are configured first
-        MongoPropertyConflictResolver.EnsureBaseClassesConfigured(type, configuredTypes);
-
-        // Configure the main type
-        if (!BsonClassMap.IsClassMapRegistered(type))
+        lock (_lock)
         {
-            try
-            {
-                // Create a new BsonClassMap and register it manually
-                var classMap = new BsonClassMap(type);
-                BsonClassMap.RegisterClassMap(classMap);
-                classMap.AutoMap();
-                var convention = new RestmeDbAttributeConvention();
-                convention.Apply(classMap);
-                MongoPropertyConflictResolver.ResolvePropertyConflicts(classMap, type);
-            }
-            catch (InvalidOperationException)
-            {
-                // Class map already registered by another thread
-            }
-        }
+            if (configuredTypes.Contains(type) || _registeredTypes.Contains(type))
+                return;
 
-        configuredTypes.Add(type);
+            // Ensure all base classes are configured first
+            MongoPropertyConflictResolver.EnsureBaseClassesConfigured(type, configuredTypes);
+
+            // Configure the main type
+            if (!BsonClassMap.IsClassMapRegistered(type))
+            {
+                try
+                {
+                    // Create a new BsonClassMap and register it manually
+                    var classMap = new BsonClassMap(type);
+                    BsonClassMap.RegisterClassMap(classMap);
+                    classMap.AutoMap();
+                    var convention = new RestmeDbAttributeConvention();
+                    convention.Apply(classMap);
+                    MongoPropertyConflictResolver.ResolvePropertyConflicts(classMap, type);
+                    _registeredTypes.Add(type);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Class map already registered by another thread
+                    _registeredTypes.Add(type);
+                }
+                catch (ArgumentException ex) when (ex.Message.Contains("An item with the same key has already been added"))
+                {
+                    // Another thread already registered this type - this is fine
+                    _registeredTypes.Add(type);
+                }
+            }
+
+            configuredTypes.Add(type);
+        }
     }
 }

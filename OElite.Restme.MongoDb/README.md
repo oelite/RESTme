@@ -1563,7 +1563,30 @@ public async Task<Dictionary<string, object>> GetCategoryStatisticsBadAsync()
 
 ### Error Handling and Best Practices
 
-#### 1. Handle Empty Results Gracefully
+#### 1. Thread-Safe MongoDB Class Mapping (Concurrent Environment Support)
+
+The library now provides enhanced thread-safety for MongoDB class mapping registration to prevent race conditions in multi-threaded environments:
+
+```csharp
+// Thread-safe class mapping registration
+// Multiple threads can safely call this simultaneously without conflicts
+MongoClassMapConfigurator.RegisterClassMapping<Product>();
+
+// The library handles concurrent registration attempts gracefully:
+// - Uses internal locks to prevent race conditions
+// - Catches and handles duplicate registration attempts
+// - Maintains an internal registry of registered types
+// - No application code changes required
+```
+
+**Key Improvements:**
+- **Atomic Registration**: Uses locks to ensure only one thread registers a type at a time
+- **Duplicate Detection**: Prevents "An item with the same key has already been added" errors
+- **Exception Handling**: Gracefully handles concurrent registration attempts
+- **BaseEntity Safety**: Special handling for BaseEntity and inheritance chains
+- **Backward Compatibility**: All existing code continues to work without changes
+
+#### 2. Handle Empty Results Gracefully
 
 ```csharp
 public async Task<decimal> GetAveragePriceSafelyAsync()
