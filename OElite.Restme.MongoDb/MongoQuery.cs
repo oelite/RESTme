@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Linq.Expressions;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 
 namespace OElite.Restme.MongoDb;
@@ -285,23 +286,47 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
     public async Task<UpdateResult> UpdateOneAsync(Dictionary<string, object> update)
     {
         var combinedFilter = CombineFilters();
-        var updateBuilder = Builders<T>.Update;
-        var updateDefinitions = new List<UpdateDefinition<T>>();
 
-        foreach (var kvp in update)
+        // Check if the update dictionary contains MongoDB operators (starts with $)
+        if (update.Keys.Any(k => k.StartsWith("$")))
         {
-            updateDefinitions.Add(updateBuilder.Set(kvp.Key, kvp.Value));
-        }
+            // Raw MongoDB update operators - convert to BSON document
+            var updateDoc = new BsonDocument(update.ToDictionary(
+                kvp => kvp.Key,
+                kvp => BsonValue.Create(kvp.Value)
+            ));
+            var updateDef = new BsonDocumentUpdateDefinition<T>(updateDoc);
 
-        var updateDef = updateBuilder.Combine(updateDefinitions);
-
-        if (_session != null)
-        {
-            return await _collection.UpdateOneAsync(_session, combinedFilter, updateDef);
+            if (_session != null)
+            {
+                return await _collection.UpdateOneAsync(_session, combinedFilter, updateDef);
+            }
+            else
+            {
+                return await _collection.UpdateOneAsync(combinedFilter, updateDef);
+            }
         }
         else
         {
-            return await _collection.UpdateOneAsync(combinedFilter, updateDef);
+            // Simple field updates - wrap with $set
+            var updateBuilder = Builders<T>.Update;
+            var updateDefinitions = new List<UpdateDefinition<T>>();
+
+            foreach (var kvp in update)
+            {
+                updateDefinitions.Add(updateBuilder.Set(kvp.Key, kvp.Value));
+            }
+
+            var updateDef = updateBuilder.Combine(updateDefinitions);
+
+            if (_session != null)
+            {
+                return await _collection.UpdateOneAsync(_session, combinedFilter, updateDef);
+            }
+            else
+            {
+                return await _collection.UpdateOneAsync(combinedFilter, updateDef);
+            }
         }
     }
 
@@ -520,8 +545,17 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
             }
         }
 
-        // Default to text search if no specific pattern matches
-        return Builders<T>.Filter.Text(filter);
+        // Try to parse as JSON filter first
+        try
+        {
+            return BsonSerializer.Deserialize<FilterDefinition<T>>(filter);
+        }
+        catch
+        {
+            // If JSON parsing fails, return empty filter instead of text search
+            // Text search requires explicit text indexes and should be handled separately
+            return Builders<T>.Filter.Empty;
+        }
     }
 
     private List<SortDefinition<T>> ParseSortExpression(string sortExpression)

@@ -16,6 +16,10 @@ public class BasicCrudTests : TestBase
     public async Task Product_ShouldCreateReadUpdateDelete_WhenUsingBasicOperations()
     {
         // Arrange
+        // Clear collection to ensure clean test state
+        var cleanupQuery = DbCentre.GetQuery<TestProduct>();
+        await cleanupQuery.Query(p => true).DeleteManyAsync();
+
         var originalProduct = new TestProduct
         {
             Name = "Test Product",
@@ -88,6 +92,10 @@ public class BasicCrudTests : TestBase
     public async Task Product_ShouldQueryWithStringFilter_WhenUsingJsonQuery()
     {
         // Arrange
+        // Clear collection to ensure clean test state
+        var cleanupQuery = DbCentre.GetQuery<TestProduct>();
+        await cleanupQuery.Query(p => true).DeleteManyAsync();
+
         var products = new[]
         {
             new TestProduct { Name = "Electronics Item", Price = 100.00m, IsActive = true },
@@ -136,6 +144,10 @@ public class BasicCrudTests : TestBase
     public async Task Product_ShouldQueryWithDictionaryFilter_WhenUsingComplexFilters()
     {
         // Arrange
+        // Clear collection to ensure clean test state
+        var cleanupQuery = DbCentre.GetQuery<TestProduct>();
+        await cleanupQuery.Query(p => true).DeleteManyAsync();
+
         var products = new[]
         {
             new TestProduct
@@ -177,6 +189,10 @@ public class BasicCrudTests : TestBase
     public async Task Product_ShouldHandlePagination_WhenUsingPaginatedQuery()
     {
         // Arrange
+        // Clear collection to ensure clean test state
+        var cleanupQuery = DbCentre.GetQuery<TestProduct>();
+        await cleanupQuery.Query(p => true).DeleteManyAsync();
+
         var products = Enumerable.Range(1, 10)
             .Select(i => new TestProduct
             {
@@ -206,6 +222,10 @@ public class BasicCrudTests : TestBase
     public async Task Product_ShouldHandleParameterizedQueries_WhenUsingParams()
     {
         // Arrange
+        // Clear collection to ensure clean test state
+        var cleanupQuery = DbCentre.GetQuery<TestProduct>();
+        await cleanupQuery.Query(p => true).DeleteManyAsync();
+
         var categoryId = DbObjectId.NewId();
         var products = new[]
         {

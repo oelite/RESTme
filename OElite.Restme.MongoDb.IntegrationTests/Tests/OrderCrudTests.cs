@@ -217,6 +217,8 @@ public class OrderCrudTests : TestBase
     {
         // Arrange
         var collection = GetDbCollection<TestOrder>();
+        // Clear collection to ensure clean test state
+        await collection.DeleteManyAsync(o => true);
         var orders = new[]
         {
             CreateTestOrder(status: OrderStatus.Pending),
@@ -269,6 +271,8 @@ public class OrderCrudTests : TestBase
     {
         // Arrange
         var collection = GetDbCollection<TestOrder>();
+        // Clear collection to ensure clean test state
+        await collection.DeleteManyAsync(o => true);
         var product1Id = DbObjectId.NewId();
         var product2Id = DbObjectId.NewId();
 

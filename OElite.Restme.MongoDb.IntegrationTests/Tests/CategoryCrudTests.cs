@@ -175,6 +175,8 @@ public class CategoryCrudTests : TestBase
     {
         // Arrange
         var collection = GetDbCollection<TestCategory>();
+        // Clear collection to ensure clean test state
+        await collection.DeleteManyAsync(c => true);
         var parentCategory = CreateTestCategory("Parent Category");
         await collection.InsertOneAsync(parentCategory);
 
