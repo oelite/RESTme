@@ -155,6 +155,13 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
 
     public async Task<List<T>> ToListAsync()
     {
+        // If aggregation pipeline is being used, execute aggregation instead of find
+        if (_useAggregation && _pipelineStages.Any())
+        {
+            return await ExecuteAggregationPipelineAsync<T>();
+        }
+
+        // Standard find operation
         var options = new FindOptions<T>();
 
         if (_limit.HasValue)
@@ -213,7 +220,23 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
 
     public async Task<List<TResult>> AggregateAsync<TResult>(Dictionary<string, object>[] pipeline)
     {
-        var bsonPipeline = pipeline.Select(stage =>
+        // Combine pipeline stages from Pipeline() method calls with the passed pipeline array
+        var allPipelineStages = new List<Dictionary<string, object>>();
+
+        // Add pipeline stages from Pipeline() method calls first
+        foreach (var stage in _pipelineStages)
+        {
+            if (stage is Dictionary<string, object> dictStage)
+            {
+                allPipelineStages.Add(dictStage);
+            }
+        }
+
+        // Add the pipeline stages passed to this method
+        allPipelineStages.AddRange(pipeline);
+
+        // Convert to BSON pipeline
+        var bsonPipeline = allPipelineStages.Select(stage =>
             new BsonDocument(stage.Select(kvp => new BsonElement(kvp.Key, MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value))))).ToArray();
         var aggregationPipeline = PipelineDefinition<T, TResult>.Create(bsonPipeline);
 
@@ -733,5 +756,74 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
         collection.AddRange(items);
         collection.TotalRecordsCount = (int)totalCount;
         return collection;
+    }
+
+    /// <summary>
+    /// Executes the aggregation pipeline and returns results
+    /// </summary>
+    private async Task<List<TResult>> ExecuteAggregationPipelineAsync<TResult>()
+    {
+        var pipelineDefinitions = new List<IPipelineStageDefinition>();
+
+        // Add any existing filters as $match stages first
+        if (_filters.Any())
+        {
+            var combinedFilter = CombineFilters();
+            var matchStage = PipelineStageDefinitionBuilder.Match(combinedFilter);
+            pipelineDefinitions.Add(matchStage);
+        }
+
+        // Add all pipeline stages (lookup, unwind, etc.)
+        foreach (var stage in _pipelineStages)
+        {
+            if (stage is IPipelineStageDefinition pipelineStage)
+            {
+                pipelineDefinitions.Add(pipelineStage);
+            }
+            else if (stage is Dictionary<string, object> dictStage)
+            {
+                // Convert dictionary stage to BsonDocument and add as pipeline stage
+                var bsonDoc = new BsonDocument(dictStage.Select(kvp =>
+                    new BsonElement(kvp.Key, MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value))));
+                var convertedStage = new BsonDocumentPipelineStageDefinition<T, T>(bsonDoc);
+                pipelineDefinitions.Add(convertedStage);
+            }
+        }
+
+        // Add sorting if specified
+        var combinedSort = CombineSorts();
+        if (combinedSort != null)
+        {
+            var sortStage = PipelineStageDefinitionBuilder.Sort(combinedSort);
+            pipelineDefinitions.Add(sortStage);
+        }
+
+        // Add skip/limit stages
+        if (_skip.HasValue)
+        {
+            var skipStage = PipelineStageDefinitionBuilder.Skip<T>(_skip.Value);
+            pipelineDefinitions.Add(skipStage);
+        }
+
+        if (_limit.HasValue)
+        {
+            var limitStage = PipelineStageDefinitionBuilder.Limit<T>(_limit.Value);
+            pipelineDefinitions.Add(limitStage);
+        }
+
+        // Create the aggregation pipeline
+        var pipeline = PipelineDefinition<T, TResult>.Create(pipelineDefinitions);
+
+        // Execute the aggregation
+        if (_session != null)
+        {
+            var cursor = await _collection.AggregateAsync(_session, pipeline);
+            return await cursor.ToListAsync();
+        }
+        else
+        {
+            var cursor = await _collection.AggregateAsync(pipeline);
+            return await cursor.ToListAsync();
+        }
     }
 }

@@ -11,19 +11,16 @@ namespace OElite.Restme.Hosting.Extensions
     {
         private const int DefaultCacheExpiryInSeconds = 60;
 
-        public static async Task<T?> FindmeAsync<T>(this IMemoryCache cache,
+        private static async Task<T?> FindmeAsync<T>(this IMemoryCache cache,
             string key,
             bool returnExpired = false,
             bool returnInGrace = true,
-            Func<T, Task<bool>>? additionalValidation = null,
-            Func<Task<T>>? refreshAction = null,
+            Func<T, CancellationToken, Task<bool>>? additionalValidation = null,
+            Func<CancellationToken, Task<T>>? refreshAction = null,
             CancellationToken cancellationToken = default) where T : class
         {
             if (cache == null) throw new ArgumentNullException(nameof(cache));
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("Key cannot be null or empty", nameof(key));
-
-            if (!typeof(Rest).IsAssignableFrom(typeof(T)))
-                throw new InvalidOperationException("FindmeAsync only supports Rest implementation types");
 
             var sw = Stopwatch.StartNew();
             var found = cache.TryGetValue(key, out var cachedValue);
@@ -32,7 +29,7 @@ namespace OElite.Restme.Hosting.Extensions
             if (!found || cachedValue == null)
             {
                 if (refreshAction == null) return null;
-                return await refreshAction();
+                return await refreshAction(cancellationToken);
             }
 
             try
@@ -50,7 +47,7 @@ namespace OElite.Restme.Hosting.Extensions
                 else
                 {
                     if (refreshAction == null) return null;
-                    return await refreshAction();
+                    return await refreshAction(cancellationToken);
                 }
 
                 if (responseMessage?.Data == null) return null;
@@ -71,11 +68,11 @@ namespace OElite.Restme.Hosting.Extensions
 
                 if (result == null) return null;
 
-                var customValidationResult = additionalValidation == null || await additionalValidation.Invoke(result);
+                var customValidationResult = additionalValidation == null || await additionalValidation.Invoke(result, cancellationToken);
                 if (!customValidationResult)
                 {
                     if (refreshAction == null) return null;
-                    return await refreshAction();
+                    return await refreshAction(cancellationToken);
                 }
 
                 if (returnExpired) return result;
@@ -84,19 +81,20 @@ namespace OElite.Restme.Hosting.Extensions
                 {
                     if (responseMessage.ExpiryOnUtc <= DateTime.UtcNow && refreshAction != null)
                     {
-                        refreshAction().ConfigureAwait(false);
+                        _ = Task.Run(async () => await refreshAction(cancellationToken), cancellationToken);
                     }
+
                     return result;
                 }
 
                 if (responseMessage.ExpiryOnUtc >= DateTime.UtcNow) return result;
 
-                return refreshAction != null ? await refreshAction() : null;
+                return refreshAction != null ? await refreshAction(cancellationToken) : null;
             }
             catch (JsonException)
             {
                 if (refreshAction == null) return null;
-                return await refreshAction();
+                return await refreshAction(cancellationToken);
             }
         }
 
@@ -104,8 +102,8 @@ namespace OElite.Restme.Hosting.Extensions
             object queryObject,
             bool returnExpired = false,
             bool returnInGrace = true,
-            Func<T, Task<bool>>? additionalValidation = null,
-            Func<Task<T>>? refreshAction = null,
+            Func<T, CancellationToken, Task<bool>>? additionalValidation = null,
+            Func<CancellationToken, Task<T>>? refreshAction = null,
             CancellationToken cancellationToken = default) where T : class
         {
             if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
@@ -113,10 +111,11 @@ namespace OElite.Restme.Hosting.Extensions
             var json = JsonSerializer.Serialize(queryObject);
             var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
 
-            return await cache.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction, cancellationToken);
+            return await cache.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction,
+                cancellationToken);
         }
 
-        public static void CachemeAsync<T>(this IMemoryCache cache,
+        public static Task CachemeAsync<T>(this IMemoryCache cache,
             string key,
             T data,
             int expiryInSeconds = -1,
@@ -146,6 +145,7 @@ namespace OElite.Restme.Hosting.Extensions
             };
 
             cache.Set(key, responseMessage, options);
+            return Task.CompletedTask;
         }
 
         public static void CachemeAsync<T>(this IMemoryCache cache,
@@ -156,10 +156,14 @@ namespace OElite.Restme.Hosting.Extensions
         {
             if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
 
-            var json = JsonSerializer.Serialize(queryObject);
-            var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
+            var key = queryObject is string strKey ? strKey : null;
+            if (key.IsNullOrEmpty())
+            {
+                var json = JsonSerializer.Serialize(queryObject);
+                key = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
+            }
 
-            cache.CachemeAsync(md5, data, expiryInSeconds, graceInSeconds);
+            cache.CachemeAsync(key!, data, expiryInSeconds, graceInSeconds);
         }
 
         public static bool ExpiremeAsync(this IMemoryCache cache,
@@ -224,10 +228,15 @@ namespace OElite.Restme.Hosting.Extensions
         {
             if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
 
-            var json = JsonSerializer.Serialize(queryObject);
-            var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
+            string? key;
+            if (queryObject is string) key = queryObject as string;
+            else
+            {
+                var json = JsonSerializer.Serialize(queryObject);
+                key = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
+            }
 
-            return cache.ExpiremeAsync(md5, invalidateGracePeriod);
+            return cache.ExpiremeAsync(key!, invalidateGracePeriod);
         }
     }
 }

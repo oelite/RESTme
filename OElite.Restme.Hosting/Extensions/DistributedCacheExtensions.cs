@@ -11,7 +11,7 @@ namespace OElite.Restme.Hosting.Extensions
     {
         private const int DefaultCacheExpiryInSeconds = 60;
 
-        public static async Task<T?> FindmeAsync<T>(this IDistributedCache cache,
+        private static async Task<T?> FindmeAsync<T>(this IDistributedCache cache,
             string key,
             bool returnExpired = false,
             bool returnInGrace = true,
@@ -21,9 +21,6 @@ namespace OElite.Restme.Hosting.Extensions
         {
             if (cache == null) throw new ArgumentNullException(nameof(cache));
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("Key cannot be null or empty", nameof(key));
-
-            if (!typeof(Rest).IsAssignableFrom(typeof(T)))
-                throw new InvalidOperationException("FindmeAsync only supports Rest implementation types");
 
             var sw = Stopwatch.StartNew();
             var cachedData = await cache.GetStringAsync(key, cancellationToken);
@@ -56,8 +53,9 @@ namespace OElite.Restme.Hosting.Extensions
                 {
                     if (responseMessage.ExpiryOnUtc <= DateTime.UtcNow && refreshAction != null)
                     {
-                        await refreshAction().ConfigureAwait(false);
+                        _ = Task.Run(async () => await refreshAction(), cancellationToken);
                     }
+
                     return result;
                 }
 
@@ -85,7 +83,8 @@ namespace OElite.Restme.Hosting.Extensions
             var json = JsonSerializer.Serialize(queryObject);
             var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
 
-            return await cache.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction, cancellationToken);
+            return await cache.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction,
+                cancellationToken);
         }
 
         public static async Task CachemeAsync<T>(this IDistributedCache cache,
@@ -98,9 +97,6 @@ namespace OElite.Restme.Hosting.Extensions
             if (cache == null) throw new ArgumentNullException(nameof(cache));
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("Key cannot be null or empty", nameof(key));
             if (data == null) throw new ArgumentNullException(nameof(data));
-
-            if (!typeof(Rest).IsAssignableFrom(typeof(T)))
-                throw new InvalidOperationException("CachemeAsync only supports Rest implementation types");
 
             var expiry = expiryInSeconds > 0
                 ? DateTime.UtcNow.AddSeconds(expiryInSeconds)

@@ -35,7 +35,10 @@ namespace OElite.Restme.Hosting.Redis
             // Instance name prefix will be handled by prepending to keys in the adapter
             services.AddSingleton<ICacheProvider>(provider =>
             {
-                var config = new RestConfig();
+                var config = new RestConfig
+                {
+                    OperationMode = RestMode.RedisAsCache
+                };
                 return new RedisCacheProvider(connectionString, config);
             });
 

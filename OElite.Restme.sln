@@ -19,17 +19,21 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.GoogleUtils",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.Redis", "OElite.Restme.Redis\OElite.Restme.Redis.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.RabbitMQ", "OElite.Restme.RabbitMQ\OElite.Restme.RabbitMQ.csproj", "{00000000-0000-0000-0000-000000000000}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.RabbitMQ", "OElite.Restme.RabbitMQ\OElite.Restme.RabbitMQ.csproj", "{BD79D751-8895-1CBD-5B11-42748B62E6F2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.Azure", "OElite.Restme.Azure\OElite.Restme.Azure.csproj", "{00000000-0000-0000-0000-000000000000}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.Azure", "OElite.Restme.Azure\OElite.Restme.Azure.csproj", "{B9A86654-304A-F950-A11C-8CFF35C1AABC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.S3", "OElite.Restme.S3\OElite.Restme.S3.csproj", "{00000000-0000-0000-0000-000000000000}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.S3", "OElite.Restme.S3\OElite.Restme.S3.csproj", "{8F515A65-881C-509F-4C0F-0FBA550A3B83}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.MongoDb", "OElite.Restme.MongoDb\OElite.Restme.MongoDb.csproj", "{AA3B5FFD-BB47-419A-B454-FC718334AACF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.RateLimiting", "OElite.Restme.RateLimiting\OElite.Restme.RateLimiting.csproj", "{234AEB69-50CF-4D93-AEFD-D3C62FB09674}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.Hosting", "OElite.Restme.Hosting\OElite.Restme.Hosting.csproj", "{0312F186-0FAD-4772-8D0C-9BA705694810}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.MongoDb.IntegrationTests", "OElite.Restme.MongoDb.IntegrationTests\OElite.Restme.MongoDb.IntegrationTests.csproj", "{01613906-595C-40A6-A258-5631BC7BF3B9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{021B2872-F13D-492B-B2D7-BCA98693E81D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -89,18 +93,6 @@ Global
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.Build.0 = Release|Any CPU
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.ActiveCfg = Release|Any CPU
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.Build.0 = Release|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Debug|x64.Build.0 = Debug|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Debug|x86.Build.0 = Debug|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Release|x64.ActiveCfg = Release|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Release|x64.Build.0 = Release|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Release|x86.ActiveCfg = Release|Any CPU
-		{00000000-0000-0000-0000-000000000000}.Release|x86.Build.0 = Release|Any CPU
 		{AA3B5FFD-BB47-419A-B454-FC718334AACF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{AA3B5FFD-BB47-419A-B454-FC718334AACF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AA3B5FFD-BB47-419A-B454-FC718334AACF}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -137,10 +129,29 @@ Global
 		{0312F186-0FAD-4772-8D0C-9BA705694810}.Release|x64.Build.0 = Release|Any CPU
 		{0312F186-0FAD-4772-8D0C-9BA705694810}.Release|x86.ActiveCfg = Release|Any CPU
 		{0312F186-0FAD-4772-8D0C-9BA705694810}.Release|x86.Build.0 = Release|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Debug|x64.Build.0 = Debug|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Debug|x86.Build.0 = Debug|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Release|x64.ActiveCfg = Release|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Release|x64.Build.0 = Release|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Release|x86.ActiveCfg = Release|Any CPU
+		{01613906-595C-40A6-A258-5631BC7BF3B9}.Release|x86.Build.0 = Release|Any CPU
+		{B9A86654-304A-F950-A11C-8CFF35C1AABC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9A86654-304A-F950-A11C-8CFF35C1AABC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BD79D751-8895-1CBD-5B11-42748B62E6F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BD79D751-8895-1CBD-5B11-42748B62E6F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F515A65-881C-509F-4C0F-0FBA550A3B83}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F515A65-881C-509F-4C0F-0FBA550A3B83}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{01613906-595C-40A6-A258-5631BC7BF3B9} = {021B2872-F13D-492B-B2D7-BCA98693E81D}
 	EndGlobalSection
 EndGlobal

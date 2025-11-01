@@ -1,5 +1,6 @@
 using MongoDB.Driver;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 
 namespace OElite.Restme.MongoDb;
 
@@ -28,6 +29,9 @@ public class MongoDbAdapter
 
         // Register custom serializers
         DbObjectIdSerializerProvider.RegisterSerializer();
+
+        // Register decimal serializer to ensure decimals are stored as BsonDecimal128 instead of strings
+        RegisterDecimalSerializer();
 
         // Configure class mappings
         MongoClassMapConfigurator.ConfigureClassMappings();
@@ -302,6 +306,25 @@ public class MongoDbAdapter
         }
 
         return await collection.DeleteOneAsync(filterDef);
+    }
+
+    /// <summary>
+    /// Register decimal serializer to ensure decimals are stored as BsonDecimal128 numbers instead of strings
+    /// </summary>
+    private static void RegisterDecimalSerializer()
+    {
+        try
+        {
+            // Ensure decimal is always serialized as BsonDecimal128 (number) not string
+            var decimalSerializer = new MongoDB.Bson.Serialization.Serializers.DecimalSerializer(MongoDB.Bson.BsonType.Decimal128);
+
+            BsonSerializer.RegisterSerializer(typeof(decimal), decimalSerializer);
+            BsonSerializer.RegisterSerializer(typeof(decimal?), new MongoDB.Bson.Serialization.Serializers.NullableSerializer<decimal>(decimalSerializer));
+        }
+        catch (BsonSerializationException)
+        {
+            // Serializer already registered - this is fine
+        }
     }
 }
 

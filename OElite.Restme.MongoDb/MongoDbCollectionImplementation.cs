@@ -192,7 +192,12 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
             JsonElement jsonElement => ConvertJsonElementToBsonValue(jsonElement),
             MongoDbDocument doc => ConvertToMongoDocument(doc),
             Dictionary<string, object> dict => ConvertDictionaryToBsonDocument(dict),
-            IEnumerable<object> array => new BsonArray(array.Select(ConvertToBsonValue)),
+            // Handle arrays - check for array types before IEnumerable<object>
+            Array array => new BsonArray(array.Cast<object>().Select(ConvertToBsonValue)),
+            IEnumerable<object> enumerable => new BsonArray(enumerable.Select(ConvertToBsonValue)),
+            // Handle other IEnumerable types (like List<string>, string[], etc.)
+            System.Collections.IEnumerable enumerable when !(value is string) =>
+                new BsonArray(enumerable.Cast<object>().Select(ConvertToBsonValue)),
             _ => new BsonString(value?.ToString() ?? "")
         };
     }
