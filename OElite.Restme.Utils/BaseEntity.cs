@@ -5,11 +5,6 @@ namespace OElite;
 
 public class BaseEntity : IEntity
 {
-    public BaseEntity()
-    {
-        Id = new DbObjectId();
-    }
-
     [DbId(DbIdType.DbObjectId)]
     [DbField("_id")]
     public DbObjectId Id { get; set; }
