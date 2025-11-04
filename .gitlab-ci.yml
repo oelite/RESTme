@@ -84,11 +84,9 @@ run_tests:
   dependencies:
     - build_solution
   script:
-    # Skip tests in CI/CD - integration tests require external dependencies (MongoDB, etc.)
-    # Tests should be run in environments with proper infrastructure setup
     - echo "⚠️  Tests skipped in CI/CD pipeline"
     - echo "📋 Integration tests require MongoDB and other external dependencies"
-    - echo "🔧 Run tests locally with: dotnet test --configuration Release"
+    - echo "🔧 Run tests locally with dotnet test --configuration Release"
     - echo "✅ CI/CD focused on build validation and package deployment"
   artifacts:
     reports:
