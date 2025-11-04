@@ -4,13 +4,43 @@ namespace OElite;
 
 /// <summary>
 /// Custom MongoDB collection attribute - equivalent to RestmeTable but for MongoDB
-/// Specifies the collection name for MongoDB documents
+/// Specifies the collection name and advanced database management configuration
 /// </summary>
 [AttributeUsage(AttributeTargets.Class)]
 public class DbCollectionAttribute : Attribute
 {
     public string CollectionName { get; }
     public DbNamingConvention NamingConvention { get; set; } = DbNamingConvention.SnakeCase;
+
+    /// <summary>
+    /// Whether this collection should be enabled for sharding
+    /// </summary>
+    public bool EnableSharding { get; set; } = false;
+
+    /// <summary>
+    /// Whether to enable pre-splitting of shard chunks during bootstrap
+    /// </summary>
+    public bool EnablePreSplitting { get; set; } = false;
+
+    /// <summary>
+    /// Number of chunks to pre-split when sharding is enabled
+    /// </summary>
+    public int PreSplitChunks { get; set; } = 256;
+
+    /// <summary>
+    /// TTL expiration in seconds for automatic document cleanup (0 = no TTL)
+    /// </summary>
+    public int TtlExpirationSeconds { get; set; } = 0;
+
+    /// <summary>
+    /// Whether to validate the schema during bootstrap
+    /// </summary>
+    public bool ValidateSchema { get; set; } = false;
+
+    /// <summary>
+    /// Priority for collection creation during bootstrap (lower numbers first)
+    /// </summary>
+    public int BootstrapPriority { get; set; } = 100;
 
     public DbCollectionAttribute(string? collectionName = null,
         DbNamingConvention namingConvention = DbNamingConvention.SnakeCase)

@@ -11,6 +11,13 @@ public class BaseEntity : IEntity
 
     public EntityStatus Status { get; set; }
 
+    /// <summary>
+    /// Geographic region for GDPR compliance and data sovereignty
+    /// Used for region-aware sharding and data placement
+    /// Possible values: "eu", "us", "apac", "ca", "uk", "cn", etc.
+    /// </summary>
+    [DbField("region")]
+    public string? Region { get; set; }
 
     [DbFieldIgnore] public Dictionary<string, object>? MetaData { get; set; }
 }
