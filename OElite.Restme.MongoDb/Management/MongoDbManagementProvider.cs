@@ -445,15 +445,26 @@ public class MongoDbManagementProvider : IDbManagementProvider
 
         try
         {
+            // Initialize as successful, set to false only when errors occur
+            result.Success = true;
+
+            messages.Add($"Starting validation for configuration with {configuration.Collections?.Count ?? 0} collections");
+
             // Validate basic configuration
             if (configuration.Collections == null || !configuration.Collections.Any())
             {
                 messages.Add("Warning: No collections configured for bootstrap");
+                result.Success = false;
+                result.ErrorMessage = "No collections configured for bootstrap";
+                result.Messages = messages;
+                return result;
             }
 
             // Validate each collection configuration
             foreach (var collectionConfig in configuration.Collections)
             {
+                messages.Add($"Validating collection: {collectionConfig.CollectionName}");
+
                 if (string.IsNullOrEmpty(collectionConfig.CollectionName))
                 {
                     messages.Add("Error: Collection name cannot be empty");
@@ -463,45 +474,73 @@ public class MongoDbManagementProvider : IDbManagementProvider
                 // Validate shard key if specified
                 if (collectionConfig.ShardKey != null)
                 {
-                    if (!collectionConfig.ShardKey.Fields.Any())
+                    messages.Add($"Validating shard key for collection '{collectionConfig.CollectionName}' with {collectionConfig.ShardKey.Fields?.Count ?? 0} fields");
+
+                    if (collectionConfig.ShardKey.Fields == null || !collectionConfig.ShardKey.Fields.Any())
                     {
                         messages.Add($"Error: Shard key for collection '{collectionConfig.CollectionName}' has no fields");
                         result.Success = false;
                     }
-
-                    foreach (var field in collectionConfig.ShardKey.Fields)
+                    else
                     {
-                        if (string.IsNullOrEmpty(field.FieldName))
+                        foreach (var field in collectionConfig.ShardKey.Fields)
                         {
-                            messages.Add($"Error: Shard key field name cannot be empty in collection '{collectionConfig.CollectionName}'");
-                            result.Success = false;
+                            if (string.IsNullOrEmpty(field.FieldName))
+                            {
+                                messages.Add($"Error: Shard key field name cannot be empty in collection '{collectionConfig.CollectionName}'");
+                                result.Success = false;
+                            }
+                            else
+                            {
+                                messages.Add($"Shard key field validated: {field.FieldName}");
+                            }
                         }
                     }
                 }
 
                 // Validate indexes
-                foreach (var index in collectionConfig.Indexes)
+                messages.Add($"Validating {collectionConfig.Indexes?.Count ?? 0} indexes for collection '{collectionConfig.CollectionName}'");
+                if (collectionConfig.Indexes != null)
                 {
-                    if (string.IsNullOrEmpty(index.Name))
+                    foreach (var index in collectionConfig.Indexes)
                     {
-                        messages.Add($"Warning: Index in collection '{collectionConfig.CollectionName}' has no name");
-                    }
+                        messages.Add($"Validating index: {index.Name} with {index.Fields?.Count ?? 0} fields");
 
-                    if (!index.Fields.Any())
-                    {
-                        messages.Add($"Error: Index '{index.Name}' in collection '{collectionConfig.CollectionName}' has no fields");
-                        result.Success = false;
+                        if (string.IsNullOrEmpty(index.Name))
+                        {
+                            messages.Add($"Warning: Index in collection '{collectionConfig.CollectionName}' has no name");
+                        }
+
+                        if (index.Fields == null || !index.Fields.Any())
+                        {
+                            messages.Add($"Error: Index '{index.Name}' in collection '{collectionConfig.CollectionName}' has no fields");
+                            result.Success = false;
+                        }
+                        else
+                        {
+                            foreach (var field in index.Fields)
+                            {
+                                if (string.IsNullOrEmpty(field.FieldName))
+                                {
+                                    messages.Add($"Error: Index '{index.Name}' in collection '{collectionConfig.CollectionName}' has empty field name");
+                                    result.Success = false;
+                                }
+                                else
+                                {
+                                    messages.Add($"Index field validated: {field.FieldName}");
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             if (!result.Success)
             {
-                result.ErrorMessage = "Configuration validation failed";
+                result.ErrorMessage = $"Configuration validation failed. Details: {string.Join("; ", messages.Where(m => m.StartsWith("Error")))}";
             }
             else
             {
-                result.Success = true;
                 messages.Add("Configuration validation successful");
             }
 
@@ -510,7 +549,9 @@ public class MongoDbManagementProvider : IDbManagementProvider
         catch (Exception ex)
         {
             result.Success = false;
-            result.ErrorMessage = ex.Message;
+            result.ErrorMessage = $"Validation exception: {ex.Message}";
+            messages.Add($"Exception during validation: {ex}");
+            result.Messages = messages;
         }
 
         return result;

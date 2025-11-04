@@ -1,18 +1,52 @@
 # OElite.Restme.MongoDb
 
-A comprehensive MongoDB library for the OElite platform that provides efficient database operations, advanced querying capabilities, and seamless integration with the OElite ecosystem.
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/oelite)
+[![NuGet](https://img.shields.io/badge/nuget-v2.1.0-blue.svg)](https://www.nuget.org/packages/OElite.Restme.MongoDb/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+MongoDB integration package for OElite platform, providing enterprise-grade database management with GDPR compliance, region-aware sharding, and attribute-based configuration.
+
+## 🚀 Key Features
+
+### **Region-Aware Sharding & GDPR Compliance**
+- **Geographic Data Isolation**: Automatic region-based data placement for GDPR/CCPA compliance
+- **Cross-Region Migration**: Built-in data migration tools for compliance requirements
+- **Zone Sharding**: MongoDB zone sharding for geographic data sovereignty
+- **Retention Policies**: Configurable data retention per region with auto-cleanup
+- **Data Sovereignty**: Ensures personal data stays within required legal jurisdictions
+- **Compliance Validation**: Built-in validation for cross-region transfer restrictions
+
+### **Attribute-Based Configuration**
+- **Declarative Sharding**: Define shard keys directly on entity classes with region awareness
+- **Performance Indexing**: Automatic index generation for optimal query performance
+- **Type-Safe Configuration**: Compile-time validation of database schema
+- **Zero-Configuration Bootstrap**: Automatic database setup from entity attributes
+- **Region-First Sharding**: Smart region placement strategies for optimal performance
+- **Auto-Index Generation**: Intelligent indexing for region-aware queries
+
+### **Enterprise-Scale Performance**
+- **Trillion-Record Support**: Optimized for massive datasets (EdgeQ1 S3 storage patterns)
+- **Smart Pre-Splitting**: Intelligent chunk distribution for optimal performance
+- **Background Operations**: Non-blocking index creation and maintenance
+- **Health Monitoring**: Comprehensive database health checks and metrics
+- **Zone-Based Scaling**: Geographic distribution for global performance
+- **Migration Optimization**: Efficient cross-region data movement strategies
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Installation](#installation)
 - [Core Features](#core-features)
+- [Region-Aware Sharding & GDPR Compliance](#region-aware-sharding--gdpr-compliance)
+- [Attribute-Based Database Configuration](#attribute-based-database-configuration)
 - [Entity Configuration](#entity-configuration)
 - [Basic Operations](#basic-operations)
 - [Advanced Querying](#advanced-querying)
 - [Aggregation Pipelines](#aggregation-pipelines)
 - [Denormalization System](#denormalization-system)
 - [Performance Optimization](#performance-optimization)
+- [Geographic Data Management](#geographic-data-management)
+- [Migration & Compliance](#migration--compliance)
 - [Best Practices](#best-practices)
 - [Examples](#examples)
 - [API Reference](#api-reference)
@@ -33,6 +67,371 @@ Add the package reference to your project:
 
 ```xml
 <PackageReference Include="OElite.Restme.MongoDb" Version="2.0.10" />
+```
+
+## Region-Aware Sharding & GDPR Compliance
+
+The library provides comprehensive support for geographic data management, ensuring compliance with GDPR, CCPA, and other regional data protection regulations through intelligent sharding and automatic data placement.
+
+### 🌍 Geographic Data Sovereignty
+
+#### BaseEntity Region Support
+All entities automatically inherit region awareness through the enhanced `BaseEntity` class:
+
+```csharp
+public class Customer : BaseEntity
+{
+    public string Email { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+
+    // Region field automatically inherited from BaseEntity
+    // Controls geographic data placement for GDPR compliance
+    // public string? Region { get; set; } // from BaseEntity
+}
+
+// Entity automatically placed in correct geographic zone
+var customer = new Customer
+{
+    Email = "user@example.com",
+    FirstName = "John",
+    Region = "EU" // Ensures data stays in European jurisdiction
+};
+```
+
+#### Supported Geographic Regions
+- **EU**: European Union (GDPR compliance)
+- **US**: United States (CCPA compliance)
+- **UK**: United Kingdom (UK GDPR)
+- **CA**: Canada (PIPEDA compliance)
+- **APAC**: Asia-Pacific (various local regulations)
+- **CN**: China (Cybersecurity Law compliance)
+
+### 🗂️ Region-Aware Sharding Strategies
+
+#### 1. Region-First Sharding (Recommended for GDPR)
+Places region as the first field in the shard key for optimal data isolation:
+
+```csharp
+[DbCollection("customer_data", EnableSharding = true)]
+[DbShardKey("UserId", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
+public class CustomerData : BaseEntity
+{
+    public DbObjectId UserId { get; set; }
+    public string PersonalData { get; set; } = string.Empty;
+
+    // Effective shard key: { region: 1, user_id: 1 }
+    // Ensures all EU data is in EU shards, US data in US shards, etc.
+}
+```
+
+#### 2. Region-Last Sharding (Performance Optimized)
+Places region at the end for better distribution while maintaining compliance:
+
+```csharp
+[DbCollection("product_analytics", EnableSharding = true)]
+[DbShardKey("ProductId", "EventDate", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionLast)]
+public class ProductAnalytics : BaseEntity
+{
+    public DbObjectId ProductId { get; set; }
+    public DateTime EventDate { get; set; }
+
+    // Effective shard key: { product_id: 1, event_date: 1, region: 1 }
+    // Better distribution for global products with regional compliance
+}
+```
+
+#### 3. Region-Middle Sharding (Balanced Approach)
+Places region in the middle for specific use cases:
+
+```csharp
+[DbCollection("order_tracking", EnableSharding = true)]
+[DbShardKey("CustomerId", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionMiddle, "OrderDate")]
+public class OrderTracking : BaseEntity
+{
+    public DbObjectId CustomerId { get; set; }
+    public DateTime OrderDate { get; set; }
+
+    // Effective shard key: { customer_id: 1, region: 1, order_date: 1 }
+    // Optimal for customer-centric data with regional compliance
+}
+```
+
+### 🔐 Automatic Zone Configuration
+
+The library automatically configures MongoDB zones based on region data:
+
+```csharp
+// Geographic configuration with zone mapping
+var geographicConfig = GeographicConfiguration.CreateGdprCompliantConfiguration();
+
+// Automatic zone creation during bootstrap
+await dbCentre.BootstrapEntitiesAsync<CustomerData>(new DbBootstrapOptions
+{
+    EnableSharding = true,
+    EnablePreSplitting = true,
+    GeographicConfiguration = geographicConfig
+});
+
+// Results in MongoDB zones:
+// Zone "EU" -> Region: { "region": "EU" }
+// Zone "US" -> Region: { "region": "US" }
+// Zone "UK" -> Region: { "region": "UK" }
+```
+
+### 📋 Attribute-Based Configuration Examples
+
+#### GDPR-Compliant Customer Entity
+```csharp
+[DbCollection("gdpr_customers", EnableSharding = true, ValidateSchema = true)]
+[DbShardKey("Email", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
+[DbIndex("idx_customer_lookup", "Email", "Region", IsUnique = true)]
+[DbIndex("idx_consent_tracking", "Region", "ConsentDate", "ConsentStatus")]
+[DbIndex("idx_data_retention", "Region", "CreatedOnUtc", TtlExpirationSeconds = 94608000)] // 3 years
+public class GdprCustomer : BaseEntity
+{
+    [DbField("email")]
+    public string Email { get; set; } = string.Empty;
+
+    [DbField("first_name")]
+    public string FirstName { get; set; } = string.Empty;
+
+    [DbField("last_name")]
+    public string LastName { get; set; } = string.Empty;
+
+    [DbField("consent_date")]
+    public DateTime ConsentDate { get; set; }
+
+    [DbField("consent_status")]
+    public string ConsentStatus { get; set; } = string.Empty; // "granted", "withdrawn", "expired"
+
+    [DbField("data_processing_purposes")]
+    public List<string> DataProcessingPurposes { get; set; } = new();
+
+    // Region inherited from BaseEntity ensures geographic compliance
+}
+```
+
+#### EdgeQ1 S3 Storage with Region Awareness
+```csharp
+[DbCollection("edge_objects", EnableSharding = true, EnablePreSplitting = true, PreSplitChunks = 1024)]
+[DbShardKey("Bucket", "KeyHash", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
+[DbIndex("idx_object_lookup", "Bucket", "Key", "Region", IsUnique = true)]
+[DbIndex("idx_region_listing", "Region", "Bucket", "LastModified")]
+[DbIndex("idx_tenant_objects", "OwnerId", "Region", "Bucket", IsSparse = true)]
+public class EdgeQ1Object : BaseEntity
+{
+    [DbField("bucket")]
+    public string Bucket { get; set; } = string.Empty;
+
+    [DbField("key")]
+    public string Key { get; set; } = string.Empty;
+
+    [DbField("key_hash")]
+    public string KeyHash { get; set; } = string.Empty;
+
+    [DbField("size")]
+    public long Size { get; set; }
+
+    [DbField("content_type")]
+    public string ContentType { get; set; } = string.Empty;
+
+    [DbField("owner_id")]
+    public DbObjectId? OwnerId { get; set; }
+
+    // Region field ensures objects are stored in correct geographic zone
+    // for compliance with local data residency requirements
+}
+```
+
+### 🚀 Zero-Configuration Bootstrap
+
+#### Automatic Entity Discovery and Configuration
+```csharp
+public static async Task<DbBootstrapResult> AutoBootstrapWithRegionAwarenessAsync(string connectionString)
+{
+    using var dbCentre = new MongoDbCentre(connectionString);
+
+    // Automatic bootstrap discovers all entity attributes
+    var result = await dbCentre.BootstrapEntitiesAsync<GdprCustomer, EdgeQ1Object, OrderTracking>();
+
+    if (result.Success)
+    {
+        Console.WriteLine("✅ Region-aware database bootstrap completed!");
+        Console.WriteLine($"Configured collections: {result.ConfiguredCollections.Count}");
+        Console.WriteLine($"Created zones: {string.Join(", ", result.CreatedZones)}");
+        Console.WriteLine($"Applied retention policies: {result.RetentionPoliciesApplied}");
+    }
+
+    return result;
+}
+```
+
+#### Entity Validation and Configuration Scanning
+```csharp
+// Validate all entity configurations before deployment
+public static void ValidateEntityConfigurations()
+{
+    var entityTypes = new[]
+    {
+        typeof(GdprCustomer),
+        typeof(EdgeQ1Object),
+        typeof(OrderTracking)
+    };
+
+    var validationResult = EntityAttributeScanner.ValidateEntityConfigurations(entityTypes);
+
+    if (validationResult.IsValid)
+    {
+        Console.WriteLine("✅ All entity configurations are valid");
+        Console.WriteLine($"Validated entities: {string.Join(", ", validationResult.ValidatedEntities)}");
+    }
+    else
+    {
+        Console.WriteLine("❌ Entity configuration validation failed:");
+        foreach (var error in validationResult.ValidationErrors)
+        {
+            Console.WriteLine($"  - {error}");
+        }
+    }
+}
+```
+
+## Attribute-Based Database Configuration
+
+The library provides a comprehensive attribute-based approach to database configuration, eliminating the need for manual setup while ensuring optimal performance and compliance.
+
+### 🏷️ Core Attributes
+
+#### DbCollectionAttribute
+Controls collection-level settings including sharding and validation:
+
+```csharp
+[DbCollection("products",
+    EnableSharding = true,
+    EnablePreSplitting = true,
+    PreSplitChunks = 512,
+    ValidateSchema = true,
+    TtlExpirationSeconds = 7776000, // 90 days
+    BootstrapPriority = 1)]
+public class Product : BaseEntity
+{
+    // Entity properties...
+}
+```
+
+#### DbShardKeyAttribute
+Defines shard key configuration with region awareness:
+
+```csharp
+// Simple shard key
+[DbShardKey("ProductId")]
+
+// Compound shard key with region awareness
+[DbShardKey("TenantId", "ProductId", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
+
+// Hashed shard key for even distribution
+[DbShardKey("UserId", IsHashed = new[] { true })]
+
+// Complex configuration with unique constraint
+[DbShardKey("Email", "Region", IsUnique = true, IncludeRegion = false)] // Region explicitly in key
+```
+
+#### DbIndexAttribute
+Configures performance and compliance indexes:
+
+```csharp
+// Simple index
+[DbIndex("idx_name", "Name")]
+
+// Compound index with sorting
+[DbIndex("idx_price_category", "CategoryId", "Price", Directions = new[] { 1, -1 })]
+
+// Unique constraint index
+[DbIndex("idx_unique_email", "Email", "Region", IsUnique = true)]
+
+// Sparse index for optional fields
+[DbIndex("idx_owner", "OwnerId", IsSparse = true)]
+
+// TTL index for automatic cleanup
+[DbIndex("idx_expiry", "ExpiresAt", TtlExpirationSeconds = 0)]
+
+// Text search index
+[DbIndex("idx_search", "Name", "Description", IsTextIndex = true)]
+
+// Background creation for large collections
+[DbIndex("idx_background", "CreatedAt", CreateInBackground = true, Priority = 200)]
+```
+
+### 🔍 Automatic Index Generation
+
+The library automatically generates standard indexes for common patterns:
+
+```csharp
+public class Product : BaseEntity
+{
+    // Automatic indexes are created for BaseEntity properties:
+    // - idx_auto_created: CreatedOnUtc
+    // - idx_auto_updated: UpdatedOnUtc
+    // - idx_auto_active: IsActive
+    // - idx_auto_owner_merchant: OwnerMerchantId (sparse)
+    // - idx_auto_owner_contact: OwnerContactId (sparse)
+    // - idx_auto_region: Region (sparse) - for GDPR compliance
+
+    public string Name { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+}
+```
+
+### 📊 Configuration Scanning and Bootstrap
+
+#### Entity Attribute Scanner
+Automatically discovers and validates entity configurations:
+
+```csharp
+// Scan entities and build configuration
+var entityTypes = new[] { typeof(Product), typeof(Customer), typeof(Order) };
+var configuration = EntityAttributeScanner.ScanEntitiesForBootstrapConfiguration(
+    entityTypes,
+    new DbBootstrapOptions
+    {
+        EnableSharding = true,
+        EnablePreSplitting = true,
+        CreateIndexesInBackground = true
+    });
+
+// Configuration includes:
+// - Collection settings from [DbCollection]
+// - Shard key definitions from [DbShardKey]
+// - Index definitions from [DbIndex]
+// - Automatic indexes for BaseEntity properties
+// - Region-aware configurations
+// - Priority-ordered bootstrap sequence
+```
+
+#### Bootstrap Service Integration
+```csharp
+public class ApplicationDbCentre : MongoDbCentre
+{
+    public ApplicationDbCentre(string connectionString) : base(connectionString) { }
+
+    // Strongly-typed collections
+    public IMongoDbCollection<Product> Products => GetMongoDbCollection<Product>();
+    public IMongoDbCollection<Customer> Customers => GetMongoDbCollection<Customer>();
+
+    // Automatic bootstrap
+    public async Task<DbBootstrapResult> InitializeAsync()
+    {
+        return await this.BootstrapEntitiesAsync<Product, Customer, Order>(
+            new DbBootstrapOptions
+            {
+                EnableSharding = true,
+                EnablePreSplitting = true,
+                CreateIndexesInBackground = true,
+                MaxRetryAttempts = 3,
+                TimeoutSeconds = 300
+            });
+    }
+}
 ```
 
 ## Core Features
@@ -2241,10 +2640,25 @@ For support and questions:
 - Contact the OElite development team
 - Check the documentation wiki
 
+## 📚 Detailed Documentation
+
+For comprehensive guides on specific features, see the detailed documentation:
+
+### Core Features Documentation
+- **[Region-Aware Sharding & GDPR Compliance](docs/REGION-AWARE-SHARDING.md)** - Complete guide to implementing geographic data management and compliance
+- **[Attribute-Based Configuration](../OElite.Restme.Utils/docs/DATA-ATTRIBUTES-CONFIGURATION.md)** - Detailed guide to using database attributes and entity configuration
+- **[Migration & Compliance Tools](docs/REGION-AWARE-SHARDING.md#migration--compliance)** - GDPR right to erasure, data portability, and cross-region migration
+- **[Performance Optimization](README.md#performance-optimization)** - Advanced performance tuning and best practices
+
+### Quick Reference
+- **[Examples Repository](docs/REGION-AWARE-SHARDING.md#examples)** - Real-world implementation examples
+- **[Best Practices](docs/REGION-AWARE-SHARDING.md#best-practices)** - Recommended patterns and approaches
+- **[Troubleshooting Guide](README.md#troubleshooting)** - Common issues and solutions
+
 ---
 
-**Version**: 2.1.0  
-**Last Updated**: 2024  
+**Version**: 2.3.0
+**Last Updated**: 2024
 **Compatibility**: .NET 9.0+
 
 ## 🚀 High-Performance Update Operations
@@ -2711,8 +3125,384 @@ var products = await Products.Where(p => p.Sku == sku).ToListAsync(); // Don't l
 var hasProducts = products.Count > 0; // Inefficient existence check
 ```
 
+## Geographic Data Management
+
+The library provides comprehensive geographic data management capabilities for global applications that need to comply with regional data protection regulations.
+
+### 🌐 GeographicConfiguration
+
+#### GDPR-Compliant Configuration
+```csharp
+var config = GeographicConfiguration.CreateGdprCompliantConfiguration();
+
+// Results in configuration with:
+// - EU region with GDPR compliance rules
+// - US region with CCPA compliance rules
+// - UK region with UK GDPR rules
+// - Strict transfer restrictions between regions
+// - Automatic data retention policies
+// - Geographic zone mapping for MongoDB
+```
+
+#### Custom Geographic Configuration
+```csharp
+var customConfig = new GeographicConfiguration
+{
+    DefaultRegion = "US",
+    AllowCrossRegionMigration = true,
+    MigrationStrategy = RegionMigrationStrategy.CopyAndArchive,
+    MigrationRetentionPeriod = TimeSpan.FromDays(365),
+    Regions = new List<RegionConfiguration>
+    {
+        new()
+        {
+            RegionId = "US",
+            DataCenters = new[] { "us-east-1", "us-west-2" },
+            Jurisdiction = new DataJurisdiction
+            {
+                LegalFramework = "CCPA",
+                TransferRestrictions = new[] { "No EU transfers without consent" },
+                RequiresEncryptionAtRest = true
+            },
+            RetentionPolicy = new DataRetentionPolicy
+            {
+                DefaultRetentionPeriod = TimeSpan.FromDays(2555), // 7 years
+                PurgeDeletedDataAfter = TimeSpan.FromDays(30)
+            }
+        },
+        new()
+        {
+            RegionId = "EU",
+            DataCenters = new[] { "eu-west-1", "eu-central-1" },
+            Jurisdiction = new DataJurisdiction
+            {
+                LegalFramework = "GDPR",
+                TransferRestrictions = new[] { "No non-EU transfers without adequacy decision" },
+                RequiresEncryptionAtRest = true
+            },
+            RetentionPolicy = new DataRetentionPolicy
+            {
+                DefaultRetentionPeriod = TimeSpan.FromDays(1095), // 3 years
+                PurgeDeletedDataAfter = TimeSpan.FromDays(30)
+            }
+        }
+    }
+};
+```
+
+### 🗺️ Zone-Based Sharding
+
+#### Automatic Zone Configuration
+```csharp
+// Bootstrap with geographic zones
+var result = await dbCentre.BootstrapEntitiesAsync<CustomerData>(
+    new DbBootstrapOptions
+    {
+        EnableSharding = true,
+        GeographicConfiguration = config
+    });
+
+// Automatically creates MongoDB zones:
+// sh.addShardToZone("shard01", "EU")
+// sh.addShardToZone("shard02", "US")
+// sh.addShardToZone("shard03", "UK")
+// sh.updateZoneKeyRange("customer_data", { "region": "EU" }, { "region": "EU\u9999" }, "EU")
+```
+
+#### Zone-Aware Queries
+```csharp
+// Queries automatically route to correct geographic zones
+public class CustomerRepository : DataRepository
+{
+    public MongoQuery<Customer> Customers => new(_adapter.GetCollection<Customer>());
+
+    // This query only hits EU shards when region = "EU"
+    public async Task<List<Customer>> GetEuCustomersAsync()
+    {
+        return await Customers
+            .Where(c => c.Region == "EU")
+            .Where(c => c.IsActive == true)
+            .ToListAsync();
+    }
+
+    // Cross-region queries hit multiple zones (use carefully for compliance)
+    public async Task<List<Customer>> GetAllActiveCustomersAsync()
+    {
+        return await Customers
+            .Where(c => c.IsActive == true)
+            .ToListAsync(); // May hit multiple geographic zones
+    }
+}
+```
+
+### 📊 Region-Aware Analytics
+
+#### Geographic Data Distribution
+```csharp
+public async Task<Dictionary<string, int>> GetCustomerDistributionByRegionAsync()
+{
+    return await Customers
+        .Where(c => c.IsActive == true)
+        .GroupByAsync(c => c.Region ?? "Unknown");
+}
+
+public async Task<object> GetRegionalStatisticsAsync()
+{
+    var totalsByRegion = await Customers
+        .Where(c => c.IsActive == true)
+        .GroupByAsync(c => c.Region ?? "Unknown");
+
+    return totalsByRegion.ToDictionary(g => g.Key, g => new
+    {
+        CustomerCount = g.Value.Count,
+        AverageCreationDate = g.Value.Average(c => c.CreatedOnUtc.Ticks),
+        OldestCustomer = g.Value.Min(c => c.CreatedOnUtc),
+        NewestCustomer = g.Value.Max(c => c.CreatedOnUtc)
+    });
+}
+```
+
+## Migration & Compliance
+
+The library includes comprehensive data migration tools for regional compliance, supporting multiple migration strategies while maintaining data integrity and regulatory compliance.
+
+### 🚀 RegionDataMigrator
+
+#### Migration Strategies
+```csharp
+public enum RegionMigrationStrategy
+{
+    CopyAndDelete,      // Complete data transfer (GDPR right to portability)
+    CopyAndArchive,     // Keep original with retention policy
+    PreventMigration,   // Block transfer for compliance
+    FederatedAccess     // Virtual access without data movement
+}
+```
+
+#### Basic Migration Operations
+```csharp
+var migrator = new RegionDataMigrator(managementProvider, geographicConfig);
+
+// Migrate single customer from US to EU
+var result = await migrator.MigrateEntityAsync<Customer>(
+    customerId,
+    sourceRegion: "US",
+    targetRegion: "EU",
+    new RegionMigrationOptions
+    {
+        Strategy = RegionMigrationStrategy.CopyAndDelete,
+        VerifyIntegrity = true,
+        MaxRetryAttempts = 3
+    });
+
+if (result.Success)
+{
+    Console.WriteLine($"✅ Customer migrated successfully in {result.Duration?.TotalSeconds:F2}s");
+    Console.WriteLine($"Migration steps: {string.Join(", ", result.MigrationSteps)}");
+}
+```
+
+#### Batch Migration for Compliance
+```csharp
+// Batch migrate customers for GDPR compliance
+var customerIds = await GetCustomersRequiringMigrationAsync("EU");
+
+var batchResult = await migrator.MigrateBatchAsync<Customer>(
+    customerIds,
+    sourceRegion: "US",
+    targetRegion: "EU",
+    new RegionMigrationOptions
+    {
+        Strategy = RegionMigrationStrategy.CopyAndArchive,
+        VerifyIntegrity = true
+    });
+
+Console.WriteLine($"Migration completed: {batchResult.SuccessfulMigrations}/{batchResult.TotalEntities}");
+if (batchResult.FailedMigrations > 0)
+{
+    Console.WriteLine("Failed migrations:");
+    foreach (var error in batchResult.Errors)
+    {
+        Console.WriteLine($"  - {error}");
+    }
+}
+```
+
+### ✅ Compliance Validation
+
+#### Pre-Migration Compliance Checks
+```csharp
+// Validate compliance before migration
+var complianceResult = migrator.ValidateMigrationCompliance("US", "EU");
+
+if (!complianceResult.IsCompliant)
+{
+    Console.WriteLine("❌ Migration blocked by compliance issues:");
+    foreach (var issue in complianceResult.ComplianceIssues)
+    {
+        Console.WriteLine($"  - {issue}");
+    }
+    return; // Don't proceed with migration
+}
+
+if (complianceResult.ComplianceWarnings.Any())
+{
+    Console.WriteLine("⚠️ Migration warnings:");
+    foreach (var warning in complianceResult.ComplianceWarnings)
+    {
+        Console.WriteLine($"  - {warning}");
+    }
+}
+```
+
+#### GDPR Right to Data Portability
+```csharp
+public async Task<byte[]> ExportCustomerDataForPortabilityAsync(DbObjectId customerId)
+{
+    // 1. Validate customer consent for data export
+    var customer = await Customers.Where(c => c.Id == customerId).FirstOrDefaultAsync();
+    if (customer?.ConsentStatus != "granted")
+    {
+        throw new InvalidOperationException("Customer has not granted consent for data export");
+    }
+
+    // 2. Gather all related data across collections
+    var customerData = await Customers.Where(c => c.Id == customerId).FirstOrDefaultAsync();
+    var orders = await Orders.Where(o => o.CustomerId == customerId).ToListAsync();
+    var addresses = await Addresses.Where(a => a.CustomerId == customerId).ToListAsync();
+
+    // 3. Create portable data package
+    var exportData = new
+    {
+        Customer = customerData,
+        Orders = orders,
+        Addresses = addresses,
+        ExportDate = DateTime.UtcNow,
+        LegalBasis = "GDPR Article 20 - Right to Data Portability",
+        DataRetentionNotice = "This export contains personal data valid as of export date"
+    };
+
+    // 4. Return as JSON for portability
+    return System.Text.Encoding.UTF8.GetBytes(
+        System.Text.Json.JsonSerializer.Serialize(exportData, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        }));
+}
+```
+
+#### GDPR Right to be Forgotten (Erasure)
+```csharp
+public async Task<bool> EraseCustomerDataAsync(DbObjectId customerId, string legalBasis)
+{
+    try
+    {
+        // 1. Validate legal basis for erasure
+        if (!IsValidErasureBasis(legalBasis))
+        {
+            throw new InvalidOperationException($"Invalid legal basis for erasure: {legalBasis}");
+        }
+
+        // 2. Identify all data related to customer across collections
+        var collections = new[]
+        {
+            (Collection: Customers, Filter: (Expression<Func<Customer, bool>>)(c => c.Id == customerId)),
+            (Collection: Orders, Filter: (Expression<Func<Order, bool>>)(o => o.CustomerId == customerId)),
+            (Collection: Addresses, Filter: (Expression<Func<Address, bool>>)(a => a.CustomerId == customerId))
+        };
+
+        // 3. Perform secure deletion across all collections
+        foreach (var (collection, filter) in collections)
+        {
+            await collection.Where(filter).DeleteAsync();
+        }
+
+        // 4. Log erasure for compliance audit trail
+        await AuditLog.InsertAsync(new DataErasureAuditEntry
+        {
+            CustomerId = customerId,
+            ErasureDate = DateTime.UtcNow,
+            LegalBasis = legalBasis,
+            ErasedCollections = collections.Select(c => c.Collection.GetType().Name).ToList(),
+            RequestedBy = "system", // or actual user ID
+            ComplianceFramework = "GDPR Article 17"
+        });
+
+        return true;
+    }
+    catch (Exception ex)
+    {
+        // Log failure for compliance audit trail
+        await AuditLog.InsertAsync(new DataErasureFailureEntry
+        {
+            CustomerId = customerId,
+            FailureDate = DateTime.UtcNow,
+            ErrorMessage = ex.Message,
+            LegalBasis = legalBasis
+        });
+
+        throw;
+    }
+}
+
+private bool IsValidErasureBasis(string legalBasis)
+{
+    var validBases = new[]
+    {
+        "GDPR Article 17(1)(a) - Consent withdrawn",
+        "GDPR Article 17(1)(b) - No longer necessary",
+        "GDPR Article 17(1)(c) - Unlawful processing",
+        "GDPR Article 17(1)(d) - Objection to processing",
+        "GDPR Article 17(1)(e) - Legal obligation"
+    };
+
+    return validBases.Contains(legalBasis);
+}
+```
+
+### 📝 Compliance Audit Trail
+
+#### Automatic Audit Logging
+```csharp
+[DbCollection("compliance_audit", EnableSharding = true)]
+[DbShardKey("Region", "AuditDate", IncludeRegion = false)] // Region explicit in shard key
+[DbIndex("idx_audit_timeline", "Region", "AuditDate", "ComplianceFramework")]
+[DbIndex("idx_customer_audit", "CustomerId", "AuditDate")]
+[DbIndex("idx_cleanup", "AuditDate", TtlExpirationSeconds = 220752000)] // 7 years retention
+public class ComplianceAuditEntry : BaseEntity
+{
+    [DbField("customer_id")]
+    public DbObjectId CustomerId { get; set; }
+
+    [DbField("audit_date")]
+    public DateTime AuditDate { get; set; }
+
+    [DbField("action_type")]
+    public string ActionType { get; set; } = string.Empty; // "migration", "erasure", "export", "consent_change"
+
+    [DbField("legal_basis")]
+    public string LegalBasis { get; set; } = string.Empty;
+
+    [DbField("compliance_framework")]
+    public string ComplianceFramework { get; set; } = string.Empty; // "GDPR", "CCPA", "PIPEDA"
+
+    [DbField("source_region")]
+    public string? SourceRegion { get; set; }
+
+    [DbField("target_region")]
+    public string? TargetRegion { get; set; }
+
+    [DbField("requested_by")]
+    public string RequestedBy { get; set; } = string.Empty;
+
+    [DbField("audit_details")]
+    public Dictionary<string, object> AuditDetails { get; set; } = new();
+}
+```
+
 ## Version History
 
+- **v2.3.0** - Added comprehensive region-aware sharding, GDPR compliance features, geographic data management, and cross-region migration tools
 - **v2.2.0** - Added high-performance UpdateBuilder<T>, enhanced MongoQueryExtensions with advanced LINQ support, and ExpressionToMongoPipeline for sophisticated aggregation operations
 - **v2.1.0** - Added MongoDB class mapping and conflict resolution system with MongoPropertyConflictResolver, MongoClassMapConfigurator, and enhanced RestmeDbAttributeConvention
 - **v2.0.9** - Enhanced aggregation operations and LINQ expression support

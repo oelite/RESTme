@@ -53,6 +53,21 @@ public class DbBootstrapService
             result.Success = bootstrapResult.Success;
             result.ErrorMessage = bootstrapResult.ErrorMessage;
 
+            // Copy essential bootstrap results to main result
+            result.ConfiguredCollections = bootstrapResult.ConfiguredCollections;
+            result.ShardKeysConfigured = bootstrapResult.ShardKeysConfigured;
+            if (bootstrapResult.Messages != null && result.Messages == null)
+            {
+                result.Messages = new List<string>();
+            }
+            if (bootstrapResult.Messages != null)
+            {
+                foreach (var message in bootstrapResult.Messages)
+                {
+                    result.Messages.Add(message);
+                }
+            }
+
             // Gather post-bootstrap health information
             if (result.Success)
             {
@@ -128,6 +143,7 @@ public class DbBootstrapService
         return await BootstrapAsync(configuration, cancellationToken);
     }
 
+
     /// <summary>
     /// Validate database configuration without applying changes
     /// </summary>
@@ -183,7 +199,7 @@ public class DbBootstrapService
 
     #region Private Methods
 
-    private async Task<DbManagementResult> ExecuteBootstrapWithRetryAsync(
+    private async Task<DbBootstrapResult> ExecuteBootstrapWithRetryAsync(
         DbBootstrapConfiguration configuration,
         CancellationToken cancellationToken)
     {
@@ -194,11 +210,60 @@ public class DbBootstrapService
         {
             try
             {
-                var result = await _managementProvider.InitializeDatabaseAsync(configuration, cancellationToken);
+                // Debug: Log configuration details
+                Console.WriteLine($"DEBUG: Attempting bootstrap with {configuration.Collections?.Count ?? 0} collections");
+                foreach (var col in configuration.Collections ?? Enumerable.Empty<DbCollectionConfiguration>())
+                {
+                    Console.WriteLine($"DEBUG: Collection: {col.CollectionName}");
+                }
+
+                var managementResult = await _managementProvider.InitializeDatabaseAsync(configuration, cancellationToken);
+
+                Console.WriteLine($"DEBUG: InitializeDatabaseAsync returned Success = {managementResult.Success}");
+                Console.WriteLine($"DEBUG: Error message: {managementResult.ErrorMessage}");
+
+                // Convert DbManagementResult to DbBootstrapResult
+                var result = new DbBootstrapResult
+                {
+                    Success = managementResult.Success,
+                    ErrorMessage = managementResult.ErrorMessage,
+                    Messages = managementResult.Messages,
+                    ExecutionTime = managementResult.ExecutionTime,
+                    Metadata = managementResult.Metadata
+                };
 
                 if (result.Success)
                 {
+                    Console.WriteLine($"DEBUG: Bootstrap SUCCESS branch entered");
                     result.Messages.Add($"Bootstrap completed successfully on attempt {attempt}");
+
+                    // Populate ConfiguredCollections and ShardKeysConfigured
+                    if (configuration.Collections != null)
+                    {
+                        Console.WriteLine($"DEBUG: Populating ConfiguredCollections with {configuration.Collections.Count} collections");
+                        var configuredCollections = new List<string>();
+                        foreach (var collection in configuration.Collections)
+                        {
+                            if (!string.IsNullOrEmpty(collection.CollectionName))
+                            {
+                                configuredCollections.Add(collection.CollectionName);
+                                Console.WriteLine($"DEBUG: Added collection: {collection.CollectionName}");
+                            }
+                        }
+                        result.ConfiguredCollections = configuredCollections;
+                        Console.WriteLine($"DEBUG: Final ConfiguredCollections count: {result.ConfiguredCollections?.Count ?? 0}");
+
+                        // Count shard keys configured
+                        var shardKeysCount = configuration.Collections
+                            .Count(c => c.ShardKey != null && c.ShardKey.Fields?.Any() == true);
+                        result.ShardKeysConfigured = shardKeysCount;
+                        Console.WriteLine($"DEBUG: ShardKeysConfigured: {result.ShardKeysConfigured}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"DEBUG: configuration.Collections is null!");
+                    }
+
                     return result;
                 }
 
@@ -220,17 +285,17 @@ public class DbBootstrapService
 
                 if (attempt == maxAttempts)
                 {
-                    return new DbManagementResult
+                    return new DbBootstrapResult
                     {
                         Success = false,
                         ErrorMessage = ex.Message,
-                        Messages = { $"Bootstrap failed after {maxAttempts} attempts: {ex.Message}" }
+                        Messages = new List<string> { $"Bootstrap failed after {maxAttempts} attempts: {ex.Message}" }
                     };
                 }
             }
         }
 
-        return new DbManagementResult
+        return new DbBootstrapResult
         {
             Success = false,
             ErrorMessage = "Bootstrap failed after all retry attempts"
@@ -403,6 +468,12 @@ public class DbBootstrapService
             if (options.EnableSharding && ShouldShardEntity(entityType))
             {
                 config.ShardKey = CreateShardKeyForEntity(entityType);
+
+                // Debug logging - remove after fix
+                if (config.ShardKey == null)
+                {
+                    throw new InvalidOperationException($"Failed to create shard key for entity {entityType.Name} - this should not happen when sharding is enabled");
+                }
             }
 
             collections.Add(config);
@@ -413,51 +484,31 @@ public class DbBootstrapService
 
     private static List<DbIndexDefinition> CreateEntityIndexes(Type entityType, DbBootstrapOptions options)
     {
-        var indexes = new List<DbIndexDefinition>();
-        var properties = entityType.GetProperties();
-
-        // Standard indexes for BaseEntity-derived types
-        if (entityType.IsSubclassOf(typeof(BaseEntity)))
-        {
-            // Common indexable properties
-            var indexableProperties = new Dictionary<string, (string indexName, bool isUnique, bool isSparse)>
-            {
-                { "CreatedOnUtc", ("idx_created", false, false) },
-                { "UpdatedOnUtc", ("idx_updated", false, false) },
-                { "IsActive", ("idx_active", false, false) },
-                { "Status", ("idx_status", false, false) },
-                { "OwnerMerchantId", ("idx_owner_merchant", false, true) },
-                { "OwnerContactId", ("idx_owner_contact", false, true) },
-                { "TenantId", ("idx_tenant", false, true) }
-            };
-
-            foreach (var (propertyName, (indexName, isUnique, isSparse)) in indexableProperties)
-            {
-                if (properties.Any(p => p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    indexes.Add(new DbIndexDefinition
-                    {
-                        Name = indexName,
-                        Fields = new List<DbIndexField>
-                        {
-                            new() { FieldName = propertyName.ToLowerInvariant(), Direction = DbSortDirection.Ascending }
-                        },
-                        IsUnique = isUnique,
-                        IsSparse = isSparse,
-                        CreateInBackground = options.CreateIndexesInBackground
-                    });
-                }
-            }
-        }
-
-        return indexes;
+        // Use the proper EntityAttributeScanner to get indexes from DbIndexAttribute and automatic indexes
+        return EntityAttributeScanner.ScanEntityForIndexes(entityType, options);
     }
 
     private static bool ShouldShardEntity(Type entityType)
     {
-        var properties = entityType.GetProperties();
+        // First, check for explicit sharding attributes - these take priority
+        var dbCollectionAttr = entityType.GetCustomAttributes(typeof(DbCollectionAttribute), false)
+            .Cast<DbCollectionAttribute>()
+            .FirstOrDefault();
 
-        // Entities with owner isolation, bucket patterns, or high volume indicators should be sharded
+        if (dbCollectionAttr?.EnableSharding == true)
+        {
+            return true;
+        }
+
+        // Also check for explicit DbShardKey attribute
+        var shardKeyAttributes = entityType.GetCustomAttributes(typeof(DbShardKeyAttribute), false);
+        if (shardKeyAttributes.Length > 0)
+        {
+            return true;
+        }
+
+        // Fallback to property-based heuristics for automatic detection
+        var properties = entityType.GetProperties();
         return properties.Any(p =>
             p.Name.Contains("Owner", StringComparison.OrdinalIgnoreCase) ||
             p.Name.Contains("Bucket", StringComparison.OrdinalIgnoreCase) ||
@@ -467,8 +518,73 @@ public class DbBootstrapService
 
     private static DbShardKey CreateShardKeyForEntity(Type entityType)
     {
+        try
+        {
+            // First check if entity has a DbShardKeyAttribute - this takes priority
+            var shardKeyAttributes = entityType.GetCustomAttributes(typeof(DbShardKeyAttribute), false);
+
+            if (shardKeyAttributes.Length > 0)
+            {
+                var shardKeyAttr = (DbShardKeyAttribute)shardKeyAttributes[0];
+                var shardKey = new DbShardKey();
+
+                // Process the fields from the attribute
+                if (shardKeyAttr.Fields != null)
+                {
+                    foreach (var fieldName in shardKeyAttr.Fields)
+                    {
+                        if (!string.IsNullOrEmpty(fieldName))
+                        {
+                            shardKey.Fields.Add(new DbShardKeyField
+                            {
+                                FieldName = fieldName,
+                                Direction = DbSortDirection.Ascending,
+                                IsHashed = false // Default to false, will be enhanced later if needed
+                            });
+                        }
+                    }
+                }
+
+                // Handle region inclusion if specified
+                if (shardKeyAttr.IncludeRegion)
+                {
+                    var regionFieldName = "region";
+                    var insertPosition = 0;
+
+                    // Determine position based on strategy
+                    switch (shardKeyAttr.RegionStrategy)
+                    {
+                        case RegionShardingStrategy.RegionFirst:
+                            insertPosition = 0;
+                            break;
+                        case RegionShardingStrategy.RegionMiddle:
+                            insertPosition = shardKey.Fields.Count / 2;
+                            break;
+                        case RegionShardingStrategy.RegionLast:
+                            insertPosition = shardKey.Fields.Count;
+                            break;
+                    }
+
+                    shardKey.Fields.Insert(insertPosition, new DbShardKeyField
+                    {
+                        FieldName = regionFieldName,
+                        Direction = DbSortDirection.Ascending,
+                        IsHashed = false
+                    });
+                }
+
+                return shardKey.Fields.Any() ? shardKey : null;
+            }
+        }
+        catch (Exception ex)
+        {
+            // For debugging - in production this should be logged properly
+            throw new InvalidOperationException($"Error creating shard key for entity {entityType.Name}: {ex.Message}", ex);
+        }
+
+        // Fallback to automatic shard key detection for entities without explicit attributes
         var properties = entityType.GetProperties();
-        var shardKey = new DbShardKey();
+        var fallbackShardKey = new DbShardKey();
 
         // Priority order for shard key selection
         var candidates = new[]
@@ -487,7 +603,7 @@ public class DbBootstrapService
             var property = properties.FirstOrDefault(p => p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
             if (property != null)
             {
-                shardKey.Fields.Add(new DbShardKeyField
+                fallbackShardKey.Fields.Add(new DbShardKeyField
                 {
                     FieldName = property.Name.ToLowerInvariant(),
                     Direction = DbSortDirection.Ascending,
@@ -497,7 +613,7 @@ public class DbBootstrapService
                 // For non-ID fields, add ID as secondary key for better distribution
                 if (propertyName != "_id")
                 {
-                    shardKey.Fields.Add(new DbShardKeyField
+                    fallbackShardKey.Fields.Add(new DbShardKeyField
                     {
                         FieldName = "_id",
                         Direction = DbSortDirection.Ascending,
@@ -509,7 +625,7 @@ public class DbBootstrapService
             }
         }
 
-        return shardKey.Fields.Any() ? shardKey : null;
+        return fallbackShardKey.Fields.Any() ? fallbackShardKey : null;
     }
 
     private static List<string> GenerateRecommendations(

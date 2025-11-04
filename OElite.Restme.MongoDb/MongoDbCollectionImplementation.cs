@@ -388,4 +388,74 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
         var count = await CountDocumentsAsync(filter, cancellationToken);
         return count > 0;
     }
+
+    // Additional Dictionary-based overloads required by comprehensive tests
+    public async Task<bool> ReplaceOneAsync(Dictionary<string, object> filter, T replacement, CancellationToken cancellationToken = default)
+    {
+        var bsonFilter = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(filter);
+        var result = await _collection.ReplaceOneAsync(bsonFilter, replacement, cancellationToken: cancellationToken);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> UpdateOneAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default)
+    {
+        var bsonUpdate = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(update);
+        var result = await _collection.UpdateOneAsync(filter, bsonUpdate, cancellationToken: cancellationToken);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> UpdateOneAsync(Dictionary<string, object> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default)
+    {
+        var bsonFilter = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(filter);
+        var bsonUpdate = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(update);
+        var result = await _collection.UpdateOneAsync(bsonFilter, bsonUpdate, cancellationToken: cancellationToken);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<long> UpdateManyAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default)
+    {
+        var bsonUpdate = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(update);
+        var result = await _collection.UpdateManyAsync(filter, bsonUpdate, cancellationToken: cancellationToken);
+        return result.ModifiedCount;
+    }
+
+    public async Task<long> UpdateManyAsync(Dictionary<string, object> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default)
+    {
+        var bsonFilter = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(filter);
+        var bsonUpdate = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(update);
+        var result = await _collection.UpdateManyAsync(bsonFilter, bsonUpdate, cancellationToken: cancellationToken);
+        return result.ModifiedCount;
+    }
+
+    public async Task<long> DeleteManyAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
+    {
+        var bsonFilter = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(filter);
+        var result = await _collection.DeleteManyAsync(bsonFilter, cancellationToken);
+        return result.DeletedCount;
+    }
+
+    public async Task<long> DeleteOneAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
+    {
+        var result = await _collection.DeleteOneAsync(filter, cancellationToken);
+        return result.DeletedCount;
+    }
+
+    public async Task<long> DeleteOneAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
+    {
+        var bsonFilter = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(filter);
+        var result = await _collection.DeleteOneAsync(bsonFilter, cancellationToken);
+        return result.DeletedCount;
+    }
+
+    public async Task<long> CountDocumentsAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
+    {
+        var bsonFilter = MongoDbCollectionImplementation.ConvertDictionaryToBsonDocument(filter);
+        return await _collection.CountDocumentsAsync(bsonFilter, cancellationToken: cancellationToken);
+    }
+
+    public async Task<bool> ExistsAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default)
+    {
+        var count = await CountDocumentsAsync(filter, cancellationToken);
+        return count > 0;
+    }
 }

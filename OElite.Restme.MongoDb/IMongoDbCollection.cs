@@ -125,14 +125,54 @@ public interface IMongoDbCollection<T> where T : BaseEntity
     Task<T?> FindOneAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Replace document
+    /// Replace document using lambda expression filter
     /// </summary>
     Task<bool> ReplaceOneAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, T replacement, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Replace document using Dictionary-based filter
+    /// </summary>
+    Task<bool> ReplaceOneAsync(Dictionary<string, object> filter, T replacement, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update single document using lambda expression filter
+    /// </summary>
+    Task<bool> UpdateOneAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update single document using Dictionary-based filter
+    /// </summary>
+    Task<bool> UpdateOneAsync(Dictionary<string, object> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update multiple documents using lambda expression filter
+    /// </summary>
+    Task<long> UpdateManyAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update multiple documents using Dictionary-based filter
+    /// </summary>
+    Task<long> UpdateManyAsync(Dictionary<string, object> filter, Dictionary<string, object> update, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete documents using lambda expression filter
     /// </summary>
     Task<long> DeleteManyAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Delete documents using Dictionary-based filter
+    /// </summary>
+    Task<long> DeleteManyAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Delete single document using lambda expression filter
+    /// </summary>
+    Task<long> DeleteOneAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Delete single document using Dictionary-based filter
+    /// </summary>
+    Task<long> DeleteOneAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Insert document
@@ -145,7 +185,17 @@ public interface IMongoDbCollection<T> where T : BaseEntity
     Task<long> CountDocumentsAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Count documents using Dictionary-based filter
+    /// </summary>
+    Task<long> CountDocumentsAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Check if documents exist using lambda expression filter
     /// </summary>
     Task<bool> ExistsAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Check if documents exist using Dictionary-based filter
+    /// </summary>
+    Task<bool> ExistsAsync(Dictionary<string, object> filter, CancellationToken cancellationToken = default);
 }
