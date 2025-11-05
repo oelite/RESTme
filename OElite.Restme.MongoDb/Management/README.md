@@ -7,7 +7,7 @@ This module provides advanced database management capabilities for MongoDB throu
 - **Full MongoDB Encapsulation**: No `MongoDB.*` references required in application code
 - **Automatic Sharding**: Intelligent shard key selection and collection sharding
 - **Optimized Indexing**: Performance-optimized index creation for various scenarios
-- **S3 Storage Optimization**: Pre-configured setups for EdgeQ1 S3-compatible storage
+- **S3 Storage Optimization**: Pre-configured setups for Q1 S3-compatible storage
 - **Entity-Based Configuration**: Automatic configuration based on entity types and attributes
 - **Health Monitoring**: Database health checks and performance recommendations
 - **Retry Logic**: Robust error handling and retry mechanisms
@@ -32,10 +32,10 @@ else
 }
 ```
 
-### EdgeQ1 S3 Storage Bootstrap
+### Q1 S3 Storage Bootstrap
 
 ```csharp
-using var dbCentre = new EdgeQ1DbCentre("mongodb://localhost:27017/edgeq1");
+using var dbCentre = new Q1DbCentre("mongodb://localhost:27017/q1");
 
 // Optimized for S3-style object storage
 var result = await dbCentre.BootstrapS3StorageAsync(new DbS3StorageOptions
@@ -116,11 +116,11 @@ var bootstrapService = new DbBootstrapService(dbCentre);
 
 // Entity-based bootstrap
 var result = await bootstrapService.BootstrapForEntitiesAsync(
-    new[] { typeof(EdgeQ1Object), typeof(EdgeQ1Bucket) },
+    new[] { typeof(Q1Object), typeof(Q1Bucket) },
     new DbBootstrapOptions { EnableSharding = true });
 
 // S3-optimized bootstrap
-var s3Result = await bootstrapService.BootstrapForEdgeQ1Async(
+var s3Result = await bootstrapService.BootstrapForQ1Async(
     new DbS3StorageOptions { PreSplitCount = 512 });
 
 // Get recommendations
@@ -184,7 +184,7 @@ The system automatically recognizes OElite entity attributes:
 
 ```csharp
 [DbCollection("objects")]
-public class EdgeQ1Object : BaseEntity
+public class Q1Object : BaseEntity
 {
     [DbField("bucket")]
     public string Bucket { get; set; }
@@ -204,9 +204,9 @@ public class EdgeQ1Object : BaseEntity
 
 ## S3 Storage Optimization
 
-For S3-compatible storage scenarios (like EdgeQ1), use the pre-optimized configurations with GDPR region compliance:
+For S3-compatible storage scenarios (like Q1), use the pre-optimized configurations with GDPR region compliance:
 
-### Production EdgeQ1 Object Storage Implementation
+### Production Q1 Object Storage Implementation
 
 #### 1. **Entity Definitions with Region-Aware Sharding**
 
@@ -217,7 +217,7 @@ For S3-compatible storage scenarios (like EdgeQ1), use the pre-optimized configu
 [DbIndex("idx_bucket_listing", "bucket", "key", "lastModified")]
 [DbIndex("idx_region_compliance", "region", "bucket", "lastModified", IsSparse = true)]
 [DbIndex("idx_tenant_objects", "ownerId", "region", "bucket", IsSparse = true)]
-public class EdgeQ1Object : BaseEntity
+public class Q1Object : BaseEntity
 {
     [DbField("bucket")]
     public string Bucket { get; set; } = string.Empty;
@@ -258,7 +258,7 @@ public class EdgeQ1Object : BaseEntity
 [DbIndex("idx_upload_lookup", "bucket", "key")]
 [DbIndex("idx_upload_cleanup", "expires", TtlExpiration = "PT0S")]
 [DbIndex("idx_region_uploads", "region", "initiated", IsSparse = true)]
-public class EdgeQ1Upload : BaseEntity
+public class Q1Upload : BaseEntity
 {
     [DbField("uploadId")]
     public string UploadId { get; set; } = string.Empty;
@@ -292,7 +292,7 @@ public class EdgeQ1Upload : BaseEntity
 [DbIndex("idx_bucket_name", "bucketName", IsUnique = true)]
 [DbIndex("idx_tenant_buckets", "ownerMerchantId", "bucketName", IsSparse = true)]
 [DbIndex("idx_region_buckets", "region", "bucketName", IsSparse = true)]
-public class EdgeQ1Bucket : BaseEntity
+public class Q1Bucket : BaseEntity
 {
     [DbField("bucketName")]
     public string BucketName { get; set; } = string.Empty;
@@ -314,26 +314,26 @@ public class EdgeQ1Bucket : BaseEntity
 #### 2. **Production DbCentre Implementation**
 
 ```csharp
-public class EdgeQ1DbCentre : MongoDbCentre
+public class Q1DbCentre : MongoDbCentre
 {
-    public EdgeQ1DbCentre(string connectionString) : base(connectionString) { }
+    public Q1DbCentre(string connectionString) : base(connectionString) { }
 
-    public IMongoDbCollection<EdgeQ1Object> Objects =>
-        GetMongoDbCollection<EdgeQ1Object>("objects");
+    public IMongoDbCollection<Q1Object> Objects =>
+        GetMongoDbCollection<Q1Object>("objects");
 
-    public IMongoDbCollection<EdgeQ1Upload> Uploads =>
-        GetMongoDbCollection<EdgeQ1Upload>("uploads");
+    public IMongoDbCollection<Q1Upload> Uploads =>
+        GetMongoDbCollection<Q1Upload>("uploads");
 
-    public IMongoDbCollection<EdgeQ1Bucket> Buckets =>
-        GetMongoDbCollection<EdgeQ1Bucket>("buckets");
+    public IMongoDbCollection<Q1Bucket> Buckets =>
+        GetMongoDbCollection<Q1Bucket>("buckets");
 
     /// <summary>
-    /// Initialize EdgeQ1 storage with GDPR region compliance
+    /// Initialize Q1 storage with GDPR region compliance
     /// </summary>
     public async Task<bool> InitializeAsync(GeographicConfiguration geoConfig)
     {
         var bootstrapService = new DbBootstrapService(this);
-        var entityTypes = new[] { typeof(EdgeQ1Object), typeof(EdgeQ1Upload), typeof(EdgeQ1Bucket) };
+        var entityTypes = new[] { typeof(Q1Object), typeof(Q1Upload), typeof(Q1Bucket) };
 
         var result = await bootstrapService.BootstrapForEntitiesAsync(entityTypes, new DbBootstrapOptions
         {
@@ -352,7 +352,7 @@ public class EdgeQ1DbCentre : MongoDbCentre
 #### 3. **GDPR-Compliant Application Startup**
 
 ```csharp
-public static async Task<EdgeQ1DbCentre> InitializeProductionStorageAsync(
+public static async Task<Q1DbCentre> InitializeProductionStorageAsync(
     string connectionString,
     string region = "eu")
 {
@@ -367,12 +367,12 @@ public static async Task<EdgeQ1DbCentre> InitializeProductionStorageAsync(
         AllowedRegions = new List<string> { "eu", "us", "ca", "uk", "apac" }
     };
 
-    var dbCentre = new EdgeQ1DbCentre(connectionString);
+    var dbCentre = new Q1DbCentre(connectionString);
 
     var success = await dbCentre.InitializeAsync(geoConfig);
     if (!success)
     {
-        throw new InvalidOperationException("Failed to initialize EdgeQ1 storage");
+        throw new InvalidOperationException("Failed to initialize Q1 storage");
     }
 
     return dbCentre;
@@ -385,7 +385,7 @@ public static async Task<EdgeQ1DbCentre> InitializeProductionStorageAsync(
 // Store object with explicit region for GDPR compliance
 public async Task<string> StoreObjectAsync(string bucket, string key, Stream data, string region = "eu")
 {
-    var obj = new EdgeQ1Object
+    var obj = new Q1Object
     {
         Id = DbObjectId.NewId(),
         Bucket = bucket,
@@ -404,7 +404,7 @@ public async Task<string> StoreObjectAsync(string bucket, string key, Stream dat
 }
 
 // GDPR-compliant object listing (region-filtered)
-public async Task<List<EdgeQ1Object>> ListObjectsAsync(string bucket, string region)
+public async Task<List<Q1Object>> ListObjectsAsync(string bucket, string region)
 {
     return await Objects
         .Where(o => o.Bucket == bucket && o.Region == region && o.IsActive)
@@ -588,9 +588,9 @@ public class MyEntity : BaseEntity
 ```csharp
 var entityTypes = new[]
 {
-    typeof(EdgeQ1Object),
-    typeof(EdgeQ1Bucket),
-    typeof(EdgeQ1Upload),
+    typeof(Q1Object),
+    typeof(Q1Bucket),
+    typeof(Q1Upload),
     typeof(MyCustomEntity)
 };
 

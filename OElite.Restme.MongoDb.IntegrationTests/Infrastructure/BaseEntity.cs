@@ -16,7 +16,12 @@ public abstract class TestBaseEntity : OElite.BaseEntity
 
     protected TestBaseEntity()
     {
-        Id = DbObjectId.NewId();
+        // For integration tests only - assign ID to satisfy test patterns
+        // Production entities should use repository-based ID assignment
+        if (Id.IsEmpty)
+        {
+            Id = DbObjectId.NewId();
+        }
         CreatedOnUtc = DateTime.UtcNow;
         UpdatedOnUtc = DateTime.UtcNow;
     }

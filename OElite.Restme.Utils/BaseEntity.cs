@@ -14,7 +14,7 @@ public class BaseEntity : IEntity
     /// <summary>
     /// Geographic region for GDPR compliance and data sovereignty
     /// Used for region-aware sharding and data placement
-    /// Possible values: "eu", "us", "apac", "ca", "uk", "cn", etc.
+    /// Possible values: "gb", "us", "cn", etc. using countries' ISO 3166-1 alpha-2 codes
     /// </summary>
     [DbField("region")]
     public string? Region { get; set; }

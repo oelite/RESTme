@@ -572,7 +572,7 @@ public class GdprCustomer : BaseEntity
 }
 ```
 
-### EdgeQ1 S3 Storage Entity
+### Q1 S3 Storage Entity
 
 ```csharp
 [DbCollection("edge_objects", EnableSharding = true, EnablePreSplitting = true, PreSplitChunks = 1024)]
@@ -580,7 +580,7 @@ public class GdprCustomer : BaseEntity
 [DbIndex("idx_object_lookup", "Bucket", "Key", "Region", IsUnique = true)]
 [DbIndex("idx_region_listing", "Region", "Bucket", "LastModified")]
 [DbIndex("idx_tenant_objects", "OwnerId", "Region", "Bucket", IsSparse = true)]
-public class EdgeQ1Object : BaseEntity
+public class Q1Object : BaseEntity
 {
     [DbField("bucket")]
     public string Bucket { get; set; } = string.Empty;

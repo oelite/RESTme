@@ -321,55 +321,6 @@ public static class GeographicConfigurationHelper
         };
     }
 
-    /// <summary>
-    /// Create EdgeQ1 S3 storage configuration with geographic isolation
-    /// </summary>
-    /// <returns>EdgeQ1-optimized geographic configuration</returns>
-    public static GeographicConfiguration CreateEdgeQ1Configuration()
-    {
-        return new GeographicConfiguration
-        {
-            DefaultRegion = "US",
-            EnableAutoRegionDetection = true,
-            AllowCrossRegionMigration = true,
-            MigrationStrategy = RegionMigrationStrategy.CopyAndDelete,
-            MigrationRetentionPeriod = TimeSpan.FromDays(7), // Faster migration for object storage
-            CreateRegionSpecificIndexes = true,
-            Regions = new List<RegionConfiguration>
-            {
-                new()
-                {
-                    RegionId = "US",
-                    DisplayName = "US East",
-                    ShardTag = "US_EAST",
-                    RetentionPolicy = new DataRetentionPolicy
-                    {
-                        DefaultRetentionPeriod = TimeSpan.FromDays(2555),
-                        AutoDeleteExpiredData = false // Manual lifecycle management
-                    }
-                },
-                new()
-                {
-                    RegionId = "EU",
-                    DisplayName = "EU West",
-                    ShardTag = "EU_WEST",
-                    RequiresEncryptionAtRest = true,
-                    RetentionPolicy = new DataRetentionPolicy
-                    {
-                        DefaultRetentionPeriod = TimeSpan.FromDays(2555),
-                        AutoDeleteExpiredData = true // GDPR compliance
-                    }
-                },
-                new()
-                {
-                    RegionId = "APAC",
-                    DisplayName = "APAC Singapore",
-                    ShardTag = "APAC_SG",
-                    RequiresEncryptionAtRest = true
-                }
-            }
-        };
-    }
 
     /// <summary>
     /// Validate geographic configuration

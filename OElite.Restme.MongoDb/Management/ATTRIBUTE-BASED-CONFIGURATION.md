@@ -21,7 +21,7 @@ The enhanced OElite.Restme.MongoDb now supports **attribute-based database confi
     PreSplitChunks = 512,
     TtlExpirationSeconds = 7776000, // 90 days
     BootstrapPriority = 1)]
-public class EdgeQ1Object : BaseEntity
+public class Q1Object : BaseEntity
 {
     // Entity properties...
 }
@@ -40,7 +40,7 @@ public class EdgeQ1Object : BaseEntity
 ```csharp
 // Compound shard key (recommended for S3 workloads)
 [DbShardKey("Bucket", "KeyHash")]
-public class EdgeQ1Object : BaseEntity { }
+public class Q1Object : BaseEntity { }
 
 // Hashed shard key (for even distribution)
 [DbShardKey.Hashed("UserId")]
@@ -91,7 +91,7 @@ public class MyEntity : BaseEntity { }
 
 ## Complete Entity Example
 
-### EdgeQ1 S3 Storage Entity
+### Q1 S3 Storage Entity
 
 ```csharp
 [DbCollection("objects",
@@ -104,7 +104,7 @@ public class MyEntity : BaseEntity { }
 [DbIndex.Compound("idx_bucket_listing", "Bucket", "Key", "LastModified")]
 [DbIndex.Sparse("idx_tenant_objects", "OwnerId", "Bucket", "LastModified")]
 [DbIndex.Compound("idx_storage_class", "StorageClass", "LastModified")]
-public class EdgeQ1Object : BaseEntity
+public class Q1Object : BaseEntity
 {
     [DbField("bucket")]
     public string Bucket { get; set; } = string.Empty;
@@ -143,7 +143,7 @@ public class EdgeQ1Object : BaseEntity
 // All configuration is defined in attributes - no manual setup needed!
 using var dbCentre = new MyDbCentre("mongodb://localhost:27017/mydb");
 
-var result = await dbCentre.BootstrapEntitiesAsync<EdgeQ1Object, EdgeQ1Bucket>();
+var result = await dbCentre.BootstrapEntitiesAsync<Q1Object, Q1Bucket>();
 
 if (result.Success)
 {
@@ -154,7 +154,7 @@ if (result.Success)
 ### Configuration Validation
 
 ```csharp
-var entityTypes = new[] { typeof(EdgeQ1Object), typeof(EdgeQ1Bucket) };
+var entityTypes = new[] { typeof(Q1Object), typeof(Q1Bucket) };
 var validation = EntityAttributeScanner.ValidateEntityConfigurations(entityTypes);
 
 if (validation.IsValid)
@@ -377,7 +377,7 @@ var result = await dbCentre.InitializeDatabaseAsync(configuration);
 [DbCollection("objects", EnableSharding = true)]
 [DbShardKey("Bucket", "KeyHash")]
 [DbIndex.Unique("idx_object_lookup", "Bucket", "Key")]
-public class EdgeQ1Object : BaseEntity
+public class Q1Object : BaseEntity
 {
     [DbField("bucket")]
     public string Bucket { get; set; } = string.Empty;
@@ -390,7 +390,7 @@ public class EdgeQ1Object : BaseEntity
 }
 
 // Usage is much simpler
-var result = await dbCentre.BootstrapEntitiesAsync<EdgeQ1Object>();
+var result = await dbCentre.BootstrapEntitiesAsync<Q1Object>();
 ```
 
 ## Troubleshooting

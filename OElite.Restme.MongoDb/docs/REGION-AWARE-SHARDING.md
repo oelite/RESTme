@@ -257,7 +257,7 @@ public class DataPortabilityRequest
 }
 ```
 
-#### EdgeQ1 S3 Storage with Region Awareness
+#### Q1 S3 Storage with Region Awareness
 
 ```csharp
 [DbCollection("edge_objects", EnableSharding = true, EnablePreSplitting = true, PreSplitChunks = 1024)]
@@ -266,7 +266,7 @@ public class DataPortabilityRequest
 [DbIndex("idx_region_listing", "Region", "Bucket", "LastModified")]
 [DbIndex("idx_tenant_objects", "OwnerId", "Region", "Bucket", IsSparse = true)]
 [DbIndex("idx_compliance_audit", "Region", "ComplianceStatus", "LastAuditDate")]
-public class EdgeQ1Object : BaseEntity
+public class Q1Object : BaseEntity
 {
     [DbField("bucket")]
     public string Bucket { get; set; } = string.Empty;

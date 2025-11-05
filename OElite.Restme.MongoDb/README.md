@@ -25,7 +25,7 @@ MongoDB integration package for OElite platform, providing enterprise-grade data
 - **Auto-Index Generation**: Intelligent indexing for region-aware queries
 
 ### **Enterprise-Scale Performance**
-- **Trillion-Record Support**: Optimized for massive datasets (EdgeQ1 S3 storage patterns)
+- **Trillion-Record Support**: Optimized for massive datasets (Q1 S3 storage patterns)
 - **Smart Pre-Splitting**: Intelligent chunk distribution for optimal performance
 - **Background Operations**: Non-blocking index creation and maintenance
 - **Health Monitoring**: Comprehensive database health checks and metrics
@@ -211,14 +211,14 @@ public class GdprCustomer : BaseEntity
 }
 ```
 
-#### EdgeQ1 S3 Storage with Region Awareness
+#### Q1 S3 Storage with Region Awareness
 ```csharp
 [DbCollection("edge_objects", EnableSharding = true, EnablePreSplitting = true, PreSplitChunks = 1024)]
 [DbShardKey("Bucket", "KeyHash", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
 [DbIndex("idx_object_lookup", "Bucket", "Key", "Region", IsUnique = true)]
 [DbIndex("idx_region_listing", "Region", "Bucket", "LastModified")]
 [DbIndex("idx_tenant_objects", "OwnerId", "Region", "Bucket", IsSparse = true)]
-public class EdgeQ1Object : BaseEntity
+public class Q1Object : BaseEntity
 {
     [DbField("bucket")]
     public string Bucket { get; set; } = string.Empty;
@@ -252,7 +252,7 @@ public static async Task<DbBootstrapResult> AutoBootstrapWithRegionAwarenessAsyn
     using var dbCentre = new MongoDbCentre(connectionString);
 
     // Automatic bootstrap discovers all entity attributes
-    var result = await dbCentre.BootstrapEntitiesAsync<GdprCustomer, EdgeQ1Object, OrderTracking>();
+    var result = await dbCentre.BootstrapEntitiesAsync<GdprCustomer, Q1Object, OrderTracking>();
 
     if (result.Success)
     {
@@ -274,7 +274,7 @@ public static void ValidateEntityConfigurations()
     var entityTypes = new[]
     {
         typeof(GdprCustomer),
-        typeof(EdgeQ1Object),
+        typeof(Q1Object),
         typeof(OrderTracking)
     };
 
