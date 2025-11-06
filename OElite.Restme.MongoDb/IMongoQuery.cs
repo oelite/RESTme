@@ -21,7 +21,7 @@ public interface IMongoQuery<T> where T : BaseEntity
     // Transaction support
     IMongoQuery<T> WithTransaction(IClientSessionHandle session);
 
-    Task<TCollection> FetchAsync<TCollection>() where TCollection : EntityCollection<T>, new();
+    Task<TCollection> FetchAsync<TCollection>() where TCollection : BaseEntityCollection<T>, new();
     Task<T?> FirstOrDefaultAsync();
     Task<List<T>> ToListAsync();
     Task<long> CountAsync();

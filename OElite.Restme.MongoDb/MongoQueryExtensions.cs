@@ -339,11 +339,11 @@ public static class MongoQueryExtensions
     }
 
     /// <summary>
-    /// Executes the query with pagination and returns a EntityCollection - optimized for large datasets
+    /// Executes the query with pagination and returns a BaseEntityCollection - optimized for large datasets
     /// </summary>
     public static async Task<TCollection> ToPagedCollectionAsync<T, TCollection>(this IMongoQuery<T> query, int pageIndex, int pageSize) 
         where T : BaseEntity 
-        where TCollection : EntityCollection<T>, new()
+        where TCollection : BaseEntityCollection<T>, new()
     {
         var (items, totalCount) = await query.ToPagedListAsync(pageIndex, pageSize);
         var collection = new TCollection();
@@ -644,11 +644,11 @@ public static class MongoQueryExtensions
     }
 
     /// <summary>
-    /// Executes the query and returns results as a EntityCollection - equivalent to ToListAsync with collection wrapper
+    /// Executes the query and returns results as a BaseEntityCollection - equivalent to ToListAsync with collection wrapper
     /// </summary>
     public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, bool returnTotalCount = false) 
         where T : BaseEntity 
-        where TCollection : EntityCollection<T>, new()
+        where TCollection : BaseEntityCollection<T>, new()
     {
         var collection = new TCollection();
         
@@ -674,11 +674,11 @@ public static class MongoQueryExtensions
     }
 
     /// <summary>
-    /// Executes the query with pagination and returns results as a EntityCollection with optional total count
+    /// Executes the query with pagination and returns results as a BaseEntityCollection with optional total count
     /// </summary>
     public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, int pageIndex, int pageSize, bool returnTotalCount = false)
         where T : BaseEntity
-        where TCollection : EntityCollection<T>, new()
+        where TCollection : BaseEntityCollection<T>, new()
     {
         var collection = new TCollection();
 

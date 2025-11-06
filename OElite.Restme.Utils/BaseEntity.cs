@@ -22,7 +22,7 @@ public class BaseEntity : IEntity
     [DbFieldIgnore] public Dictionary<string, object>? MetaData { get; set; }
 }
 
-public class EntityCollection<T> : List<T>, IEntityCollection
+public class BaseEntityCollection<T> : List<T>, IEntityCollection
     where T : BaseEntity
 {
     public int TotalRecordsCount { get; set; }
@@ -43,7 +43,7 @@ public static class BaseEntityCollectionHelpers
     public static TC? ToBaseEntityCollection<T, TC>(this IEnumerable<T> data,
         int totalRecordCount,
         bool returnEmptyCollectionIfNullOrNoRecords = true)
-        where TC : EntityCollection<T>, new() where T : BaseEntity
+        where TC : BaseEntityCollection<T>, new() where T : BaseEntity
     {
         var result = new TC();
         var items = data?.ToList();
@@ -90,7 +90,7 @@ public static class BaseEntityCollectionHelpers
     /// Adds entities to the collection
     /// </summary>
     public static TC AddEntities<T, TC>(this TC collection, IEnumerable<T> entities)
-        where TC : EntityCollection<T> where T : BaseEntity
+        where TC : BaseEntityCollection<T> where T : BaseEntity
     {
         if (entities != null)
         {
