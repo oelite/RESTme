@@ -50,4 +50,54 @@ public static class BaseEntityCollectionHelpers
 
         return result;
     }
+
+    /// <summary>
+    /// Sets the total records count for the collection
+    /// </summary>
+    public static TC SetTotalRecordsCount<T, TC>(this TC collection, int totalRecordsCount)
+        where TC : BaseEntityCollection<T> where T : BaseEntity
+    {
+        collection.TotalRecordsCount = totalRecordsCount;
+        return collection;
+    }
+
+    /// <summary>
+    /// Adds entities to the collection
+    /// </summary>
+    public static TC AddEntities<T, TC>(this TC collection, IEnumerable<T> entities)
+        where TC : BaseEntityCollection<T> where T : BaseEntity
+    {
+        if (entities != null)
+        {
+            collection.AddRange(entities);
+        }
+        return collection;
+    }
+
+    /// <summary>
+    /// Adds metadata to the collection
+    /// </summary>
+    public static TC AddMetaData<T, TC>(this TC collection, string key, object value)
+        where TC : BaseEntityCollection<T> where T : BaseEntity
+    {
+        collection.MetaData ??= new Dictionary<string, object>();
+        collection.MetaData[key] = value;
+        return collection;
+    }
+
+    /// <summary>
+    /// Adds multiple metadata entries to the collection
+    /// </summary>
+    public static TC AddMetaData<T, TC>(this TC collection, Dictionary<string, object> metadata)
+        where TC : BaseEntityCollection<T> where T : BaseEntity
+    {
+        if (metadata == null) return collection;
+
+        collection.MetaData ??= new Dictionary<string, object>();
+        foreach (var kvp in metadata)
+        {
+            collection.MetaData[kvp.Key] = kvp.Value;
+        }
+        return collection;
+    }
 }
