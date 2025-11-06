@@ -118,7 +118,7 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
         return this;
     }
 
-    public async Task<TCollection> FetchAsync<TCollection>() where TCollection : BaseEntityCollection<T>, new()
+    public async Task<TCollection> FetchAsync<TCollection>() where TCollection : EntityCollection<T>, new()
     {
         var results = await ToListAsync();
         var collection = new TCollection();
@@ -780,10 +780,10 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
     }
 
     /// <summary>
-    /// Executes the query and returns results as a BaseEntityCollection with total count
+    /// Executes the query and returns results as a EntityCollection with total count
     /// </summary>
     public async Task<TCollection> ToPagedCollectionAsync<TCollection>(int pageIndex, int pageSize) 
-        where TCollection : BaseEntityCollection<T>, new()
+        where TCollection : EntityCollection<T>, new()
     {
         var (items, totalCount) = await ToPagedListAsync(pageIndex, pageSize);
         var collection = new TCollection();

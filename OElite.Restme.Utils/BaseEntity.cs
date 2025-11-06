@@ -22,7 +22,7 @@ public class BaseEntity : IEntity
     [DbFieldIgnore] public Dictionary<string, object>? MetaData { get; set; }
 }
 
-public class BaseEntityCollection<T> : List<T>, IBaseEntityCollection
+public class EntityCollection<T> : List<T>, IEntityCollection
     where T : BaseEntity
 {
     public int TotalRecordsCount { get; set; }
@@ -31,12 +31,37 @@ public class BaseEntityCollection<T> : List<T>, IBaseEntityCollection
     public string BaseEntityTypeName => typeof(T).Name;
 }
 
+public class DataCollection<T> : List<T>, IEntityCollection where T : class
+{
+    public int TotalRecordsCount { get; set; }
+    public Dictionary<string, object>? MetaData { get; set; }
+    public string BaseEntityTypeName => typeof(T).Name;
+}
+
 public static class BaseEntityCollectionHelpers
 {
     public static TC? ToBaseEntityCollection<T, TC>(this IEnumerable<T> data,
         int totalRecordCount,
         bool returnEmptyCollectionIfNullOrNoRecords = true)
-        where TC : BaseEntityCollection<T>, new() where T : BaseEntity
+        where TC : EntityCollection<T>, new() where T : BaseEntity
+    {
+        var result = new TC();
+        var items = data?.ToList();
+        if (!(items?.Count > 0)) return returnEmptyCollectionIfNullOrNoRecords ? result : null;
+
+        result.AddRange(items);
+        if (totalRecordCount > 0)
+        {
+            result.TotalRecordsCount = totalRecordCount;
+        }
+
+        return result;
+    }
+
+    public static TC? ToDataCollection<T, TC>(this IEnumerable<T> data,
+        int totalRecordCount,
+        bool returnEmptyCollectionIfNullOrNoRecords = true)
+        where TC : DataCollection<T>, new() where T : class
     {
         var result = new TC();
         var items = data?.ToList();
@@ -55,7 +80,7 @@ public static class BaseEntityCollectionHelpers
     /// Sets the total records count for the collection
     /// </summary>
     public static TC SetTotalRecordsCount<T, TC>(this TC collection, int totalRecordsCount)
-        where TC : BaseEntityCollection<T> where T : BaseEntity
+        where TC : IEntityCollection where T : class
     {
         collection.TotalRecordsCount = totalRecordsCount;
         return collection;
@@ -65,12 +90,24 @@ public static class BaseEntityCollectionHelpers
     /// Adds entities to the collection
     /// </summary>
     public static TC AddEntities<T, TC>(this TC collection, IEnumerable<T> entities)
-        where TC : BaseEntityCollection<T> where T : BaseEntity
+        where TC : EntityCollection<T> where T : BaseEntity
     {
         if (entities != null)
         {
             collection.AddRange(entities);
         }
+
+        return collection;
+    }
+
+    public static TC AddData<T, TC>(this TC collection, IEnumerable<T> entities)
+        where TC : DataCollection<T> where T : class
+    {
+        if (entities != null)
+        {
+            collection.AddRange(entities);
+        }
+
         return collection;
     }
 
@@ -78,7 +115,7 @@ public static class BaseEntityCollectionHelpers
     /// Adds metadata to the collection
     /// </summary>
     public static TC AddMetaData<T, TC>(this TC collection, string key, object value)
-        where TC : BaseEntityCollection<T> where T : BaseEntity
+        where TC : IEntityCollection where T : class
     {
         collection.MetaData ??= new Dictionary<string, object>();
         collection.MetaData[key] = value;
@@ -89,7 +126,7 @@ public static class BaseEntityCollectionHelpers
     /// Adds multiple metadata entries to the collection
     /// </summary>
     public static TC AddMetaData<T, TC>(this TC collection, Dictionary<string, object> metadata)
-        where TC : BaseEntityCollection<T> where T : BaseEntity
+        where TC : IEntityCollection where T : class
     {
         if (metadata == null) return collection;
 
@@ -98,6 +135,7 @@ public static class BaseEntityCollectionHelpers
         {
             collection.MetaData[kvp.Key] = kvp.Value;
         }
+
         return collection;
     }
 }
