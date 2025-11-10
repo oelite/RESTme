@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -87,7 +88,7 @@ public static class BaseEntityCollectionHelpers
     }
 
     /// <summary>
-    /// Adds entities to the collection
+    /// Adds entities to BaseEntityCollection
     /// </summary>
     public static TC AddEntities<T, TC>(this TC collection, IEnumerable<T> entities)
         where TC : BaseEntityCollection<T> where T : BaseEntity
@@ -100,6 +101,9 @@ public static class BaseEntityCollectionHelpers
         return collection;
     }
 
+    /// <summary>
+    /// Adds data to DataCollection (legacy method name for backwards compatibility)
+    /// </summary>
     public static TC AddData<T, TC>(this TC collection, IEnumerable<T> entities)
         where TC : DataCollection<T> where T : class
     {
@@ -112,10 +116,29 @@ public static class BaseEntityCollectionHelpers
     }
 
     /// <summary>
-    /// Adds metadata to the collection
+    /// Unified method: Adds entities to any collection implementing IEntityCollection
+    /// This method works with both BaseEntityCollection and DataCollection
     /// </summary>
-    public static TC AddMetaData<T, TC>(this TC collection, string key, object value)
-        where TC : IEntityCollection where T : class
+    public static TC AddItems<TC>(this TC collection, IEnumerable entities)
+        where TC : IEntityCollection, IList
+    {
+        if (entities != null)
+        {
+            foreach (var entity in entities)
+            {
+                collection.Add(entity);
+            }
+        }
+
+        return collection;
+    }
+
+    /// <summary>
+    /// Adds metadata to any collection implementing IEntityCollection
+    /// Works with both BaseEntityCollection and DataCollection
+    /// </summary>
+    public static TC AddMetaData<TC>(this TC collection, string key, object value)
+        where TC : IEntityCollection
     {
         collection.MetaData ??= new Dictionary<string, object>();
         collection.MetaData[key] = value;
@@ -123,10 +146,11 @@ public static class BaseEntityCollectionHelpers
     }
 
     /// <summary>
-    /// Adds multiple metadata entries to the collection
+    /// Adds multiple metadata entries to any collection implementing IEntityCollection
+    /// Works with both BaseEntityCollection and DataCollection
     /// </summary>
-    public static TC AddMetaData<T, TC>(this TC collection, Dictionary<string, object> metadata)
-        where TC : IEntityCollection where T : class
+    public static TC AddMetaData<TC>(this TC collection, Dictionary<string, object> metadata)
+        where TC : IEntityCollection
     {
         if (metadata == null) return collection;
 
