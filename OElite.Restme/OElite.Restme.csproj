@@ -15,8 +15,13 @@
         <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
         <Title>OElite.Restme</Title>
         <Nullable>enable</Nullable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 </Project>

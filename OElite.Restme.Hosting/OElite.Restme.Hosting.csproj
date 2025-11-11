@@ -12,6 +12,7 @@
         <Title>OElite.Restme.Hosting</Title>
         <Nullable>enable</Nullable>
         <PackageId>OElite.Restme.Hosting</PackageId>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -22,5 +23,9 @@
     <ItemGroup>
         <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
         <ProjectReference Include="..\OElite.Restme.Redis\OElite.Restme.Redis.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 </Project>
