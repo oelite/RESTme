@@ -23,36 +23,82 @@ namespace OElite.Providers
             _config = config;
             
             var factory = new ConnectionFactory();
-            if (connectionString.StartsWith("amqp://") || connectionString.StartsWith("amqps://"))
+            
+            // Check if connection string includes VHost info (format: uri|vhost=name)
+            string actualConnectionString = connectionString;
+            string? vhost = null;
+            
+            if (connectionString.Contains("|vhost="))
             {
-                factory.Uri = new Uri(connectionString);
+                var parts = connectionString.Split(new[] { "|vhost=" }, StringSplitOptions.None);
+                actualConnectionString = parts[0];
+                vhost = parts.Length > 1 ? parts[1] : null;
+            }
+            
+            // Parse the connection string/URI
+            if (actualConnectionString.StartsWith("amqp://") || actualConnectionString.StartsWith("amqps://"))
+            {
+                factory.Uri = new Uri(actualConnectionString);
             }
             else
             {
                 // Parse connection string format: host:port or host
-                var parts = connectionString.Split(':');
+                var parts = actualConnectionString.Split(':');
                 factory.HostName = parts[0];
                 if (parts.Length > 1 && int.TryParse(parts[1], out int port))
                 {
                     factory.Port = port;
                 }
             }
+            
+            // Override with authentication from RestConfig if provided
+            if (!string.IsNullOrEmpty(config.RestKey))
+            {
+                factory.UserName = config.RestKey;
+            }
+            
+            if (!string.IsNullOrEmpty(config.RestSecret))
+            {
+                factory.Password = config.RestSecret;
+            }
+            
+            // Set VHost if provided
+            if (!string.IsNullOrEmpty(vhost))
+            {
+                factory.VirtualHost = vhost;
+            }
 
-            _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
-            _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
+            // Use safer connection creation with timeout and cancellation support
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                _connection = factory.CreateConnectionAsync(cancellationToken: cts.Token).GetAwaiter().GetResult();
+                _channel = _connection.CreateChannelAsync(cancellationToken: cts.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                throw new OEliteException("Connection to RabbitMQ timed out after 30 seconds");
+            }
+            catch (System.Threading.ThreadAbortException ex)
+            {
+                throw new OEliteException("RabbitMQ connection was aborted due to threading issue. This may be caused by compatibility issues with the current .NET version.", ex);
+            }
         }
 
-        public async Task<bool> PublishAsync<T>(T message, string? queueName = null, string? routingKey = null, 
-            string? exchangeName = null, bool isDurable = true, bool isExclusive = false, 
-            bool autoDelete = true, string exchangeType = "direct", bool isMessagePersistent = true) where T : class
+
+        public async Task<bool> PublishAsync<T>(T message, string? queueName = null, string? routingKey = null,
+            string? exchangeName = null, bool isDurable = true, bool isExclusive = false,
+            bool autoDelete = true, string exchangeType = "direct", bool isMessagePersistent = true,
+            CancellationToken cancellationToken = default) where T : class
         {
             try
             {
                 if (string.IsNullOrEmpty(exchangeName))
                     exchangeName = "";
 
+                cancellationToken.ThrowIfCancellationRequested();
                 if (string.IsNullOrEmpty(queueName))
-                    queueName = await DeclareQueueAsync();
+                    queueName = await DeclareQueueAsync(cancellationToken: cancellationToken);
 
                 if (string.IsNullOrEmpty(routingKey))
                     routingKey = queueName;
@@ -60,16 +106,16 @@ namespace OElite.Providers
                 // Declare exchange if provided
                 if (!string.IsNullOrEmpty(exchangeName))
                 {
-                    await DeclareExchangeAsync(exchangeName, exchangeType, isDurable, autoDelete);
+                    await DeclareExchangeAsync(exchangeName, exchangeType, isDurable, autoDelete, cancellationToken);
                 }
 
                 // Declare queue
-                await DeclareQueueAsync(queueName, isDurable, isExclusive, autoDelete);
+                await DeclareQueueAsync(queueName, isDurable, isExclusive, autoDelete, cancellationToken);
 
                 // Bind queue to exchange if exchange is provided
                 if (!string.IsNullOrEmpty(exchangeName))
                 {
-                    await BindQueueAsync(queueName, exchangeName, routingKey);
+                    await BindQueueAsync(queueName, exchangeName, routingKey, cancellationToken);
                 }
 
                 var jsonMessage = message.JsonSerialize(_config.UseRestConvertForCollectionSerialization, _config.SerializerSettings);
@@ -80,26 +126,29 @@ namespace OElite.Providers
                     Persistent = isMessagePersistent
                 };
 
-                await _channel.BasicPublishAsync(exchange: exchangeName, routingKey: routingKey, mandatory: false, basicProperties: properties, body: body);
-                
+                cancellationToken.ThrowIfCancellationRequested();
+                await _channel.BasicPublishAsync(exchange: exchangeName, routingKey: routingKey, mandatory: false, basicProperties: properties, body: body, cancellationToken);
+
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to publish message: {ex.Message}", ex);
+                throw new OEliteException($"Failed to publish message: {ex.Message}", ex);
             }
         }
 
-        public async Task StartConsumingAsync<T>(Func<T, Task<bool>> messageHandler, 
+
+        public async Task StartConsumingAsync<T>(Func<T, Task<bool>> messageHandler,
             Func<Task<bool>>? completionCondition = null, string? exchangeName = null,
             string? queueName = null, string? routingKey = null, ushort prefetchCount = 1,
             bool isDurable = true, bool isExclusive = false, bool autoDelete = true,
-            string exchangeType = "direct") where T : class
+            string exchangeType = "direct", CancellationToken cancellationToken = default) where T : class
         {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (string.IsNullOrEmpty(queueName))
-                    queueName = await DeclareQueueAsync();
+                    queueName = await DeclareQueueAsync(cancellationToken: cancellationToken);
 
                 if (string.IsNullOrEmpty(routingKey))
                     routingKey = queueName;
@@ -107,11 +156,20 @@ namespace OElite.Providers
                 // Declare exchange if provided
                 if (!string.IsNullOrEmpty(exchangeName))
                 {
-                    await DeclareExchangeAsync(exchangeName, exchangeType, isDurable, autoDelete);
-                    await BindQueueAsync(queueName, exchangeName, routingKey);
+                    await DeclareExchangeAsync(exchangeName, exchangeType, isDurable, autoDelete, cancellationToken);
                 }
 
-                await _channel.BasicQosAsync(0, prefetchCount, false);
+                // Always declare the queue before binding (auto-create if missing)
+                await DeclareQueueAsync(queueName, isDurable, isExclusive, autoDelete, cancellationToken);
+
+                // Bind queue to exchange if exchange is provided
+                if (!string.IsNullOrEmpty(exchangeName))
+                {
+                    await BindQueueAsync(queueName, exchangeName, routingKey, cancellationToken);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                await _channel.BasicQosAsync(0, prefetchCount, false, cancellationToken);
 
                 var consumer = new AsyncEventingBasicConsumer(_channel);
                 consumer.ReceivedAsync += async (model, ea) =>
@@ -123,96 +181,118 @@ namespace OElite.Providers
                         var deserializedMessage = message.JsonDeserialize<T>();
 
                         var success = await messageHandler(deserializedMessage);
-                        
+
                         if (success)
                         {
-                            await _channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
+                            await _channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false, cancellationToken);
                         }
                         else
                         {
-                            await _channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true);
+                            await _channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true, cancellationToken);
                         }
 
                         // Check completion condition
                         if (completionCondition != null && await completionCondition())
                         {
-                            await _channel.BasicCancelAsync(ea.ConsumerTag);
+                            await _channel.BasicCancelAsync(ea.ConsumerTag, false, cancellationToken);
                         }
                     }
                     catch (Exception ex)
                     {
-                        await _channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true);
-                        throw new OEliteWebException($"Error processing message: {ex.Message}", ex);
+                        await _channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true, cancellationToken);
+                        throw new OEliteException($"Error processing message: {ex.Message}", ex);
                     }
                 };
 
-                await _channel.BasicConsumeAsync(queue: queueName, autoAck: false, consumer: consumer);
+                await _channel.BasicConsumeAsync(queue: queueName, autoAck: false, consumer: consumer, cancellationToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to start consuming: {ex.Message}", ex);
+                throw new OEliteException($"Failed to start consuming: {ex.Message}", ex);
             }
         }
 
-        public async Task StopConsumingAsync()
+
+        public async Task StopConsumingAsync(CancellationToken cancellationToken = default)
         {
             try
             {
                 // Close the channel and connection
+                cancellationToken.ThrowIfCancellationRequested();
                 if (_channel.IsOpen)
                     await _channel.CloseAsync();
-                
+
                 if (_connection.IsOpen)
                     await _connection.CloseAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to stop consuming: {ex.Message}", ex);
+                throw new OEliteException($"Failed to stop consuming: {ex.Message}", ex);
             }
         }
 
-        public async Task<string> DeclareQueueAsync(string? queueName = null, bool isDurable = true, 
-            bool isExclusive = false, bool autoDelete = true)
+
+        public async Task<string> DeclareQueueAsync(string? queueName = null, bool isDurable = true,
+            bool isExclusive = false, bool autoDelete = true, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (string.IsNullOrEmpty(queueName))
                     queueName = $"queue_{Guid.NewGuid():N}";
 
-                await _channel.QueueDeclareAsync(queue: queueName, durable: isDurable, exclusive: isExclusive, 
-                    autoDelete: autoDelete, arguments: null);
-                
+                cancellationToken.ThrowIfCancellationRequested();
+                // Use passive=false to auto-create the queue if it doesn't exist
+                await _channel.QueueDeclareAsync(queue: queueName, durable: isDurable, exclusive: isExclusive,
+                    autoDelete: autoDelete, arguments: null, passive: false, cancellationToken: cancellationToken);
+
                 return queueName;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to declare queue '{queueName}': {ex.Message}", ex);
+                // Log but don't fail if queue already exists with different parameters
+                if (ex.Message.Contains("PRECONDITION_FAILED"))
+                {
+                    // Queue exists but with different parameters - this is usually OK for consumers
+                    return queueName ?? "";
+                }
+                throw new OEliteException($"Failed to declare queue '{queueName}': {ex.Message}", ex);
             }
         }
 
-        public async Task DeclareExchangeAsync(string exchangeName, string exchangeType = "direct", 
-            bool isDurable = true, bool autoDelete = true)
+
+        public async Task DeclareExchangeAsync(string exchangeName, string exchangeType = "direct",
+            bool isDurable = true, bool autoDelete = true, CancellationToken cancellationToken = default)
         {
             try
             {
-                await _channel.ExchangeDeclareAsync(exchange: exchangeName, type: exchangeType, durable: isDurable, 
-                    autoDelete: autoDelete, arguments: null);
+                cancellationToken.ThrowIfCancellationRequested();
+                // Use passive=false to auto-create the exchange if it doesn't exist
+                await _channel.ExchangeDeclareAsync(exchange: exchangeName, type: exchangeType, durable: isDurable,
+                    autoDelete: autoDelete, arguments: null, passive: false, cancellationToken: cancellationToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to declare exchange '{exchangeName}': {ex.Message}", ex);
+                // Log but don't fail if exchange already exists with different parameters
+                if (ex.Message.Contains("PRECONDITION_FAILED"))
+                {
+                    // Exchange exists but with different parameters - this is usually OK
+                    return;
+                }
+                throw new OEliteException($"Failed to declare exchange '{exchangeName}': {ex.Message}", ex);
             }
         }
 
-        public async Task BindQueueAsync(string queueName, string exchangeName, string routingKey)
+
+        public async Task BindQueueAsync(string queueName, string exchangeName, string routingKey, CancellationToken cancellationToken = default)
         {
             try
             {
-                await _channel.QueueBindAsync(queue: queueName, exchange: exchangeName, routingKey: routingKey);
+                cancellationToken.ThrowIfCancellationRequested();
+                await _channel.QueueBindAsync(queue: queueName, exchange: exchangeName, routingKey: routingKey, cancellationToken: cancellationToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to bind queue '{queueName}' to exchange '{exchangeName}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to bind queue '{queueName}' to exchange '{exchangeName}': {ex.Message}", ex);
             }
         }
 

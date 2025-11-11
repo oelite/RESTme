@@ -64,7 +64,7 @@ Backend Packages:
 using OElite;
 
 // Initialize HTTP client
-var rest = new Rest("https://api.example.com", RestMode.HTTPClient);
+var rest = new Rest("https://api.example.com", new RestConfig { OperationMode = RestMode.Http });
 
 // GET request
 var user = await rest.GetAsync<User>("/users/123");
@@ -99,11 +99,11 @@ await rest.RemovemeAsync("user:123");
 
 ```csharp
 // Add OElite.Restme.Azure package
-var connectionString = "DefaultEndpointsProtocol=https;AccountName=...";
+var connectionString = "DefaultEndpointsProtocol=https;AccountName=...;RootPath=my-app/uploads";
 var rest = new Rest(connectionString, RestMode.AzureStorageClient);
 
-// Store data
-await rest.StoremAsync("documents/report.pdf", fileData);
+// Store data (rootPath is automatically prefixed)
+await rest.StoremAsync("documents/report.pdf", fileData); // Stored as "my-app/uploads/documents/report.pdf"
 
 // Retrieve data
 var fileData = await rest.RetrievemeAsync<byte[]>("documents/report.pdf");
@@ -120,15 +120,15 @@ await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(1));
 // Amazon S3
 var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;Region=us-west-2", RestMode.S3Client);
 
-// Backblaze B2
-var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true", RestMode.S3Client);
+// Backblaze B2 with root path
+var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true;RootPath=my-app/uploads", RestMode.S3Client);
 
-// MinIO (local development)
-var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true", RestMode.S3Client);
+// MinIO (local development) with root path
+var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true;RootPath=dev/cache", RestMode.S3Client);
 
-// Store and cache operations
-await rest.StoremAsync("files/document.pdf", fileData);
-await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(2));
+// Store and cache operations (rootPath is automatically prefixed)
+await rest.StoremAsync("files/document.pdf", fileData); // Stored as "my-app/uploads/files/document.pdf"
+await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(2)); // Cached as "dev/cache/cache:key"
 ```
 
 ### 5. RabbitMQ Message Queuing
@@ -147,15 +147,51 @@ await rest.DomeAsync<User>("user.created", async (user) => {
 });
 ```
 
+### 6. Base Providers (No additional packages required)
+
+Use built-in base providers for simple scenarios without external infrastructure.
+
+```csharp
+using OElite;
+
+// Memory cache
+var restMemoryCache = new Rest(
+    configuration: new RestConfig { OperationMode = RestMode.MemoryAsCache }
+);
+await restMemoryCache.CachemeAsync("user:123", userData, TimeSpan.FromMinutes(30));
+var cached = await restMemoryCache.FindmeAsync<User>("user:123");
+
+// Local file system storage (uses default AppContext.BaseDirectory/restme_storage)
+var restLocalFs = new Rest(
+    endPointOrConnectionString: "/var/data/myapp", // optional base directory; omit to use default
+    configuration: new RestConfig { OperationMode = RestMode.LocalFileSystemAsStorage }
+);
+await restLocalFs.StoremAsync("docs/report.pdf", fileBytes);
+var file = await restLocalFs.RetrievemeAsync<byte[]>("docs/report.pdf");
+
+// In-memory queue (single-process)
+var restInMemoryQueue = new Rest(
+    configuration: new RestConfig { OperationMode = RestMode.InMemoryQueue }
+);
+await restInMemoryQueue.QueuemeAsync("events.user.created", newUser);
+await restInMemoryQueue.DomeAsync<User>("events.user.created", async user => {
+    // handle user
+    return true;
+});
+```
+
 ## 🔧 Configuration
 
 ### RestMode Options
 
-- `RestMode.HTTPClient` - HTTP REST client
+- `RestMode.Http` - HTTP REST client
 - `RestMode.RedisCacheClient` - Redis caching
 - `RestMode.AzureStorageClient` - Azure Blob Storage
 - `RestMode.S3Client` - S3-compatible storage
 - `RestMode.RabbitMq` - RabbitMQ message queuing
+- `RestMode.MemoryAsCache` - In-memory cache (base provider)
+- `RestMode.LocalFileSystemAsStorage` - Local filesystem storage (base provider)
+- `RestMode.InMemoryQueue` - In-process queue (base provider)
 
 ### Connection Strings
 
@@ -168,12 +204,12 @@ redis://user:password@localhost:6379
 
 #### Azure Blob Storage
 ```
-DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net
+DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net;RootPath=my-app/uploads
 ```
 
 #### S3-Compatible Providers
 ```
-AccessKeyId=your_key;SecretAccessKey=your_secret;ServiceUrl=https://your-endpoint.com;BucketName=your-bucket;ForcePathStyle=true
+AccessKeyId=your_key;SecretAccessKey=your_secret;ServiceUrl=https://your-endpoint.com;BucketName=your-bucket;ForcePathStyle=true;RootPath=my-app/uploads
 ```
 
 #### RabbitMQ
@@ -263,76 +299,727 @@ await rest.DomeAsync<User>("user.created",
 
 ## 🌐 S3-Compatible Providers
 
-OElite.Restme.S3 supports numerous S3-compatible providers:
+OElite.Restme.S3 supports numerous S3-compatible providers with advanced path management:
 
-### Supported Providers
+### RootPath Feature
 
-- **Amazon S3** - Default AWS S3
-- **Backblaze B2** - Cost-effective cloud storage
-- **MinIO** - Self-hosted object storage
-- **DigitalOcean Spaces** - Simple object storage
-- **Cloudflare R2** - Cloudflare's object storage
-- **Wasabi** - Hot cloud storage
-- **Scaleway Object Storage** - European cloud storage
-- **Any S3-compatible provider**
+The `RootPath` parameter allows you to organize your storage with logical path prefixes. When specified, all operations will automatically prefix the provided path to your object keys.
 
-### Provider Examples
+**Benefits:**
+- **Environment Separation**: Use different root paths for dev/staging/production
+- **Application Isolation**: Separate different applications in the same bucket
+- **Logical Organization**: Group related files under common prefixes
+- **Easy Migration**: Change root paths without code changes
 
+**Example:**
 ```csharp
-// Backblaze B2
-var rest = new Rest("AccessKeyId=key;SecretAccessKey=secret;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true", RestMode.S3Client);
+// Connection string with rootPath
+var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;RootPath=my-app/uploads", RestMode.S3Client);
 
-// MinIO (local development)
-var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true", RestMode.S3Client);
+// Operations automatically use the root path
+await rest.StoremAsync("documents/file.pdf", data); // Stored as "my-app/uploads/documents/file.pdf"
+await rest.CachemeAsync("user:123", userData); // Cached as "my-app/uploads/user:123"
 
-// DigitalOcean Spaces
-var rest = new Rest("AccessKeyId=key;SecretAccessKey=secret;ServiceUrl=https://nyc3.digitaloceanspaces.com;ForcePathStyle=true", RestMode.S3Client);
+// Root path is applied to all operations (GET, PUT, DELETE, EXISTS)
+var file = await rest.RetrievemeAsync<byte[]>("documents/file.pdf"); // Retrieves from "my-app/uploads/documents/file.pdf"
 ```
 
-## 🔒 Security Best Practices
+**Connection String Parameters:**
+- `AccessKeyId` - S3 access key ID
+- `SecretAccessKey` - S3 secret access key
+- `ServiceUrl` - S3 endpoint URL (for non-AWS providers)
+- `BucketName` - S3 bucket name
+- `Region` - AWS region (for AWS S3)
+- `ForcePathStyle` - Use path-style URLs (required for most non-AWS providers)
+- `UseHttp` - Use HTTP instead of HTTPS (for local development)
+- `RootPath` - Logical prefix for all operations
 
-1. **Use HTTPS**: Always use secure connections in production
-2. **Rotate Keys**: Regularly rotate your access keys
-3. **Bucket Policies**: Configure appropriate bucket policies
-4. **VPC**: Use VPC endpoints when available
-5. **IAM**: Use IAM roles when possible instead of access keys
+**Examples:**
+```
+# AWS S3
+AccessKeyId=AKIAIOSFODNN7EXAMPLE;SecretAccessKey=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY;Region=us-west-2
 
-## 🚀 Performance Tips
+# Backblaze B2
+AccessKeyId=your_key_id;SecretAccessKey=your_secret;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true;RootPath=myapp/data
 
-1. **Connection Pooling**: The AWS SDK handles connection pooling automatically
-2. **CDN Integration**: Both cache and storage providers set appropriate cache headers
-3. **Compression**: Consider compressing large objects before storage
-4. **Batch Operations**: Use batch operations when possible
-5. **Async Operations**: Always use async methods for better performance
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **403 Forbidden**: Check your credentials and permissions
-2. **404 Not Found**: Ensure the resource exists and you have access
-3. **Connection Timeout**: Verify the endpoint is correct and accessible
-4. **SSL Errors**: Check if you need `UseHttp=true` for local development
-
-### Debug Mode
-
-Enable debug logging to see detailed request/response information:
-
-```csharp
-var rest = new Rest(connectionString, RestMode.S3Client);
-rest.Logger = logger; // Your ILogger instance
+# MinIO (Local)
+AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true;RootPath=dev/cache
 ```
 
-## 🤝 Contributing
+## 📦 Complete Package Reference
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+### Core Packages
+
+| Package | Description | Latest Version |
+|---------|-------------|----------------|
+| **OElite.Restme** | Core abstractions and HTTP client | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.svg)](https://www.nuget.org/packages/OElite.Restme/) |
+| **OElite.Restme.Utils** | Utility extensions and helpers | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.Utils.svg)](https://www.nuget.org/packages/OElite.Restme.Utils/) |
+
+### Backend Providers
+
+| Package | Description | Latest Version |
+|---------|-------------|----------------|
+| **OElite.Restme.Redis** | Redis cache and queue provider | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.Redis.svg)](https://www.nuget.org/packages/OElite.Restme.Redis/) |
+| **OElite.Restme.RabbitMQ** | RabbitMQ message queue provider | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.RabbitMQ.svg)](https://www.nuget.org/packages/OElite.Restme.RabbitMQ/) |
+| **OElite.Restme.Azure** | Azure Blob Storage provider | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.Azure.svg)](https://www.nuget.org/packages/OElite.Restme.Azure/) |
+| **OElite.Restme.S3** | S3-compatible storage provider | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.S3.svg)](https://www.nuget.org/packages/OElite.Restme.S3/) |
+| **OElite.Restme.MongoDb** | MongoDB operations and aggregation | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.MongoDb.svg)](https://www.nuget.org/packages/OElite.Restme.MongoDb/) |
+
+### Integration Packages
+
+| Package | Description | Latest Version |
+|---------|-------------|----------------|
+| **OElite.Restme.Hosting** | ASP.NET Core integration extensions | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.Hosting.svg)](https://www.nuget.org/packages/OElite.Restme.Hosting/) |
+| **OElite.Restme.RateLimiting** | Advanced rate limiting middleware | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.RateLimiting.svg)](https://www.nuget.org/packages/OElite.Restme.RateLimiting/) |
+| **OElite.Restme.GoogleUtils** | Google Cloud integrations | [![NuGet](https://img.shields.io/nuget/v/OElite.Restme.GoogleUtils.svg)](https://www.nuget.org/packages/OElite.Restme.GoogleUtils/) |
+
+## 🏗️ Package Details
+
+### OElite.Restme.MongoDb
+
+Advanced MongoDB library with comprehensive query capabilities, high-performance updates, aggregation pipelines, and denormalization system.
+
+**Key Features:**
+- **High-Performance UpdateBuilder**: 2-3x faster updates with fluent API and BSON optimization
+- **Enhanced LINQ Extensions**: Complete LINQ support with advanced aggregation operations
+- **Type-safe MongoDB operations** with full IntelliSense support
+- **Advanced aggregation pipelines** for complex queries with expression-to-pipeline conversion
+- **Automatic denormalization** for efficient data relationships
+- **Enhanced LINQ expression support** with nested documents and extension methods
+- **Performance-optimized aggregation methods** using MongoDB's native capabilities
+- **MongoDB class mapping** with conflict resolution
+- ⭐ **MongoDB-Free Application Layer**: Complete abstraction eliminates MongoDB dependencies from application code
+- **Zero Vendor Lock-in**: Application developers work with pure .NET types and collections
+- **Clean Architecture**: Perfect separation between business logic and database implementation
+- 🆕 **MongoDbDocument API**: Replace BsonDocument with pure .NET Dictionary-based operations
+- 🆕 **IMongoDbCollection Interface**: MongoDB-free collection operations with Dictionary and lambda support
+- 🆕 **Seamless Type Conversion**: Internal MongoDB type conversion while exposing clean .NET APIs
+
+**Quick Example:**
+```csharp
+// Entity with denormalized fields
+[DbCollection("products", DbNamingConvention.SnakeCase)]
+public class Product : BaseEntity
+{
+    [DbId] public DbObjectId Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public DbObjectId CategoryId { get; set; }
+
+    [DenormalizedField("categories", "name", "@CategoryId")]
+    public string CategoryName { get; set; } = string.Empty;
+}
+
+// Repository with enhanced LINQ support and high-performance updates
+public class ProductRepository : DataRepository
+{
+    public MongoQuery<Product> ProductStock => new(_adapter.GetCollection<Product>());
+
+    // Enhanced LINQ queries with extension method support
+    public async Task<List<Product>> GetExpensiveProductsAsync(decimal minPrice)
+    {
+        return await ProductStock
+            .Where(p => p.Price > minPrice)
+            .Where(p => p.Name.IsNotNullOrEmpty()) // Extension method support
+            .OrderByDescending(p => p.Price)
+            .Take(10)
+            .ToListAsync();
+    }
+
+    // High-performance updates with fluent API
+    public async Task UpdateProductAsync(DbObjectId productId, string newName, decimal newPrice)
+    {
+        await ProductStock
+            .Where(p => p.Id == productId)
+            .UpdateAsync(u => u
+                .Set(p => p.Name, newName)
+                .Set(p => p.Price, newPrice)
+                .Inc(p => p.ViewCount, 1)
+                .CurrentDate(p => p.UpdatedAt));
+    }
+
+    // Advanced aggregation operations
+    public async Task<List<ProductSummary>> GetProductSummariesAsync()
+    {
+        return await ProductStock
+            .Where(p => p.Status == EntityStatus.Active)
+            .SelectAsync(p => new ProductSummary
+            {
+                Name = p.Name,
+                Price = p.Price,
+                CategoryName = p.Category.Name // Nested property support
+            });
+    }
+
+    // Performance-optimized collection fetching
+    public async Task<ProductCollection> GetActiveProductsAsync(int pageIndex, int pageSize)
+    {
+        return await ProductStock
+            .Where(p => p.Status == EntityStatus.Active)
+            .OrderBy(p => p.Name)
+            .FetchAsync<Product, ProductCollection>(pageIndex, pageSize, returnTotalCount: false);
+    }
+
+    // ⭐ MongoDB-Free Aggregation: Zero MongoDB dependencies in application code
+    public async Task<List<(string Query, int Count)>> GetPopularSearchTermsAsync(DbObjectId merchantId)
+    {
+        // Complex aggregation pipeline using pure Dictionary<string, object>
+        var pipeline = new Dictionary<string, object>[]
+        {
+            new Dictionary<string, object> {
+                ["$match"] = new Dictionary<string, object> {
+                    ["ownerMerchantId"] = merchantId.ToString(),
+                    ["searchedOnUtc"] = new Dictionary<string, object> { ["$gte"] = DateTime.UtcNow.AddDays(-7) }
+                }
+            },
+            new Dictionary<string, object> {
+                ["$group"] = new Dictionary<string, object> {
+                    ["_id"] = "$normalizedQuery",
+                    ["count"] = new Dictionary<string, object> { ["$sum"] = 1 }
+                }
+            },
+            new Dictionary<string, object> {
+                ["$sort"] = new Dictionary<string, object> { ["count"] = -1 }
+            },
+            new Dictionary<string, object> {
+                ["$limit"] = 10
+            }
+        };
+
+        // Returns List<Dictionary<string, object>> - no MongoDB types exposed
+        var results = await DbCentre.SearchHistory.AggregateAsync<Dictionary<string, object>>(pipeline);
+
+        // Application code uses standard .NET types
+        return results.Select(doc => (
+            Query: (string)doc["_id"],
+            Count: (int)doc["count"]
+        )).ToList();
+    }
+
+    // 🆕 MongoDB-Free Collection Operations: New API for zero-dependency database operations
+    public async Task<List<Product>> GetProductsWithMongoDbFreeAPI(string categoryName)
+    {
+        // Get MongoDB-free collection interface - no MongoDB types exposed
+        var productsCollection = DbCentre.GetMongoDbCollection<Product>();
+
+        // Use strongly-typed operations with lambda expressions
+        var activeProducts = await productsCollection.FindAsync(p => p.Status == EntityStatus.Active);
+
+        // Or use Dictionary-based filters for dynamic queries
+        var categoryFilter = new Dictionary<string, object>
+        {
+            ["categoryName"] = categoryName,
+            ["status"] = (int)EntityStatus.Active
+        };
+
+        var categoryProducts = await productsCollection.FindAsync(categoryFilter);
+
+        return categoryProducts;
+    }
+
+    // 🆕 MongoDbDocument API: Direct document operations without MongoDB dependencies
+    public async Task<List<MongoDbDocument>> GetProductDocuments(string searchTerm)
+    {
+        // Get raw MongoDB-free collection for document operations
+        var collection = DbCentre.GetMongoDbCollection("products");
+
+        // Create filter using MongoDbDocument (replaces BsonDocument)
+        var filter = new MongoDbDocument
+        {
+            ["name"] = new MongoDbDocument { ["$regex"] = searchTerm, ["$options"] = "i" },
+            ["status"] = 1
+        };
+
+        // Returns List<MongoDbDocument> - pure .NET types, no MongoDB dependencies
+        var results = await collection.FindAsync(filter);
+
+        return results;
+    }
+}
+```
+
+#### 🏗️ Clean Architecture: Zero MongoDB Dependencies
+
+OElite.Restme.MongoDb provides complete abstraction from MongoDB specifics, ensuring your application code remains vendor-neutral and testable.
+
+**Before (Traditional MongoDB.Driver usage):**
+```csharp
+using MongoDB.Driver;  // ❌ Direct MongoDB dependency
+using MongoDB.Bson;    // ❌ Exposes internal types
+
+public async Task<List<BsonDocument>> GetReports()  // ❌ MongoDB types in return signature
+{
+    var collection = _database.GetCollection<BsonDocument>("reports");
+    var pipeline = new BsonDocument[]  // ❌ MongoDB-specific pipeline format
+    {
+        new BsonDocument("$match", new BsonDocument("status", "active")),
+        new BsonDocument("$group", new BsonDocument
+        {
+            { "_id", "$category" },
+            { "count", new BsonDocument("$sum", 1) }
+        })
+    };
+
+    var cursor = await collection.AggregateAsync(pipeline);
+    return await cursor.ToListAsync();  // ❌ Returns MongoDB-specific types
+}
+```
+
+**After (OElite.Restme.MongoDb with MongoDB-Free API):**
+```csharp
+// ✅ Zero MongoDB dependencies - clean application code
+
+public async Task<List<(string Category, int Count)>> GetReports()  // ✅ Pure .NET return types
+{
+    // Get MongoDB-free collection interface
+    var reportsCollection = DbCentre.GetMongoDbCollection("reports");
+
+    var pipeline = new Dictionary<string, object>[]  // ✅ Standard .NET collections
+    {
+        new Dictionary<string, object> {
+            ["$match"] = new Dictionary<string, object> { ["status"] = "active" }
+        },
+        new Dictionary<string, object> {
+            ["$group"] = new Dictionary<string, object> {
+                ["_id"] = "$category",
+                ["count"] = new Dictionary<string, object> { ["$sum"] = 1 }
+            }
+        }
+    };
+
+    // ✅ Returns List<Dictionary<string, object>> - no MongoDB types
+    var results = await reportsCollection.AggregateAsync(pipeline);
+
+    // ✅ Application code works with standard .NET types
+    return results.Select(doc => (
+        Category: (string)doc["_id"],
+        Count: (int)doc["count"]
+    )).ToList();
+}
+
+// 🆕 NEW: MongoDbDocument API (replaces BsonDocument)
+public async Task<List<MongoDbDocument>> GetActiveReportsAsync()
+{
+    var reportsCollection = DbCentre.GetMongoDbCollection("reports");
+
+    // Create filter using MongoDbDocument instead of BsonDocument
+    var filter = new MongoDbDocument
+    {
+        ["status"] = "active",
+        ["createdAt"] = new MongoDbDocument { ["$gte"] = DateTime.UtcNow.AddDays(-30) }
+    };
+
+    // ✅ Returns List<MongoDbDocument> - pure .NET types
+    return await reportsCollection.FindAsync(filter);
+}
+
+// 🆕 NEW: Strongly-typed MongoDB-free operations
+public async Task<List<Report>> GetReportsWithTypedAPI()
+{
+    var reportsCollection = DbCentre.GetMongoDbCollection<Report>();
+
+    // Lambda expressions - no MongoDB types needed
+    var reports = await reportsCollection.FindAsync(r => r.Status == "active");
+
+    // Dictionary filters for dynamic queries
+    var dynamicFilter = new Dictionary<string, object>
+    {
+        ["status"] = "active",
+        ["priority"] = new Dictionary<string, object> { ["$in"] = new[] { "high", "urgent" } }
+    };
+
+    var priorityReports = await reportsCollection.FindAsync(dynamicFilter);
+
+    return reports;
+}
+```
+
+**Architecture Benefits:**
+- 🎯 **Zero Vendor Lock-in**: Switch databases without changing application logic
+- 🧪 **Enhanced Testability**: Mock with standard .NET interfaces and collections
+- 📚 **Clean Domain Models**: Business logic free from infrastructure concerns
+- 🔄 **Future-Proof**: Database implementation changes don't affect application code
+- 👥 **Developer Experience**: Team members don't need MongoDB expertise for application development
+
+### OElite.Restme.Hosting
+
+ASP.NET Core integration extensions providing dependency injection, cache adapters, and middleware.
+
+**Key Features:**
+- IDistributedCache and IMemoryCache adapters
+- Dependency injection extensions for all providers
+- Clean separation between core and framework integrations
+- Multi-framework support (.NET 8+)
+- Redis and Memory cache implementations
+
+**Quick Example:**
+```csharp
+// Replace Microsoft.Extensions.Caching.StackExchangeRedis
+builder.Services.AddRestmeRedisCache(options =>
+{
+    options.ConnectionString = "localhost:6379";
+    options.InstanceName = "myapp:";
+});
+
+// Or use memory cache with both IMemoryCache and IDistributedCache
+builder.Services.AddRestmeMemoryCacheWithDistributed("myapp:");
+
+// Use in controllers exactly like Microsoft's caching
+public class ProductController : ControllerBase
+{
+    private readonly IDistributedCache _cache;
+
+    public ProductController(IDistributedCache cache) => _cache = cache;
+
+    public async Task<Product> GetAsync(int id)
+    {
+        var cached = await _cache.GetStringAsync($"product:{id}");
+        if (cached != null) return JsonSerializer.Deserialize<Product>(cached);
+
+        // Fetch and cache...
+    }
+}
+```
+
+### OElite.Restme.RateLimiting
+
+Enterprise-grade rate limiting middleware with advanced DDoS protection and adaptive limiting.
+
+**Key Features:**
+- Multiple algorithms: Fixed Window, Token Bucket, Sliding Window, Leaky Bucket
+- DDoS protection with progressive blocking
+- Emergency mode for severe attacks
+- Adaptive limiting based on server load
+- Distributed Redis storage for multi-instance deployments
+- RFC 6585 compliant with proper HTTP headers
+
+**Quick Example:**
+```csharp
+builder.Services.AddRateLimiting(options =>
+{
+    options.Limit = 1000;
+    options.WindowInSeconds = 60;
+    options.EnableDDoSProtection = true;
+    options.DDoSThreshold = 5000;
+    options.EmergencyMode.Enabled = true;
+    options.Algorithm = RateLimitAlgorithm.TokenBucket;
+    options.StorageType = RateLimitStorageType.Redis;
+});
+
+app.UseRateLimiting();
+```
+
+### OElite.Restme.Utils
+
+Utility extensions and helper methods for common operations.
+
+**Key Features:**
+- String extension methods (`IsNotNullOrEmpty()`, etc.)
+- Collection helpers and LINQ extensions
+- Validation utilities
+- Data transformation helpers
+
+### OElite.Restme.GoogleUtils
+
+Google Cloud Platform integrations and utilities.
+
+**Key Features:**
+- Google Cloud Storage integration
+- Google Authentication helpers
+- Firebase utilities
+- Google API client extensions
+
+## 🔧 Advanced Integration Patterns
+
+### ASP.NET Core Cache Extensions
+
+The Hosting package provides powerful cache extensions that work with both IDistributedCache and IMemoryCache:
+
+```csharp
+// Enhanced cache methods with Rest-style API
+public static class CacheExtensions
+{
+    // Find cached data with advanced features
+    public static async Task<T?> FindmeAsync<T>(this IDistributedCache cache,
+        string key,
+        bool returnExpired = false,
+        bool returnInGrace = true,
+        Func<T, Task<bool>>? additionalValidation = null,
+        Func<Task<T>>? refreshAction = null,
+        CancellationToken cancellationToken = default) where T : class;
+
+    // Cache data with expiry and grace period
+    public static async Task CachemeAsync<T>(this IDistributedCache cache,
+        string key,
+        T data,
+        int expiryInSeconds = -1,
+        int graceInSeconds = -1,
+        CancellationToken cancellationToken = default) where T : class;
+
+    // Expire cached data with grace period options
+    public static async Task<bool> ExpiremeAsync(this IDistributedCache cache,
+        string key,
+        bool invalidateGracePeriod = true,
+        CancellationToken cancellationToken = default);
+
+    // Query object-based caching with MD5 key generation
+    public static async Task<T?> FindmeAsync<T>(this IDistributedCache cache,
+        object queryObject,
+        bool returnExpired = false,
+        bool returnInGrace = true,
+        Func<T, Task<bool>>? additionalValidation = null,
+        Func<Task<T>>? refreshAction = null,
+        CancellationToken cancellationToken = default) where T : class;
+}
+```
+
+**Usage Example:**
+```csharp
+public class ProductService
+{
+    private readonly IDistributedCache _cache;
+
+    public ProductService(IDistributedCache cache) => _cache = cache;
+
+    public async Task<Product?> GetProductAsync(int productId)
+    {
+        // Try cache first with refresh callback
+        return await _cache.FindmeAsync<Product>(
+            key: $"product:{productId}",
+            refreshAction: async () => await FetchProductFromDatabase(productId)
+        );
+    }
+
+    public async Task<List<Product>> SearchProductsAsync(ProductSearchQuery query)
+    {
+        // Use query object for automatic MD5 key generation
+        return await _cache.FindmeAsync<List<Product>>(
+            queryObject: query,
+            refreshAction: async () => await ExecuteProductSearch(query)
+        );
+    }
+
+    public async Task InvalidateProductCacheAsync(int productId)
+    {
+        // Expire with grace period (allows stale data during refresh)
+        await _cache.ExpiremeAsync($"product:{productId}", invalidateGracePeriod: false);
+    }
+}
+```
+
+## 🚀 Getting Started Scenarios
+
+### Scenario 1: Simple Web API with Caching
+```bash
+# Install packages
+dotnet add package OElite.Restme.Hosting
+dotnet add package OElite.Restme.Redis
+```
+
+```csharp
+// Program.cs
+builder.Services.AddRestmeRedisCache("localhost:6379", "myapi:");
+
+// Controller
+public class ProductController : ControllerBase
+{
+    private readonly IDistributedCache _cache;
+
+    [HttpGet("{id}")]
+    public async Task<Product?> Get(int id)
+    {
+        return await _cache.FindmeAsync<Product>(
+            $"product:{id}",
+            refreshAction: () => _repository.GetByIdAsync(id)
+        );
+    }
+}
+```
+
+### Scenario 2: Enterprise API with Rate Limiting and High-Performance MongoDB
+```bash
+# Install packages
+dotnet add package OElite.Restme.MongoDb
+dotnet add package OElite.Restme.RateLimiting
+dotnet add package OElite.Restme.Hosting
+```
+
+```csharp
+// Program.cs
+builder.Services.AddRateLimiting(options =>
+{
+    options.Limit = 1000;
+    options.EnableDDoSProtection = true;
+    options.StorageType = RateLimitStorageType.Redis;
+});
+
+builder.Services.AddRestmeRedisCache("localhost:6379", "api:");
+
+// Repository with enhanced MongoDB operations
+public class ProductRepository : DataRepository
+{
+    public MongoQuery<Product> Products => new(_adapter.GetCollection<Product>());
+
+    // High-performance LINQ queries with aggregation
+    public async Task<ProductCollection> GetPopularProductsAsync(int pageIndex, int pageSize)
+    {
+        return await Products
+            .Where(p => p.Status == EntityStatus.Active)
+            .Where(p => p.Rating > 4.0)
+            .OrderByDescending(p => p.SalesCount)
+            .FetchAsync<Product, ProductCollection>(pageIndex, pageSize, returnTotalCount: true);
+    }
+
+    // Advanced aggregation operations
+    public async Task<List<CategorySummary>> GetCategoryStatisticsAsync()
+    {
+        return await Products
+            .Where(p => p.Status == EntityStatus.Active)
+            .SelectAsync(p => new CategorySummary
+            {
+                CategoryId = p.CategoryId,
+                CategoryName = p.Category.Name,
+                TotalProducts = 1,
+                AveragePrice = p.Price
+            });
+    }
+
+    // High-performance batch updates
+    public async Task UpdateProductPricesAsync(decimal categoryId, decimal priceMultiplier)
+    {
+        await Products
+            .Where(p => p.CategoryId == categoryId)
+            .UpdateAsync(u => u
+                .Mul(p => p.Price, priceMultiplier)
+                .Inc(p => p.UpdateCount, 1)
+                .CurrentDate(p => p.UpdatedAt));
+    }
+
+    // Server-side mathematical operations
+    public async Task<decimal> GetCategoryTotalValueAsync(DbObjectId categoryId)
+    {
+        return await Products
+            .Where(p => p.CategoryId == categoryId)
+            .Where(p => p.Status == EntityStatus.Active)
+            .SumAsync(p => p.Price);
+    }
+}
+```
+
+### Scenario 3: Microservice with Multiple Storage Backends
+```bash
+# Install packages
+dotnet add package OElite.Restme
+dotnet add package OElite.Restme.S3
+dotnet add package OElite.Restme.RabbitMQ
+dotnet add package OElite.Restme.Redis
+```
+
+```csharp
+public class DocumentService
+{
+    private readonly Rest _storage;   // S3 for file storage
+    private readonly Rest _cache;     // Redis for caching
+    private readonly Rest _queue;     // RabbitMQ for events
+
+    public DocumentService()
+    {
+        _storage = new Rest("AccessKeyId=...;ServiceUrl=https://s3.amazonaws.com", RestMode.S3Client);
+        _cache = new Rest("localhost:6379", RestMode.RedisCacheClient);
+        _queue = new Rest("amqp://localhost", RestMode.RabbitMq);
+    }
+
+    public async Task<byte[]> GetDocumentAsync(string documentId)
+    {
+        // Try cache first
+        var cached = await _cache.FindmeAsync<byte[]>($"doc:{documentId}");
+        if (cached != null) return cached;
+
+        // Fetch from storage
+        var document = await _storage.RetrievemeAsync<byte[]>($"documents/{documentId}");
+
+        // Cache for future requests
+        await _cache.CachemeAsync($"doc:{documentId}", document, TimeSpan.FromHours(1));
+
+        return document;
+    }
+
+    public async Task SaveDocumentAsync(string documentId, byte[] data)
+    {
+        // Save to storage
+        await _storage.StoremAsync($"documents/{documentId}", data);
+
+        // Invalidate cache
+        await _cache.RemovemeAsync($"doc:{documentId}");
+
+        // Publish event
+        await _queue.QueuemeAsync("document.saved", new { DocumentId = documentId });
+    }
+}
+```
+
+## 🏆 Best Practices
+
+### 1. Package Selection
+- **Core only**: Use `OElite.Restme` for HTTP clients
+- **ASP.NET Core**: Add `OElite.Restme.Hosting` for DI integration
+- **Caching**: Use `OElite.Restme.Redis` or memory providers
+- **Database**: Add `OElite.Restme.MongoDb` for MongoDB operations
+- **Security**: Include `OElite.Restme.RateLimiting` for protection
+
+### 2. Configuration Management
+```csharp
+// Use configuration sections
+builder.Services.Configure<RedisOptions>(
+    builder.Configuration.GetSection("Redis")
+);
+
+// Environment-based configuration
+var redisConnection = builder.Configuration.GetConnectionString("Redis")
+    ?? Environment.GetEnvironmentVariable("REDIS_CONNECTION");
+```
+
+### 3. Error Handling and Resilience
+```csharp
+// Graceful degradation for cache failures
+public async Task<Product?> GetProductAsync(int id)
+{
+    try
+    {
+        return await _cache.FindmeAsync<Product>($"product:{id}");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Cache error for product {ProductId}", id);
+        return await _repository.GetByIdAsync(id); // Fallback to database
+    }
+}
+```
+
+### 4. Performance Optimization
+```csharp
+// Use appropriate data structures
+public async Task<ProductCollection> GetProductsByCategoryAsync(int categoryId)
+{
+    return await Products
+        .Where(p => p.CategoryId == categoryId)
+        .Where(p => p.Status == EntityStatus.Active)
+        .OrderBy(p => p.Name)
+        .FetchAsync<Product, ProductCollection>(returnTotalCount: false); // Skip count for better performance
+}
+```
+
+## 🔗 Related Resources
+
+- **Documentation**: [OElite Platform Wiki](https://wiki.oelite.com)
+- **Examples**: [GitHub Examples Repository](https://github.com/oelite/examples)
+- **API Reference**: [API Documentation](https://docs.oelite.com/restme)
+- **Support**: [GitHub Issues](https://github.com/oelite/uranus/restme/issues)
 
 ## 📄 License
 
-Released under [MIT License](http://choosealicense.com/licenses/mit).
+This project is licensed under the MIT License. See [LICENSE](LICENSE) file for details.
 
-## 🔗 Links
+---
 
-- [NuGet Package](https://www.nuget.org/packages/OElite.Restme/)
-- [GitHub Repository](https://github.com/your-org/OElite.Restme)
-- [Documentation](https://github.com/your-org/OElite.Restme/wiki)
+**OElite.Restme** - *Unifying your data operations across HTTP, caching, storage, and messaging*

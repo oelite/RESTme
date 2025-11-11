@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.Extensions.Logging;
@@ -38,6 +40,9 @@ namespace OElite
             Params = @params ?? new Dictionary<string, string>();
             Headers = headers ?? new Dictionary<string, List<string>>();
             BaseUri = baseUri!;
+            ConnectionString = baseUri?.Host?.IsNotNullOrEmpty() == true
+                ? $"{baseUri.Scheme}://{baseUri.Host}{(baseUri.Port > 0 ? ":" + baseUri : null)}"
+                : null;
             RequestUrlPath = urlPath;
             Logger = logger;
             Configuration = config!;
@@ -77,7 +82,7 @@ namespace OElite
             try
             {
                 // Initialize log provider first (always available)
-                LogProvider = new DefaultLogProvider(Logger);
+                LogProvider = new OElite.Base.ConsoleLogProvider();
 
                 // Load appropriate assemblies to trigger static constructors
                 LoadProviderAssemblies();
@@ -85,22 +90,35 @@ namespace OElite
                 // Try to load providers dynamically based on mode
                 switch (Configuration.OperationMode)
                 {
-                    case RestMode.RedisCacheClient:
+                    case RestMode.MemoryAsCache:
+                        CacheProvider = new OElite.Base.MemoryCacheProvider();
+                        break;
+                    case RestMode.LocalFileSystemAsStorage:
+                        StorageProvider = new OElite.Base.LocalFileSystemStorageProvider(ConnectionString);
+                        break;
+                    case RestMode.InMemoryQueue:
+                        QueueProvider = new OElite.Base.MemoryQueueProvider();
+                        break;
+                    case RestMode.RedisAsCache:
                         InitializeCacheProvider();
                         break;
                     case RestMode.RabbitMq:
                         InitializeQueueProvider();
                         break;
-                    case RestMode.AzureStorageClient:
+                    case RestMode.AzureAsStorage:
                         InitializeStorageProvider();
-                        InitializeCacheProvider(); // Azure can also serve as cache
                         break;
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsCache:
+                        InitializeCacheProvider();
+                        break;
+                    case RestMode.S3AsStorage:
                         InitializeStorageProvider();
-                        InitializeCacheProvider(); // S3 can also serve as cache
                         break;
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.S3AsCache:
+                        InitializeCacheProvider();
+                        break;
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                     default:
                         InitializeHttpProvider();
                         break;
@@ -111,7 +129,8 @@ namespace OElite
             catch (Exception ex)
             {
                 Logger?.LogError(ex, "Failed to initialize providers for mode {Mode}", Configuration.OperationMode);
-                throw new OEliteWebException($"Failed to initialize providers for mode {Configuration.OperationMode}: {ex.Message}", ex);
+                throw new OEliteException(
+                    $"Failed to initialize providers for mode {Configuration.OperationMode}: {ex.Message}", ex);
             }
         }
 
@@ -122,20 +141,44 @@ namespace OElite
         {
             try
             {
-                switch (Configuration.OperationMode)
+                string? assemblyName = Configuration.OperationMode switch
                 {
-                    case RestMode.RedisCacheClient:
-                        LoadAssembly("OElite.Restme.Redis");
-                        break;
-                    case RestMode.RabbitMq:
-                        LoadAssembly("OElite.Restme.RabbitMQ");
-                        break;
-                    case RestMode.AzureStorageClient:
-                        LoadAssembly("OElite.Restme.Azure");
-                        break;
-                    case RestMode.S3Client:
-                        LoadAssembly("OElite.Restme.S3");
-                        break;
+                    RestMode.RedisAsCache => "OElite.Restme.Redis",
+                    RestMode.RabbitMq => "OElite.Restme.RabbitMQ",
+                    RestMode.AzureAsStorage or RestMode.AzureAsCache => "OElite.Restme.Azure",
+                    RestMode.S3AsStorage or RestMode.S3AsCache => "OElite.Restme.S3",
+                    _ => null
+                };
+
+                if (!string.IsNullOrEmpty(assemblyName))
+                {
+                    Logger?.LogDebug("Attempting to load provider assembly: {AssemblyName}", assemblyName);
+                    var loaded = LoadAssembly(assemblyName);
+                    if (loaded)
+                    {
+                        Logger?.LogDebug("Successfully loaded provider assembly: {AssemblyName}", assemblyName);
+                    }
+                    else
+                    {
+                        Logger?.LogWarning("Failed to load provider assembly: {AssemblyName}", assemblyName);
+
+                        // Try discovery as a fallback
+                        Logger?.LogDebug("Attempting provider auto-discovery as fallback");
+                        ServiceLocator.Clear(); // Clear cache to force discovery
+                        var factory = ServiceLocator.GetFactory(Configuration.OperationMode switch
+                        {
+                            RestMode.RedisAsCache => "redis",
+                            RestMode.RabbitMq => "rabbitmq",
+                            RestMode.AzureAsStorage or RestMode.AzureAsCache => "azure",
+                            RestMode.S3AsStorage or RestMode.S3AsCache => "s3",
+                            _ => ""
+                        });
+
+                        if (factory != null)
+                        {
+                            Logger?.LogDebug("Provider discovered through auto-discovery");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -148,19 +191,170 @@ namespace OElite
         /// <summary>
         /// Load an assembly by name to trigger static constructors
         /// </summary>
-        private void LoadAssembly(string assemblyName)
+        private bool LoadAssembly(string assemblyName)
         {
             try
             {
-                var assembly = System.Reflection.Assembly.Load(assemblyName);
-                // Force static constructors to run by accessing a type
-                var types = assembly.GetTypes();
+                Assembly? assembly = null;
+
+                // Check if assembly is already loaded first
+                var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+                assembly = loadedAssemblies.FirstOrDefault(a => a.GetName().Name == assemblyName);
+
+                if (assembly == null)
+                {
+                    // Try different assembly loading strategies
+                    try
+                    {
+                        // Strategy 1: Load by name (works for GAC and referenced assemblies)
+                        assembly = Assembly.Load(assemblyName);
+                        Logger?.LogDebug("Loaded assembly {AssemblyName} using Assembly.Load", assemblyName);
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        // Strategy 2: Try to find and load from file path
+                        assembly = TryLoadAssemblyFromFile(assemblyName);
+                        if (assembly != null)
+                        {
+                            Logger?.LogDebug("Loaded assembly {AssemblyName} from file path", assemblyName);
+                        }
+                    }
+                }
+                else
+                {
+                    Logger?.LogDebug("Assembly {AssemblyName} already loaded", assemblyName);
+                }
+
+                if (assembly != null)
+                {
+                    // Force static constructors to run by getting and accessing types
+                    var types = assembly.GetTypes();
+
+                    // Specifically look for service factory types and trigger their static constructors
+                    var factoryTypes = types.Where(t =>
+                        typeof(IServiceFactory).IsAssignableFrom(t) &&
+                        !t.IsInterface && !t.IsAbstract).ToList();
+
+                    foreach (var factoryType in factoryTypes)
+                    {
+                        try
+                        {
+                            // Trigger static constructor
+                            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(factoryType.TypeHandle);
+                            Logger?.LogDebug("Triggered static constructor for {FactoryType}", factoryType.Name);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger?.LogWarning(ex, "Failed to trigger static constructor for {FactoryType}",
+                                factoryType.Name);
+                        }
+                    }
+
+                    return true;
+                }
+
+                return false;
             }
-            catch (System.IO.FileNotFoundException)
+            catch (Exception ex)
             {
                 // Assembly not found - this is expected if the backend package isn't referenced
-                Logger?.LogDebug("Provider assembly {AssemblyName} not found - backend package may not be referenced", assemblyName);
+                Logger?.LogDebug(ex,
+                    "Provider assembly {AssemblyName} not found - backend package may not be referenced", assemblyName);
+                return false;
             }
+        }
+
+        /// <summary>
+        /// Try to load assembly from file in various search paths
+        /// </summary>
+        private Assembly? TryLoadAssemblyFromFile(string assemblyName)
+        {
+            var searchPaths = new List<string>();
+
+            // Add current directory
+            var currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (currentDirectory != null)
+                searchPaths.Add(currentDirectory);
+
+            // Add entry assembly directory (for when used as NuGet package)
+            var entryAssembly = Assembly.GetEntryAssembly();
+            if (entryAssembly != null)
+            {
+                var entryDirectory = Path.GetDirectoryName(entryAssembly.Location);
+                if (entryDirectory != null && !searchPaths.Contains(entryDirectory))
+                    searchPaths.Add(entryDirectory);
+            }
+
+            // Add base directory
+            if (!string.IsNullOrEmpty(AppDomain.CurrentDomain.BaseDirectory) &&
+                !searchPaths.Contains(AppDomain.CurrentDomain.BaseDirectory))
+                searchPaths.Add(AppDomain.CurrentDomain.BaseDirectory);
+
+            // Add additional common deployment paths
+            var additionalPaths = new List<string>
+            {
+                // Current working directory
+                Environment.CurrentDirectory,
+
+                // Bin directory (common in ASP.NET deployments)
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin"),
+
+                // Refs directory (for .NET Core self-contained deployments)
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "refs"),
+
+                // Runtime directory
+                Path.GetDirectoryName(typeof(object).Assembly.Location) ?? "",
+
+                // NuGet package directories in user profile
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages"),
+
+                // Global NuGet packages (Windows)
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared")
+            };
+
+            foreach (var path in additionalPaths)
+            {
+                if (!string.IsNullOrEmpty(path) && Directory.Exists(path) && !searchPaths.Contains(path))
+                    searchPaths.Add(path);
+            }
+
+            Logger?.LogDebug("Searching for assembly {AssemblyName} in {PathCount} paths", assemblyName, searchPaths.Count);
+
+            foreach (var searchPath in searchPaths)
+            {
+                try
+                {
+                    var assemblyPath = Path.Combine(searchPath, $"{assemblyName}.dll");
+                    Logger?.LogDebug("Checking path: {AssemblyPath}", assemblyPath);
+
+                    if (File.Exists(assemblyPath))
+                    {
+                        Logger?.LogDebug("Found assembly at: {AssemblyPath}", assemblyPath);
+                        return Assembly.LoadFrom(assemblyPath);
+                    }
+
+                    // Also try recursive search in subdirectories for NuGet packages
+                    if (searchPath.Contains(".nuget") || searchPath.Contains("packages"))
+                    {
+                        var foundFiles = Directory.GetFiles(searchPath, $"{assemblyName}.dll", SearchOption.AllDirectories);
+
+                        if (foundFiles.Length > 0)
+                        {
+                            var assemblyFile = foundFiles.First();
+                            Logger?.LogDebug("Found assembly in NuGet location: {AssemblyPath}", assemblyFile);
+                            return Assembly.LoadFrom(assemblyFile);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogDebug(ex, "Failed to load assembly from {SearchPath}", searchPath);
+                    // Continue to next path
+                }
+            }
+
+            Logger?.LogDebug("Assembly {AssemblyName} not found in any search paths", assemblyName);
+            return null;
         }
 
         /// <summary>
@@ -172,9 +366,9 @@ namespace OElite
             {
                 string factoryName = Configuration.OperationMode switch
                 {
-                    RestMode.RedisCacheClient => "redis",
-                    RestMode.AzureStorageClient => "azure",
-                    RestMode.S3Client => "s3",
+                    RestMode.RedisAsCache => "redis",
+                    RestMode.AzureAsCache => "azure",
+                    RestMode.S3AsCache => "s3",
                     _ => "redis" // Default fallback
                 };
 
@@ -194,12 +388,14 @@ namespace OElite
                 Logger?.LogError(ex, "Failed to initialize cache provider");
                 var packageName = Configuration.OperationMode switch
                 {
-                    RestMode.RedisCacheClient => "OElite.Restme.Redis",
-                    RestMode.AzureStorageClient => "OElite.Restme.Azure",
-                    RestMode.S3Client => "OElite.Restme.S3",
+                    RestMode.RedisAsCache => "OElite.Restme.Redis",
+                    RestMode.AzureAsCache => "OElite.Restme.Azure",
+                    RestMode.S3AsCache => "OElite.Restme.S3",
                     _ => "OElite.Restme.Redis"
                 };
-                throw new OEliteWebException($"{Configuration.OperationMode} cache provider not loaded. Please reference {packageName} package.", ex);
+                throw new OEliteException(
+                    $"{Configuration.OperationMode} cache provider not loaded. Please reference {packageName} package.",
+                    ex);
             }
         }
 
@@ -208,24 +404,50 @@ namespace OElite
         /// </summary>
         private void InitializeQueueProvider()
         {
+            // For RabbitMQ, include VHost in connection string if provided
+            var connectionStringWithVHost = ConnectionString ?? "";
+            if (!string.IsNullOrEmpty(RequestUrlPath))
+            {
+                // Append VHost info to connection string for RabbitMQ
+                connectionStringWithVHost += $"|vhost={RequestUrlPath}";
+            }
+
             try
             {
                 // Try to load RabbitMQ provider dynamically
                 var factory = ServiceLocator.GetFactory("rabbitmq");
+
+                // If factory not found, try more aggressive loading
+                if (factory == null)
+                {
+                    Logger?.LogDebug("RabbitMQ factory not found, attempting aggressive assembly loading");
+
+                    // Force assembly loading specifically for RabbitMQ
+                    LoadAssembly("OElite.Restme.RabbitMQ");
+
+                    // Force discovery after assembly load
+                    ServiceLocator.Clear();
+                    factory = ServiceLocator.GetFactory("rabbitmq");
+                }
+
                 if (factory != null)
                 {
-                    QueueProvider = factory.CreateQueueProvider(ConnectionString ?? "", Configuration);
+                    Logger?.LogDebug("Creating RabbitMQ queue provider with connection: {Connection}", connectionStringWithVHost);
+                    QueueProvider = factory.CreateQueueProvider(connectionStringWithVHost, Configuration);
+                    Logger?.LogInformation("Successfully initialized RabbitMQ queue provider");
                 }
                 else
                 {
+                    Logger?.LogError("RabbitMQ factory not found after assembly loading attempts");
                     // Fallback to default implementation that throws helpful error
                     QueueProvider = new DefaultQueueProvider();
                 }
             }
             catch (Exception ex)
             {
-                Logger?.LogError(ex, "Failed to initialize queue provider");
-                throw new OEliteWebException("RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.", ex);
+                Logger?.LogError(ex, "Failed to initialize queue provider with connection string of: {ConnectionString}", connectionStringWithVHost);
+                throw new OEliteException(
+                    "RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.", ex);
             }
         }
 
@@ -237,7 +459,12 @@ namespace OElite
             try
             {
                 // Try to load storage provider dynamically based on mode
-                string factoryName = Configuration.OperationMode == RestMode.AzureStorageClient ? "azure" : "s3";
+                string factoryName = Configuration.OperationMode switch
+                {
+                    RestMode.AzureAsStorage => "azure",
+                    RestMode.S3AsStorage => "s3",
+                    _ => "azure"
+                };
                 var factory = ServiceLocator.GetFactory(factoryName);
                 if (factory != null)
                 {
@@ -252,8 +479,14 @@ namespace OElite
             catch (Exception ex)
             {
                 Logger?.LogError(ex, "Failed to initialize storage provider");
-                var packageName = Configuration.OperationMode == RestMode.AzureStorageClient ? "OElite.Restme.Azure" : "OElite.Restme.S3";
-                throw new OEliteWebException($"{Configuration.OperationMode} provider not loaded. Please reference {packageName} package.", ex);
+                var packageName = Configuration.OperationMode switch
+                {
+                    RestMode.AzureAsStorage => "OElite.Restme.Azure",
+                    RestMode.S3AsStorage => "OElite.Restme.S3",
+                    _ => "OElite.Restme.Azure"
+                };
+                throw new OEliteException(
+                    $"{Configuration.OperationMode} provider not loaded. Please reference {packageName} package.", ex);
             }
         }
 
@@ -272,15 +505,15 @@ namespace OElite
                 }
                 else
                 {
-                    // Fallback to default implementation
-                    HttpProvider = new DefaultHttpProvider(Configuration, Logger);
+                    // Fallback to base implementation without external deps
+                    HttpProvider = new OElite.Base.HttpClientProvider(Configuration, Logger);
                 }
             }
             catch (Exception ex)
             {
                 Logger?.LogError(ex, "Failed to initialize HTTP provider");
                 // HTTP provider should always be available as fallback
-                HttpProvider = new DefaultHttpProvider(Configuration, Logger);
+                HttpProvider = new OElite.Base.HttpClientProvider(Configuration, Logger);
             }
         }
 
@@ -317,10 +550,10 @@ namespace OElite
                 if (allowMultipleValues)
                     Headers[header].Add(value);
                 else
-                    Headers[header] = [value];
+                    Headers[header] = new List<string> { value };
             }
             else
-                Headers.Add(header, [value]);
+                Headers.Add(header, new List<string> { value });
         }
 
         public void AddAuthorizationHeader(string token, string authTypePrefix = "Bearer ")
@@ -337,13 +570,14 @@ namespace OElite
         {
             switch (CurrentMode)
             {
-                case RestMode.HTTPClient:
-                case RestMode.HTTPRestClient:
+                case RestMode.Http:
+                case RestMode.HttpRest:
                     return Task.Run(() =>
                         RestmeHttpExtensions.HttpRequestAsync<T>(this, method, relativePath)
                             .WaitAndGetResult(Configuration.DefaultTimeout));
-                case RestMode.AzureStorageClient:
-                case RestMode.RedisCacheClient:
+                case RestMode.AzureAsStorage:
+                case RestMode.AzureAsCache:
+                case RestMode.RedisAsCache:
                 default:
                     throw new NotSupportedException(
                         "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
@@ -370,25 +604,29 @@ namespace OElite
                     throw new SyntaxErrorException("No key or relative url path provided.");
                 switch (CurrentMode)
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                         return this.HttpGetAsync<T>(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.S3AsStorage:
                         if (StorageProvider != null)
                         {
                             return StorageProvider.GetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         }
-                        throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
-                    case RestMode.RedisCacheClient:
+
+                        throw new InvalidOperationException(
+                            "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+                    case RestMode.RedisAsCache:
                         if (CacheProvider != null)
                         {
                             return CacheProvider.GetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         }
-                        throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+
+                        throw new InvalidOperationException(
+                            "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
                     case RestMode.RabbitMq:
                     default:
                         throw new NotSupportedException(
@@ -428,15 +666,16 @@ namespace OElite
             {
                 switch (CurrentMode)
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                         return HttpRequestAsync<T>(HttpMethod.Put, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.S3AsStorage:
                         if (StorageProvider == null)
-                            throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
-                        
+                            throw new InvalidOperationException(
+                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+
                         if (dataObject != null)
                         {
                             if (dataObject is T typedData)
@@ -444,6 +683,7 @@ namespace OElite
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
+
                         if (ObjAsParam == null)
                         {
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
@@ -463,10 +703,11 @@ namespace OElite
                             return StorageProvider.PutAsync<T>(keyOrRelativeUrlPath, typedData4)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                    case RestMode.RedisCacheClient:
+                    case RestMode.RedisAsCache:
                         if (CacheProvider == null)
-                            throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
-                        
+                            throw new InvalidOperationException(
+                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+
                         if (dataObject != null)
                         {
                             var expiry = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
@@ -474,10 +715,12 @@ namespace OElite
                             {
                                 var success = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData, expiry)
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
-                                return success ? typedData : default(T);
+                                return success ? typedData : null;
                             }
+
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
+
                         if (ObjAsParam == null)
                         {
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
@@ -498,8 +741,9 @@ namespace OElite
                         {
                             var success2 = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData5, expiry2)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
-                            return success2 ? typedData5 : default(T);
+                            return success2 ? typedData5 : null;
                         }
+
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RabbitMq:
                     default:
@@ -540,23 +784,25 @@ namespace OElite
             {
                 switch (CurrentMode)
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                         return HttpRequestAsync<T>(HttpMethod.Delete, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.S3AsStorage:
                         if (StorageProvider == null)
-                            throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+                            throw new InvalidOperationException(
+                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
                         var deleteSuccess = StorageProvider.DeleteAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                        return deleteSuccess ? default(T) : default(T);
-                    case RestMode.RedisCacheClient:
+                        return deleteSuccess ? null : null;
+                    case RestMode.RedisAsCache:
                         if (CacheProvider == null)
-                            throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+                            throw new InvalidOperationException(
+                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
                         var cacheDeleteSuccess = CacheProvider.RemoveAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                        return cacheDeleteSuccess ? default(T) : default(T);
+                        return cacheDeleteSuccess ? null : null;
                     default:
                         throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
                 }
@@ -601,17 +847,18 @@ namespace OElite
             {
                 switch (CurrentMode)
                 {
-                    case RestMode.HTTPClient:
-                    case RestMode.HTTPRestClient:
+                    case RestMode.Http:
+                    case RestMode.HttpRest:
                         if (dataObject != null)
                             ObjAsParam = dataObject;
                         return HttpRequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureStorageClient:
-                    case RestMode.S3Client:
+                    case RestMode.AzureAsStorage:
+                    case RestMode.S3AsStorage:
                         if (StorageProvider == null)
-                            throw new InvalidOperationException("Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
-                        
+                            throw new InvalidOperationException(
+                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+
                         if (dataObject != null)
                         {
                             if (dataObject is T typedData)
@@ -619,6 +866,7 @@ namespace OElite
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
+
                         if (ObjAsParam == null)
                         {
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
@@ -638,10 +886,11 @@ namespace OElite
                             return StorageProvider.PutAsync<T>(keyOrRelativeUrlPath, typedData4)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                    case RestMode.RedisCacheClient:
+                    case RestMode.RedisAsCache:
                         if (CacheProvider == null)
-                            throw new InvalidOperationException("Cache provider not initialized. Please reference OElite.Restme.Redis package.");
-                        
+                            throw new InvalidOperationException(
+                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+
                         if (dataObject != null)
                         {
                             var expiry = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
@@ -649,10 +898,12 @@ namespace OElite
                             {
                                 var success = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData, expiry)
                                     .WaitAndGetResult(Configuration.DefaultTimeout);
-                                return success ? typedData : default(T);
+                                return success ? typedData : null;
                             }
+
                             throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                         }
+
                         switch (ObjAsParam)
                         {
                             case null:
@@ -671,8 +922,9 @@ namespace OElite
                         {
                             var success2 = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData6, expiry2)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
-                            return success2 ? typedData6 : default(T);
+                            return success2 ? typedData6 : null;
                         }
+
                         throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RabbitMq:
                     default:

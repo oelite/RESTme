@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
-        <AssemblyVersion>2.0.6</AssemblyVersion>
-        <VersionPrefix>2.0.6</VersionPrefix>
+        <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
+        <AssemblyVersion>2.0.9</AssemblyVersion>
+        <VersionPrefix>2.0.9</VersionPrefix>
         <AssemblyName>OElite.Restme.GoogleUtils</AssemblyName>
         <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>

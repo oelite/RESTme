@@ -1,0 +1,863 @@
+using System.Collections;
+using System.Linq.Expressions;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Driver;
+
+namespace OElite.Restme.MongoDb;
+
+/// <summary>
+/// MongoDB query implementation
+/// </summary>
+public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
+{
+    private readonly IMongoCollection<T> _collection;
+    private readonly List<FilterDefinition<T>> _filters = new();
+    private readonly List<SortDefinition<T>> _sorts = new();
+    private readonly List<object> _pipelineStages = new();
+    private readonly Dictionary<string, object> _parameters = new();
+    private int? _limit;
+    private int? _skip;
+    private bool _useAggregation = false;
+    private IClientSessionHandle? _session;
+
+    public MongoQuery(IMongoCollection<T> collection)
+    {
+        _collection = collection;
+    }
+
+    /// <summary>
+    /// Internal collection access for aggregation operations
+    /// </summary>
+    internal IMongoCollection<T> Collection => _collection;
+
+    public IMongoQuery<T> Query(string filter)
+    {
+        var mongoFilter = ConvertStringFilterToMongoFilter(filter);
+        _filters.Add(mongoFilter);
+        return this;
+    }
+
+    public IMongoQuery<T> Query(Expression<Func<T, bool>> filter)
+    {
+        _filters.Add(Builders<T>.Filter.Where(filter));
+        return this;
+    }
+
+    public IMongoQuery<T> Query(Dictionary<string, object> filters)
+    {
+        var mongoFilters = ConvertDictionaryToMongoFilters(filters);
+        _filters.AddRange(mongoFilters);
+        return this;
+    }
+
+    public IMongoQuery<T> Params(object parameters)
+    {
+        if (parameters != null)
+        {
+            var properties = parameters.GetType().GetProperties();
+            foreach (var prop in properties)
+            {
+                _parameters[prop.Name] = prop.GetValue(parameters);
+            }
+        }
+
+        return this;
+    }
+
+    public IMongoQuery<T> Paginated(int pageIndex, int pageSize, string? sort = null)
+    {
+        _skip = pageIndex * pageSize;
+        _limit = pageSize;
+
+        if (!string.IsNullOrEmpty(sort))
+        {
+            Sort(sort);
+        }
+
+        return this;
+    }
+
+    public IMongoQuery<T> Sort(string sortExpression)
+    {
+        var sortDefinitions = ParseSortExpression(sortExpression);
+        _sorts.AddRange(sortDefinitions);
+        return this;
+    }
+
+    public IMongoQuery<T> Sort(Expression<Func<T, object>> sortExpression, bool ascending = true)
+    {
+        var fieldDefinition = new ExpressionFieldDefinition<T, object>(sortExpression);
+        if (ascending)
+        {
+            _sorts.Add(Builders<T>.Sort.Ascending(fieldDefinition));
+        }
+        else
+        {
+            _sorts.Add(Builders<T>.Sort.Descending(fieldDefinition));
+        }
+
+        return this;
+    }
+
+    public IMongoQuery<T> Limit(int limit)
+    {
+        _limit = limit;
+        return this;
+    }
+
+    public IMongoQuery<T> Skip(int skip)
+    {
+        _skip = skip;
+        return this;
+    }
+
+    public IMongoQuery<T> WithTransaction(IClientSessionHandle session)
+    {
+        _session = session;
+        return this;
+    }
+
+    public async Task<TCollection> FetchAsync<TCollection>() where TCollection : BaseEntityCollection<T>, new()
+    {
+        var results = await ToListAsync();
+        var collection = new TCollection();
+        collection.AddRange(results);
+        return collection;
+    }
+
+    public async Task<T?> FirstOrDefaultAsync()
+    {
+        var options = new FindOptions<T>
+        {
+            Limit = 1
+        };
+
+        if (_skip.HasValue)
+            options.Skip = _skip.Value;
+
+        var combinedFilter = CombineFilters();
+        var combinedSort = CombineSorts();
+
+        if (combinedSort != null)
+            options.Sort = combinedSort;
+
+        if (_session != null)
+        {
+            var cursor = await _collection.FindAsync(_session, combinedFilter, options);
+            return await cursor.FirstOrDefaultAsync();
+        }
+        else
+        {
+            var cursor = await _collection.FindAsync(combinedFilter, options);
+            return await cursor.FirstOrDefaultAsync();
+        }
+    }
+
+    public async Task<List<T>> ToListAsync()
+    {
+        // If aggregation pipeline is being used, execute aggregation instead of find
+        if (_useAggregation && _pipelineStages.Any())
+        {
+            return await ExecuteAggregationPipelineAsync<T>();
+        }
+
+        // Standard find operation
+        var options = new FindOptions<T>();
+
+        if (_limit.HasValue)
+            options.Limit = _limit.Value;
+        if (_skip.HasValue)
+            options.Skip = _skip.Value;
+
+        var combinedSort = CombineSorts();
+        if (combinedSort != null)
+            options.Sort = combinedSort;
+
+        var combinedFilter = CombineFilters();
+
+        if (_session != null)
+        {
+            var cursor = await _collection.FindAsync(_session, combinedFilter, options);
+            return await cursor.ToListAsync();
+        }
+        else
+        {
+            var cursor = await _collection.FindAsync(combinedFilter, options);
+            return await cursor.ToListAsync();
+        }
+    }
+
+    public async Task<long> CountAsync()
+    {
+        var combinedFilter = CombineFilters();
+        var options = new CountOptions();
+
+        if (_session != null)
+        {
+            return await _collection.CountDocumentsAsync(_session, combinedFilter, options);
+        }
+        else
+        {
+            return await _collection.CountDocumentsAsync(combinedFilter, options);
+        }
+    }
+
+    public async Task<bool> AnyAsync()
+    {
+        // More efficient than CountAsync() > 0 - stops at first match
+        var combinedFilter = CombineFilters();
+        var options = new CountOptions { Limit = 1 };
+
+        if (_session != null)
+        {
+            return await _collection.CountDocumentsAsync(_session, combinedFilter, options) > 0;
+        }
+        else
+        {
+            return await _collection.CountDocumentsAsync(combinedFilter, options) > 0;
+        }
+    }
+
+    public async Task<List<TResult>> AggregateAsync<TResult>(Dictionary<string, object>[] pipeline)
+    {
+        // Combine pipeline stages from Pipeline() method calls with the passed pipeline array
+        var allPipelineStages = new List<Dictionary<string, object>>();
+
+        // Add pipeline stages from Pipeline() method calls first
+        foreach (var stage in _pipelineStages)
+        {
+            if (stage is Dictionary<string, object> dictStage)
+            {
+                allPipelineStages.Add(dictStage);
+            }
+        }
+
+        // Add the pipeline stages passed to this method
+        allPipelineStages.AddRange(pipeline);
+
+        // Convert to BSON pipeline
+        var bsonPipeline = allPipelineStages.Select(stage =>
+            new BsonDocument(stage.Select(kvp => new BsonElement(kvp.Key, MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value))))).ToArray();
+        var aggregationPipeline = PipelineDefinition<T, TResult>.Create(bsonPipeline);
+
+        if (_session != null)
+        {
+            var cursor = await _collection.AggregateAsync(_session, aggregationPipeline);
+            return await cursor.ToListAsync();
+        }
+        else
+        {
+            var cursor = await _collection.AggregateAsync(aggregationPipeline);
+            return await cursor.ToListAsync();
+        }
+    }
+
+    // Write operations
+    public async Task<T> InsertOneAsync(T document)
+    {
+        if (_session != null)
+        {
+            await _collection.InsertOneAsync(_session, document);
+        }
+        else
+        {
+            await _collection.InsertOneAsync(document);
+        }
+
+        return document;
+    }
+
+    public async Task<List<T>> InsertManyAsync(IEnumerable<T> documents)
+    {
+        var documentList = documents.ToList();
+        if (_session != null)
+        {
+            await _collection.InsertManyAsync(_session, documentList);
+        }
+        else
+        {
+            await _collection.InsertManyAsync(documentList);
+        }
+
+        return documentList;
+    }
+
+    public async Task<UpdateResult> UpdateOneAsync(Dictionary<string, object> update)
+    {
+        var combinedFilter = CombineFilters();
+
+        // Check if the update dictionary contains MongoDB operators (starts with $)
+        if (update.Keys.Any(k => k.StartsWith("$")))
+        {
+            // Raw MongoDB update operators - convert to BSON document
+            var updateDoc = new BsonDocument(update.ToDictionary(
+                kvp => kvp.Key,
+                kvp => BsonValue.Create(kvp.Value)
+            ));
+            var updateDef = new BsonDocumentUpdateDefinition<T>(updateDoc);
+
+            if (_session != null)
+            {
+                return await _collection.UpdateOneAsync(_session, combinedFilter, updateDef);
+            }
+            else
+            {
+                return await _collection.UpdateOneAsync(combinedFilter, updateDef);
+            }
+        }
+        else
+        {
+            // Simple field updates - wrap with $set
+            var updateBuilder = Builders<T>.Update;
+            var updateDefinitions = new List<UpdateDefinition<T>>();
+
+            foreach (var kvp in update)
+            {
+                updateDefinitions.Add(updateBuilder.Set(kvp.Key, kvp.Value));
+            }
+
+            var updateDef = updateBuilder.Combine(updateDefinitions);
+
+            if (_session != null)
+            {
+                return await _collection.UpdateOneAsync(_session, combinedFilter, updateDef);
+            }
+            else
+            {
+                return await _collection.UpdateOneAsync(combinedFilter, updateDef);
+            }
+        }
+    }
+
+    public async Task<UpdateResult> UpdateManyAsync(Dictionary<string, object> update)
+    {
+        var combinedFilter = CombineFilters();
+        var updateBuilder = Builders<T>.Update;
+        var updateDefinitions = new List<UpdateDefinition<T>>();
+
+        foreach (var kvp in update)
+        {
+            updateDefinitions.Add(updateBuilder.Set(kvp.Key, kvp.Value));
+        }
+
+        var updateDef = updateBuilder.Combine(updateDefinitions);
+
+        if (_session != null)
+        {
+            return await _collection.UpdateManyAsync(_session, combinedFilter, updateDef);
+        }
+        else
+        {
+            return await _collection.UpdateManyAsync(combinedFilter, updateDef);
+        }
+    }
+
+    public async Task<DeleteResult> DeleteOneAsync()
+    {
+        var combinedFilter = CombineFilters();
+
+        if (_session != null)
+        {
+            return await _collection.DeleteOneAsync(_session, combinedFilter);
+        }
+        else
+        {
+            return await _collection.DeleteOneAsync(combinedFilter);
+        }
+    }
+
+    public async Task<DeleteResult> DeleteManyAsync()
+    {
+        var combinedFilter = CombineFilters();
+
+        if (_session != null)
+        {
+            return await _collection.DeleteManyAsync(_session, combinedFilter);
+        }
+        else
+        {
+            return await _collection.DeleteManyAsync(combinedFilter);
+        }
+    }
+
+    // Aggregation pipeline methods
+    public IMongoQuery<T> Pipeline(params object[] stages)
+    {
+        _useAggregation = true;
+        _pipelineStages.AddRange(stages);
+        return this;
+    }
+
+    public IMongoQuery<T> Lookup<TForeign>(string foreignCollection, string localField, string foreignField,
+        string aliasField)
+    {
+        _useAggregation = true;
+        var lookupStage = PipelineStageDefinitionBuilder.Lookup<T, TForeign, T>(
+            _collection.Database.GetCollection<TForeign>(foreignCollection),
+            localField,
+            foreignField,
+            aliasField);
+        _pipelineStages.Add(lookupStage);
+        return this;
+    }
+
+    public IMongoQuery<T> Match(Expression<Func<T, bool>> filter)
+    {
+        _useAggregation = true;
+        var filterDefinition = Builders<T>.Filter.Where(filter);
+        var matchStage = PipelineStageDefinitionBuilder.Match<T>(filterDefinition);
+        _pipelineStages.Add(matchStage);
+        return this;
+    }
+
+    public IMongoQuery<T> Project<TProjection>(Expression<Func<T, TProjection>> projection)
+    {
+        _useAggregation = true;
+        var projectionDefinition = Builders<T>.Projection.Expression(projection);
+        var projectStage = PipelineStageDefinitionBuilder.Project<T, TProjection>(projectionDefinition);
+        _pipelineStages.Add(projectStage);
+        return this;
+    }
+
+    public IMongoQuery<T> Group<TKey>(Expression<Func<T, TKey>> groupBy,
+        Expression<Func<IGrouping<TKey, T>, object>> group)
+    {
+        _useAggregation = true;
+        // Create a simple group stage using BsonDocument
+        var groupDoc = new BsonDocument();
+        groupDoc["_id"] = "$" + GetFieldName(groupBy);
+        groupDoc["count"] = new BsonDocument("$sum", 1);
+
+        var groupStage = new BsonDocument("$group", groupDoc);
+        _pipelineStages.Add(groupStage);
+        return this;
+    }
+
+    private string GetFieldName<TField>(Expression<Func<T, TField>> expression)
+    {
+        if (expression.Body is MemberExpression memberExpression)
+        {
+            return memberExpression.Member.Name.ToLowerInvariant();
+        }
+
+        return "field";
+    }
+
+    public IMongoQuery<T> Unwind<TItem>(Expression<Func<T, IEnumerable<TItem>>> arrayField)
+    {
+        _useAggregation = true;
+        var fieldDefinition = new ExpressionFieldDefinition<T, IEnumerable<TItem>>(arrayField);
+        var unwindStage = PipelineStageDefinitionBuilder.Unwind<T, TItem>(fieldDefinition);
+        _pipelineStages.Add(unwindStage);
+        return this;
+    }
+
+    private FilterDefinition<T> CombineFilters()
+    {
+        if (_filters.Count == 0)
+            return Builders<T>.Filter.Empty;
+
+        if (_filters.Count == 1)
+            return _filters[0];
+
+        return Builders<T>.Filter.And((IEnumerable<FilterDefinition<T>>)_filters);
+    }
+
+    private SortDefinition<T>? CombineSorts()
+    {
+        if (_sorts.Count == 0)
+            return null;
+
+        if (_sorts.Count == 1)
+            return _sorts[0];
+
+        return Builders<T>.Sort.Combine((IEnumerable<SortDefinition<T>>)_sorts);
+    }
+
+    private FilterDefinition<T> ConvertStringFilterToMongoFilter(string filter)
+    {
+        // Simple filter conversion - can be enhanced for more complex SQL-like syntax
+        if (string.IsNullOrEmpty(filter))
+            return Builders<T>.Filter.Empty;
+
+        // Handle basic equality filters like "Id = @Id"
+        if (filter.Contains("="))
+        {
+            var parts = filter.Split('=');
+            if (parts.Length == 2)
+            {
+                var field = parts[0].Trim();
+                var value = parts[1].Trim();
+
+                // Remove @ prefix from parameter
+                if (value.StartsWith("@"))
+                {
+                    var paramName = value.Substring(1);
+                    if (_parameters.ContainsKey(paramName))
+                    {
+                        value = _parameters[paramName]?.ToString() ?? "";
+                    }
+                }
+
+                // Remove quotes if present
+                if (value.StartsWith("'") && value.EndsWith("'"))
+                {
+                    value = value.Substring(1, value.Length - 2);
+                }
+
+                return Builders<T>.Filter.Eq(field, value);
+            }
+        }
+
+        // Handle IN filters like "Id IN (@Ids)"
+        if (filter.Contains(" IN "))
+        {
+            var parts = filter.Split(new[] { " IN " }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2)
+            {
+                var field = parts[0].Trim();
+                var valuePart = parts[1].Trim();
+
+                if (valuePart.StartsWith("(") && valuePart.EndsWith(")"))
+                {
+                    valuePart = valuePart.Substring(1, valuePart.Length - 2);
+                    var values = valuePart.Split(',');
+                    var convertedValues = values.Select(v => v.Trim().Trim('\'')).ToArray();
+                    return Builders<T>.Filter.In(field, convertedValues);
+                }
+            }
+        }
+
+        // Handle LIKE filters (convert to regex)
+        if (filter.Contains(" LIKE "))
+        {
+            var parts = filter.Split(new[] { " LIKE " }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2)
+            {
+                var field = parts[0].Trim();
+                var pattern = parts[1].Trim().Trim('\'');
+
+                // Convert SQL LIKE pattern to MongoDB regex
+                pattern = pattern.Replace("%", ".*").Replace("_", ".");
+                var regex = new BsonRegularExpression(pattern, "i");
+                return Builders<T>.Filter.Regex(field, regex);
+            }
+        }
+
+        // Try to parse as JSON filter first
+        try
+        {
+            return BsonSerializer.Deserialize<FilterDefinition<T>>(filter);
+        }
+        catch
+        {
+            // If JSON parsing fails, return empty filter instead of text search
+            // Text search requires explicit text indexes and should be handled separately
+            return Builders<T>.Filter.Empty;
+        }
+    }
+
+    private List<SortDefinition<T>> ParseSortExpression(string sortExpression)
+    {
+        var sorts = new List<SortDefinition<T>>();
+
+        if (string.IsNullOrEmpty(sortExpression))
+            return sorts;
+
+        var sortParts = sortExpression.Split(',');
+        foreach (var part in sortParts)
+        {
+            var trimmed = part.Trim();
+            if (trimmed.EndsWith(" DESC", StringComparison.OrdinalIgnoreCase))
+            {
+                var field = trimmed.Substring(0, trimmed.Length - 5).Trim();
+                sorts.Add(Builders<T>.Sort.Descending(field));
+            }
+            else if (trimmed.EndsWith(" ASC", StringComparison.OrdinalIgnoreCase))
+            {
+                var field = trimmed.Substring(0, trimmed.Length - 4).Trim();
+                sorts.Add(Builders<T>.Sort.Ascending(field));
+            }
+            else
+            {
+                // Default to ascending
+                sorts.Add(Builders<T>.Sort.Ascending(trimmed));
+            }
+        }
+
+        return sorts;
+    }
+
+    private List<FilterDefinition<T>> ConvertDictionaryToMongoFilters(Dictionary<string, object> filters)
+    {
+        var mongoFilters = new List<FilterDefinition<T>>();
+
+        foreach (var filter in filters)
+        {
+            var field = filter.Key;
+            var value = filter.Value;
+
+            if (value is Dictionary<string, object> operatorValue)
+            {
+                // Handle MongoDB operators like $in, $nin, $regex, etc.
+                foreach (var op in operatorValue)
+                {
+                    var operatorName = op.Key;
+                    var operatorVal = op.Value;
+
+                    switch (operatorName)
+                    {
+                        case "$in":
+                            if (operatorVal is IEnumerable<object> inValues)
+                                mongoFilters.Add(Builders<T>.Filter.In(field, inValues));
+                            break;
+                        case "$nin":
+                            if (operatorVal is IEnumerable<object> ninValues)
+                                mongoFilters.Add(Builders<T>.Filter.Nin(field, ninValues));
+                            break;
+                        case "$regex":
+                            var regexOptions = operatorValue.ContainsKey("$options")
+                                ? operatorValue["$options"].ToString()
+                                : "i";
+                            var regex = new BsonRegularExpression(operatorVal.ToString(), regexOptions);
+                            mongoFilters.Add(Builders<T>.Filter.Regex(field, regex));
+                            break;
+                        case "$options":
+                            // $options is handled as part of $regex processing
+                            // Skip this iteration to avoid creating duplicate filters
+                            break;
+                        case "$exists":
+                            if (operatorVal is bool existsValue)
+                                mongoFilters.Add(Builders<T>.Filter.Exists(field, existsValue));
+                            break;
+                        case "$gt":
+                            mongoFilters.Add(Builders<T>.Filter.Gt(field, operatorVal));
+                            break;
+                        case "$gte":
+                            mongoFilters.Add(Builders<T>.Filter.Gte(field, operatorVal));
+                            break;
+                        case "$lt":
+                            mongoFilters.Add(Builders<T>.Filter.Lt(field, operatorVal));
+                            break;
+                        case "$lte":
+                            mongoFilters.Add(Builders<T>.Filter.Lte(field, operatorVal));
+                            break;
+                        case "$ne":
+                            mongoFilters.Add(Builders<T>.Filter.Ne(field, operatorVal));
+                            break;
+                        default:
+                            mongoFilters.Add(Builders<T>.Filter.Eq(field, operatorVal));
+                            break;
+                    }
+                }
+            }
+            else if (field == "$or" && (value is object[] orArray || value is IEnumerable orEnumerable))
+            {
+                // Handle $or operator
+                var orFilters = new List<FilterDefinition<T>>();
+                var items = value is object[] arr ? arr : ((IEnumerable)value).Cast<object>().ToArray();
+
+                foreach (var orItem in items)
+                {
+                    if (orItem is Dictionary<string, object> orDict)
+                    {
+                        var orMongoFilters = ConvertDictionaryToMongoFilters(orDict);
+                        orFilters.AddRange(orMongoFilters);
+                    }
+                }
+
+                if (orFilters.Count > 0)
+                {
+                    mongoFilters.Add(Builders<T>.Filter.Or((IEnumerable<FilterDefinition<T>>)orFilters));
+                }
+            }
+            else if (field == "$and" && (value is object[] andArray || value is IEnumerable andEnumerable))
+            {
+                // Handle $and operator
+                var andFilters = new List<FilterDefinition<T>>();
+                var items = value is object[] arr ? arr : ((IEnumerable)value).Cast<object>().ToArray();
+
+                foreach (var andItem in items)
+                {
+                    if (andItem is Dictionary<string, object> andDict)
+                    {
+                        var andMongoFilters = ConvertDictionaryToMongoFilters(andDict);
+                        andFilters.AddRange(andMongoFilters);
+                    }
+                }
+
+                if (andFilters.Count > 0)
+                {
+                    mongoFilters.Add(Builders<T>.Filter.And((IEnumerable<FilterDefinition<T>>)andFilters));
+                }
+            }
+            else
+            {
+                // Simple equality filter
+                mongoFilters.Add(Builders<T>.Filter.Eq(field, value));
+            }
+        }
+
+        return mongoFilters;
+    }
+
+    /// <summary>
+    /// Efficiently checks if any documents exist matching the query - optimized for existence checks
+    /// </summary>
+    public async Task<bool> ExistsAsync()
+    {
+        return await AnyAsync();
+    }
+
+    /// <summary>
+    /// Gets a single document or null - optimized for single result queries
+    /// </summary>
+    public async Task<T?> SingleOrDefaultAsync()
+    {
+        // Limit to 2 to check for uniqueness
+        var options = new FindOptions<T> { Limit = 2 };
+        
+        if (_skip.HasValue)
+            options.Skip = _skip.Value;
+
+        var combinedFilter = CombineFilters();
+        var combinedSort = CombineSorts();
+
+        if (combinedSort != null)
+            options.Sort = combinedSort;
+
+        List<T> results;
+        if (_session != null)
+        {
+            var cursor = await _collection.FindAsync(_session, combinedFilter, options);
+            results = await cursor.ToListAsync();
+        }
+        else
+        {
+            var cursor = await _collection.FindAsync(combinedFilter, options);
+            results = await cursor.ToListAsync();
+        }
+
+        return results.Count switch
+        {
+            0 => default(T),
+            1 => results[0],
+            _ => throw new InvalidOperationException("Sequence contains more than one element")
+        };
+    }
+
+    /// <summary>
+    /// Gets a single document - throws if no results or multiple results
+    /// </summary>
+    public async Task<T> SingleAsync()
+    {
+        var result = await SingleOrDefaultAsync();
+        if (result == null)
+            throw new InvalidOperationException("Sequence contains no elements");
+        return result;
+    }
+
+    /// <summary>
+    /// Gets the first document - throws if no results
+    /// </summary>
+    public async Task<T> FirstAsync()
+    {
+        var result = await FirstOrDefaultAsync();
+        if (result == null)
+            throw new InvalidOperationException("Sequence contains no elements");
+        return result;
+    }
+
+    /// <summary>
+    /// Executes the query with pagination and returns both items and total count
+    /// </summary>
+    public async Task<(List<T> Items, long TotalCount)> ToPagedListAsync(int pageIndex, int pageSize)
+    {
+        var totalCount = await CountAsync();
+        var items = await Skip(pageIndex * pageSize).Limit(pageSize).ToListAsync();
+        return (items, totalCount);
+    }
+
+    /// <summary>
+    /// Executes the query and returns results as a BaseEntityCollection with total count
+    /// </summary>
+    public async Task<TCollection> ToPagedCollectionAsync<TCollection>(int pageIndex, int pageSize) 
+        where TCollection : BaseEntityCollection<T>, new()
+    {
+        var (items, totalCount) = await ToPagedListAsync(pageIndex, pageSize);
+        var collection = new TCollection();
+        collection.AddRange(items);
+        collection.TotalRecordsCount = (int)totalCount;
+        return collection;
+    }
+
+    /// <summary>
+    /// Executes the aggregation pipeline and returns results
+    /// </summary>
+    private async Task<List<TResult>> ExecuteAggregationPipelineAsync<TResult>()
+    {
+        var pipelineDefinitions = new List<IPipelineStageDefinition>();
+
+        // Add any existing filters as $match stages first
+        if (_filters.Any())
+        {
+            var combinedFilter = CombineFilters();
+            var matchStage = PipelineStageDefinitionBuilder.Match(combinedFilter);
+            pipelineDefinitions.Add(matchStage);
+        }
+
+        // Add all pipeline stages (lookup, unwind, etc.)
+        foreach (var stage in _pipelineStages)
+        {
+            if (stage is IPipelineStageDefinition pipelineStage)
+            {
+                pipelineDefinitions.Add(pipelineStage);
+            }
+            else if (stage is Dictionary<string, object> dictStage)
+            {
+                // Convert dictionary stage to BsonDocument and add as pipeline stage
+                var bsonDoc = new BsonDocument(dictStage.Select(kvp =>
+                    new BsonElement(kvp.Key, MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value))));
+                var convertedStage = new BsonDocumentPipelineStageDefinition<T, T>(bsonDoc);
+                pipelineDefinitions.Add(convertedStage);
+            }
+        }
+
+        // Add sorting if specified
+        var combinedSort = CombineSorts();
+        if (combinedSort != null)
+        {
+            var sortStage = PipelineStageDefinitionBuilder.Sort(combinedSort);
+            pipelineDefinitions.Add(sortStage);
+        }
+
+        // Add skip/limit stages
+        if (_skip.HasValue)
+        {
+            var skipStage = PipelineStageDefinitionBuilder.Skip<T>(_skip.Value);
+            pipelineDefinitions.Add(skipStage);
+        }
+
+        if (_limit.HasValue)
+        {
+            var limitStage = PipelineStageDefinitionBuilder.Limit<T>(_limit.Value);
+            pipelineDefinitions.Add(limitStage);
+        }
+
+        // Create the aggregation pipeline
+        var pipeline = PipelineDefinition<T, TResult>.Create(pipelineDefinitions);
+
+        // Execute the aggregation
+        if (_session != null)
+        {
+            var cursor = await _collection.AggregateAsync(_session, pipeline);
+            return await cursor.ToListAsync();
+        }
+        else
+        {
+            var cursor = await _collection.AggregateAsync(pipeline);
+            return await cursor.ToListAsync();
+        }
+    }
+}

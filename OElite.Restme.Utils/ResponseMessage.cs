@@ -18,6 +18,12 @@ namespace OElite
 
         public object MetaData { get; set; }
 
+        // Additional properties for error handling and HTTP status code mapping
+        public string Error { get; set; }
+        public string ErrorCode { get; set; }
+        public DateTime Timestamp { get; set; }
+        public object Details { get; set; }
+
         public ResponseMessage()
         {
             AssociatedTotalCountPropertyName = "TotalRecordsCount";

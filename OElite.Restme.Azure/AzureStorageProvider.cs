@@ -1,8 +1,10 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using OElite.Abstractions;
+using OElite.Utils;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 
@@ -11,50 +13,48 @@ namespace OElite.Providers
     /// <summary>
     /// Azure Blob Storage implementation of IStorageProvider
     /// </summary>
-    public class AzureStorageProvider : IStorageProvider
+    public class AzureStorageProvider : BaseStorageProvider
     {
         private readonly CloudBlobClient _blobClient;
-        private readonly RestConfig _config;
-        private bool _disposed = false;
+        private readonly AzureConfiguration _azureConfig;
 
-        public AzureStorageProvider(string connectionString, RestConfig config)
+        public AzureStorageProvider(string connectionString, RestConfig config) : base(config)
         {
-            _config = config;
-            var storageAccount = CloudStorageAccount.Parse(connectionString);
+            _azureConfig = AzureConnectionStringParser.ParseConnectionString(connectionString);
+            var storageAccount = CloudStorageAccount.Parse(_azureConfig.ConnectionString);
             _blobClient = storageAccount.CreateCloudBlobClient();
         }
 
-        public async Task<T?> GetAsync<T>(string key) where T : class
+        public override async Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : class
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "GetAsync");
+
             try
             {
-                var container = await GetContainerAsync(key);
-                var blobItemPath = IdentifyBlobItemPath(key);
+                // Apply root path if specified
+                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+
+                var container = await GetContainerAsync(finalKey);
+                var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
-                
+
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!await blockBlob.ExistsAsync())
                     return null;
 
                 if (typeof(Stream).IsAssignableFrom(typeof(T)))
                 {
                     using var stream = new MemoryStream();
+                    cancellationToken.ThrowIfCancellationRequested();
                     await blockBlob.DownloadToStreamAsync(stream);
-                    var bytes = FileUtils.ReadStreamToEnd(stream);
-                    
-                    T? result;
-                    if (typeof(T).GetTypeInfo().IsAbstract)
-                    {
-                        result = (T)Activator.CreateInstance(typeof(MemoryStream), bytes)!;
-                    }
-                    else
-                        result = (T)Activator.CreateInstance(typeof(T), bytes)!;
-
-                    return result;
+                    return HandleStreamType<T>(stream);
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
                 var jsonStringValue = await blockBlob.DownloadTextAsync();
                 if (!jsonStringValue.IsNotNullOrEmpty())
                     return null;
@@ -64,24 +64,31 @@ namespace OElite.Providers
 
                 return jsonStringValue.JsonDeserialize<T>();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get blob '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get blob '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public async Task<T?> PutAsync<T>(string key, T value) where T : class
+        public override async Task<T?> PutAsync<T>(string objectKey, T value, CancellationToken cancellationToken = default) where T : class
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "PutAsync");
+            ValidateValue(value, "PutAsync");
+
             try
             {
-                var container = await GetContainerAsync(key);
-                var blobItemPath = IdentifyBlobItemPath(key);
+                // Apply root path if specified
+                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+
+                var container = await GetContainerAsync(finalKey);
+                var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
 
-                var extension = FileUtils.GetFileExtensionName(key);
+                var extension = FileUtils.GetFileExtensionName(objectKey);
                 if (extension.IsNotNullOrEmpty())
                     blockBlob.Properties.ContentType = FileUtils.GetMimeType(extension);
 
@@ -89,216 +96,233 @@ namespace OElite.Providers
                 {
                     if (value is not Stream stream)
                         return value;
-                    
+
                     stream.Position = 0;
+                    cancellationToken.ThrowIfCancellationRequested();
                     await blockBlob.UploadFromStreamAsync(stream);
                 }
                 else
                 {
-                    var jsonValue = value.JsonSerialize(_config.UseRestConvertForCollectionSerialization, _config.SerializerSettings);
+                    var jsonValue = value.JsonSerialize(Config.UseRestConvertForCollectionSerialization, Config.SerializerSettings);
+                    cancellationToken.ThrowIfCancellationRequested();
                     await blockBlob.UploadTextAsync(jsonValue);
                 }
 
                 return value;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to upload blob '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to upload blob '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public async Task<bool> DeleteAsync(string key)
+        public override async Task<bool> DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "DeleteAsync");
+
             try
             {
-                var container = await GetContainerAsync(key);
-                var blobItemPath = IdentifyBlobItemPath(key);
+                // Apply root path if specified
+                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+
+                var container = await GetContainerAsync(finalKey);
+                var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
+                cancellationToken.ThrowIfCancellationRequested();
                 return await blockBlob.DeleteIfExistsAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to delete blob '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to delete blob '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public async Task<bool> ExistsAsync(string key)
+        public override async Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "ExistsAsync");
+
             try
             {
-                var container = await GetContainerAsync(key);
-                var blobItemPath = IdentifyBlobItemPath(key);
+                // Apply root path if specified
+                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+
+                var container = await GetContainerAsync(finalKey);
+                var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
                     return false;
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
+                cancellationToken.ThrowIfCancellationRequested();
                 return await blockBlob.ExistsAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to check blob existence '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to check blob existence '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public async Task<string?> GetStringAsync(string key)
+        public override async Task<string?> GetStringAsync(string objectKey, CancellationToken cancellationToken = default)
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "GetStringAsync");
+
             try
             {
-                var container = await GetContainerAsync(key);
-                var blobItemPath = IdentifyBlobItemPath(key);
+                // Apply root path if specified
+                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+
+                var container = await GetContainerAsync(finalKey);
+                var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
-                
+
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!await blockBlob.ExistsAsync())
                     return null;
 
+                cancellationToken.ThrowIfCancellationRequested();
                 return await blockBlob.DownloadTextAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get blob string '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get blob string '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public async Task<string?> PutStringAsync(string key, string value)
+        public override async Task<string?> PutStringAsync(string objectKey, string value, CancellationToken cancellationToken = default)
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "PutStringAsync");
+            ValidateValue(value, "PutStringAsync");
+
             try
             {
-                var container = await GetContainerAsync(key);
-                var blobItemPath = IdentifyBlobItemPath(key);
+                // Apply root path if specified
+                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+
+                var container = await GetContainerAsync(finalKey);
+                var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
+                cancellationToken.ThrowIfCancellationRequested();
                 await blockBlob.UploadTextAsync(value);
-                
+
                 return value;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to upload blob string '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to upload blob string '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public async Task<Stream?> GetStreamAsync(string key)
+        public override async Task<Stream?> GetStreamAsync(string objectKey, CancellationToken cancellationToken = default)
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "GetStreamAsync");
+
             try
             {
-                var container = await GetContainerAsync(key);
-                var blobItemPath = IdentifyBlobItemPath(key);
+                // Apply root path if specified
+                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+
+                var container = await GetContainerAsync(finalKey);
+                var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
-                
+
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!await blockBlob.ExistsAsync())
                     return null;
 
                 var stream = new MemoryStream();
+                cancellationToken.ThrowIfCancellationRequested();
                 await blockBlob.DownloadToStreamAsync(stream);
                 stream.Position = 0;
-                
+
                 return stream;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get blob stream '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get blob stream '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public async Task<bool> PutStreamAsync(string key, Stream stream)
+        public override async Task<bool> PutStreamAsync(string objectKey, Stream stream, CancellationToken cancellationToken = default)
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "PutStreamAsync");
+            ValidateValue(stream, "PutStreamAsync");
+
             try
             {
-                var container = await GetContainerAsync(key);
-                var blobItemPath = IdentifyBlobItemPath(key);
+                // Apply root path if specified
+                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+
+                var container = await GetContainerAsync(finalKey);
+                var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
                 if (blobItemPath.IsNullOrEmpty())
-                    throw new OEliteWebException("Invalid blob item name.");
+                    throw new OEliteException("Invalid blob item name.");
 
                 var blockBlob = container.GetBlockBlobReference(blobItemPath);
-                
-                var extension = FileUtils.GetFileExtensionName(key);
+
+                var extension = FileUtils.GetFileExtensionName(objectKey);
                 if (extension.IsNotNullOrEmpty())
                     blockBlob.Properties.ContentType = FileUtils.GetMimeType(extension);
 
                 stream.Position = 0;
+                cancellationToken.ThrowIfCancellationRequested();
                 await blockBlob.UploadFromStreamAsync(stream);
-                
+
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to upload blob stream '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to upload blob stream '{objectKey}': {ex.Message}", ex);
             }
         }
 
-        public async Task<T?> GetStreamAsync<T>(string key) where T : Stream
+        public override async Task<T> GetStreamAsync<T>(string objectKey, CancellationToken cancellationToken = default)
         {
+            ThrowIfDisposed();
+            ValidateKey(objectKey, "GetStreamAsync");
+
             try
             {
-                var stream = await GetStreamAsync(key);
-                if (stream == null)
-                    return null;
-
-                var bytes = FileUtils.ReadStreamToEnd(stream);
-                
-                T? result;
-                if (typeof(T).GetTypeInfo().IsAbstract)
-                {
-                    result = (T)Activator.CreateInstance(typeof(MemoryStream), bytes)!;
-                }
-                else
-                    result = (T)Activator.CreateInstance(typeof(T), bytes)!;
-
-                return result;
+                var stream = await GetStreamAsync(objectKey, cancellationToken);
+                return HandleStreamTypeForStream<T>(stream);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException))
             {
-                throw new OEliteWebException($"Failed to get blob stream as type '{typeof(T).Name}' for '{key}': {ex.Message}", ex);
+                throw new OEliteException($"Failed to get blob stream as type '{typeof(T).Name}' for '{objectKey}': {ex.Message}", ex);
             }
         }
 
         private async Task<CloudBlobContainer> GetContainerAsync(string storageRelativePath)
         {
-            var containerName = GetContainerName(storageRelativePath);
+            var containerName = AzureConnectionStringParser.GetContainerName(storageRelativePath);
             var container = _blobClient.GetContainerReference(containerName);
             await container.CreateIfNotExistsAsync();
             return container;
         }
 
-        private string GetContainerName(string storageRelativePath)
+        public override void Dispose()
         {
-            if (storageRelativePath.IsNullOrEmpty())
-                throw new OEliteWebException("Storage relative path cannot be null or empty.");
-
-            var segments = storageRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            return segments.Length > 0 ? segments[0] : "default";
-        }
-
-        private string? IdentifyBlobItemPath(string storageRelativePath)
-        {
-            if (storageRelativePath.IsNullOrEmpty())
-                return null;
-
-            var segments = storageRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Length <= 1)
-                return null;
-
-            return string.Join("/", segments, 1, segments.Length - 1);
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
+            if (!Disposed)
             {
                 // CloudBlobClient doesn't implement IDisposable in older versions
                 // Just mark as disposed
-                _disposed = true;
+                Disposed = true;
             }
         }
     }
