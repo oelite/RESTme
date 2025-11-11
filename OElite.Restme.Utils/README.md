@@ -1,516 +1,298 @@
 # OElite.Restme.Utils
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/oelite)
-[![NuGet](https://img.shields.io/badge/nuget-v2.1.0-blue.svg)](https://www.nuget.org/packages/OElite.Restme.Utils/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![NuGet Version](https://img.shields.io/nuget/v/OElite.Restme.Utils.svg)](https://www.nuget.org/packages/OElite.Restme.Utils)
+[![Target Framework](https://img.shields.io/badge/.NET-8%2C%209%2C%2010-blue)](https://dotnet.microsoft.com/)
 
-Core utilities and data access abstractions for the OElite platform, providing enhanced BaseEntity classes, database attributes, and region-aware data management capabilities.
+Core utility library for the Restme framework, providing essential helper functions, extensions, and foundational types used across the OElite platform.
 
 ## 🚀 Key Features
 
-### **Enhanced BaseEntity with Region Awareness**
-- **Geographic Data Placement**: Automatic region support for GDPR compliance
-- **Multi-Tenant Support**: Built-in owner tracking for merchant and contact isolation
-- **Audit Fields**: Comprehensive creation and modification tracking
-- **Type Safety**: Strong typing with DbObjectId and datetime handling
+### **Core Utilities**
+- **String Processing**: Advanced string manipulation, validation, and formatting utilities
+- **Encryption & Security**: MD5, DES/3DES encryption helpers with secure key generation
+- **Date & Time**: Comprehensive date/time utilities and conversions
+- **Type Conversion**: Robust type conversion and validation helpers
+- **GUID Operations**: Enhanced GUID generation and manipulation
 
-### **Comprehensive Database Attributes**
-- **Declarative Schema**: Define database configuration using C# attributes
-- **Field Mapping**: Flexible property-to-field mapping with naming conventions
-- **Index Configuration**: Performance-optimized index definitions
-- **Sharding Support**: Region-aware shard key configuration
-- **Validation**: Built-in configuration validation and error checking
+### **Web & HTTP Utilities**
+- **HTTP Content Types**: Custom form-encoded and RESTful HTTP content handling
+- **Web Crawling**: HTML parsing and web scraping utilities with HtmlAgilityPack integration
+- **Query Processing**: URL query string and parameter handling
 
-### **Data Access Abstractions**
-- **Repository Pattern**: Clean abstraction over data access operations
-- **Query Builders**: Type-safe query construction and execution
-- **Connection Management**: Efficient database connection handling
-- **Performance Optimization**: Built-in caching and query optimization
-
-## Table of Contents
-
-- [Installation](#installation)
-- [BaseEntity Enhancements](#baseentity-enhancements)
-- [Database Attributes](#database-attributes)
-- [Data Access Patterns](#data-access-patterns)
-- [Region-Aware Data Management](#region-aware-data-management)
-- [Configuration Examples](#configuration-examples)
-- [Best Practices](#best-practices)
-- [API Reference](#api-reference)
+### **Foundation Types**
+- **BaseEntity**: Core entity base class with common properties (Id, CreatedOnUtc, UpdatedOnUtc)
+- **Entity Status**: Standardized entity status enumeration
+- **Query Abstractions**: Base query classes for data access patterns
+- **Exception Handling**: Custom OElite exception types with detailed error information
 
 ## Installation
 
-Add the package reference to your project:
-
-```xml
-<PackageReference Include="OElite.Restme.Utils" Version="2.1.0" />
+```bash
+dotnet add package OElite.Restme.Utils
 ```
 
-## BaseEntity Enhancements
+## Quick Start
 
-### Enhanced BaseEntity with Region Support
-
-All entities automatically inherit comprehensive base functionality:
-
+### String Validation and Processing
 ```csharp
-public class Product : BaseEntity
-{
-    public string Name { get; set; } = string.Empty;
-    public decimal Price { get; set; }
-    public DbObjectId CategoryId { get; set; }
+using OElite;
 
-    // Inherited from BaseEntity:
-    // - Id (DbObjectId) - Primary key
-    // - CreatedOnUtc (DateTime) - Creation timestamp
-    // - UpdatedOnUtc (DateTime) - Last modification timestamp
-    // - IsActive (bool) - Soft deletion support
-    // - OwnerMerchantId (DbObjectId?) - Multi-tenant support
-    // - OwnerContactId (DbObjectId?) - User-specific data
-    // - Region (string?) - Geographic data placement for GDPR compliance
-}
+// String validation
+string validated = StringUtils.CanNotBeNullOrEmpty(userInput);
+
+// String manipulation
+string truncated = StringUtils.SubString(longText, 100, "...");
+string cleaned = StringUtils.CleanHtmlTags(htmlContent);
+
+// String formatting
+string titleCase = StringUtils.ToTitleCase("hello world");
 ```
 
-### Automatic Index Generation
-
-BaseEntity properties automatically receive optimized indexes:
-
+### Encryption and Security
 ```csharp
-// Automatically generated indexes:
-// - idx_auto_created: CreatedOnUtc (ascending)
-// - idx_auto_updated: UpdatedOnUtc (ascending)
-// - idx_auto_active: IsActive (ascending)
-// - idx_auto_owner_merchant: OwnerMerchantId (sparse)
-// - idx_auto_owner_contact: OwnerContactId (sparse)
-// - idx_auto_region: Region (sparse) - for GDPR compliance
+using OElite;
+
+// MD5 hashing
+string hash = EncryptHelper.Md5Encrypt("password123");
+
+// DES encryption
+byte[] key = EncryptHelper.GetDesKey();
+string encrypted = EncryptHelper.DesEncrypt("sensitive data", key);
+string decrypted = EncryptHelper.DesDecrypt(encrypted, key);
+
+// TOTP generation
+string totpCode = TotpEncrypt.GenerateTotp(secretKey);
+bool isValid = TotpEncrypt.ValidateTotp(userCode, secretKey);
 ```
 
-## Database Attributes
-
-### Core Attributes Overview
-
-| Attribute | Purpose | Example |
-|-----------|---------|---------|
-| `[DbCollection]` | Collection configuration | `[DbCollection("products", EnableSharding = true)]` |
-| `[DbShardKey]` | Shard key definition | `[DbShardKey("CategoryId", IncludeRegion = true)]` |
-| `[DbIndex]` | Index configuration | `[DbIndex("idx_name_price", "Name", "Price")]` |
-| `[DbField]` | Field mapping | `[DbField("product_name")]` |
-| `[DbId]` | Primary key marking | `[DbId]` |
-| `[DbFieldIgnore]` | Exclude from storage | `[DbFieldIgnore]` |
-
-### Collection Configuration
-
+### Type Utilities
 ```csharp
-[DbCollection("high_volume_products",
-    EnableSharding = true,
-    EnablePreSplitting = true,
-    PreSplitChunks = 256,
-    ValidateSchema = true,
-    TtlExpirationSeconds = 7776000, // 90 days
-    BootstrapPriority = 1)]
-public class Product : BaseEntity
-{
-    // Entity properties...
-}
+using OElite;
+
+// Numeric operations
+decimal amount = NumericUtils.ParseDecimal(userInput);
+bool isValidNumber = NumericUtils.IsValidCurrency(priceText);
+
+// Boolean processing
+bool result = BooleanUtils.ParseBoolean(checkboxValue);
+
+// GUID operations
+string shortGuid = GuidUtils.CreateShortGuid();
+Guid parsed = GuidUtils.ParseGuid(guidString);
 ```
 
-### Sharding Configuration
+## Core Utilities
+
+### String Processing
 
 ```csharp
-// Simple shard key
-[DbShardKey("ProductId")]
+// Validation
+string validated = StringUtils.CanNotBeNullOrEmpty(userInput, trim: true);
 
-// Compound shard key
-[DbShardKey("CategoryId", "ProductId")]
+// Safe substring operations
+string excerpt = StringUtils.SubString(content, 150, "...");
 
-// Region-aware shard key for GDPR compliance
-[DbShardKey("UserId", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
+// HTML processing
+string plainText = StringUtils.StripHtmlTags(htmlContent);
+string safeHtml = StringUtils.SanitizeHtml(userInput);
 
-// Hashed shard key for even distribution
-[DbShardKey("EventId", IsHashed = new[] { true })]
+// Text formatting
+string titleCase = StringUtils.ToTitleCase("hello world");
+string slug = StringUtils.CreateSlug("Product Name Here!");
 ```
 
-### Index Configuration
+### Date and Time Processing
 
 ```csharp
-// Simple index
-[DbIndex("idx_name", "Name")]
+// Current time operations
+DateTime utcNow = DateTimeUtils.GetUtcNow();
+DateTime localTime = DateTimeUtils.ConvertToLocal(utcTime, timezone);
 
-// Compound index with sorting
-[DbIndex("idx_category_price", "CategoryId", "Price", Directions = new[] { 1, -1 })]
+// Date validation
+bool isValid = DateTimeUtils.IsValidDateRange(startDate, endDate);
+bool isFuture = DateTimeUtils.IsFutureDate(checkDate);
 
-// Unique constraint
-[DbIndex("idx_unique_sku", "Sku", IsUnique = true)]
-
-// Text search index
-[DbIndex("idx_search", "Name", "Description", IsTextIndex = true)]
-
-// TTL index for automatic cleanup
-[DbIndex("idx_expires", "ExpiresAt", TtlExpirationSeconds = 0)]
-
-// Background creation for large collections
-[DbIndex("idx_heavy", "LargeField", CreateInBackground = true)]
+// Formatting
+string displayDate = DateTimeUtils.FormatForDisplay(dateValue);
+string isoString = DateTimeUtils.ToIsoString(dateTime);
 ```
 
-## Data Access Patterns
-
-### Repository Pattern Implementation
+### Numeric Utilities
 
 ```csharp
-public class ProductRepository : DataRepository
-{
-    public MongoQuery<Product> Products => new(_adapter.GetCollection<Product>());
+// Decimal operations
+decimal amount = NumericUtils.ParseDecimal(userInput, defaultValue: 0);
+bool isValidCurrency = NumericUtils.IsValidCurrency(priceText);
 
-    public async Task<Product?> GetProductByIdAsync(DbObjectId productId)
-    {
-        return await Products
-            .Where(p => p.Id == productId)
-            .FirstOrDefaultAsync();
-    }
+// Safe conversions
+int safeInt = NumericUtils.ToInt32(stringValue);
+double safeDouble = NumericUtils.ToDouble(numericString);
 
-    public async Task<List<Product>> GetActiveProductsAsync(string region = null)
-    {
-        var query = Products.Where(p => p.IsActive == true);
-
-        if (!string.IsNullOrEmpty(region))
-        {
-            query = query.Where(p => p.Region == region);
-        }
-
-        return await query
-            .OrderBy(p => p.Name)
-            .ToListAsync();
-    }
-
-    public async Task<ProductCollection> GetProductsByCategoryAsync(DbObjectId categoryId, int pageIndex, int pageSize)
-    {
-        return await Products
-            .Where(p => p.CategoryId == categoryId)
-            .Where(p => p.IsActive == true)
-            .OrderBy(p => p.Name)
-            .FetchAsync<Product, ProductCollection>(pageIndex, pageSize);
-    }
-}
+// Range validation
+bool inRange = NumericUtils.IsInRange(value, min: 0, max: 1000);
 ```
 
-### Query Building
+### GUID Operations
 
 ```csharp
-// Type-safe query construction
-var expensiveProducts = await Products
-    .Where(p => p.Price > 100)
-    .Where(p => p.IsActive == true)
-    .OrderByDescending(p => p.Price)
-    .Take(10)
-    .ToListAsync();
+// GUID utilities
+string shortGuid = GuidUtils.CreateShortGuid();
+Guid newGuid = GuidUtils.CreateGuid();
+Guid? parsed = GuidUtils.TryParseGuid(guidString);
 
-// Region-aware queries for GDPR compliance
-var euCustomers = await Customers
-    .Where(c => c.Region == "EU")
-    .Where(c => c.IsActive == true)
-    .ToListAsync();
-
-// Aggregation operations
-var categoryStats = await Products
-    .Where(p => p.IsActive == true)
-    .GroupByAsync(p => p.CategoryId.ToString());
+// Validation
+bool isValid = GuidUtils.IsValidGuid(inputString);
 ```
 
-## Region-Aware Data Management
+## Foundation Types
 
-### GDPR-Compliant Entity Design
+### BaseEntity
 
-```csharp
-[DbCollection("customer_data", EnableSharding = true)]
-[DbShardKey("CustomerId", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
-[DbIndex("idx_customer_region", "CustomerId", "Region", IsUnique = true)]
-[DbIndex("idx_gdpr_compliance", "Region", "ConsentStatus", "ConsentDate")]
-public class CustomerData : BaseEntity
-{
-    public DbObjectId CustomerId { get; set; }
-    public string PersonalData { get; set; } = string.Empty;
-    public DateTime ConsentDate { get; set; }
-    public string ConsentStatus { get; set; } = string.Empty;
-
-    // Region inherited from BaseEntity ensures GDPR compliance
-    // Effective shard key: { region: 1, customer_id: 1 }
-}
-```
-
-### Regional Sharding Strategies
+Core entity base class providing common functionality:
 
 ```csharp
-public enum RegionShardingStrategy
-{
-    RegionFirst,  // { region: 1, ...fields } - Best for GDPR compliance
-    RegionLast,   // { ...fields, region: 1 } - Best for performance
-    RegionMiddle  // { field1: 1, region: 1, field2: 1 } - Balanced approach
-}
-```
+using OElite.Restme.Utils;
 
-### Region Assignment
-
-```csharp
-public static class RegionHelper
-{
-    public static string DetermineRegionFromLocation(string userLocation)
-    {
-        return userLocation switch
-        {
-            var loc when IsEuCountry(loc) => "EU",
-            var loc when IsUkTerritory(loc) => "UK",
-            var loc when IsUsTerritory(loc) => "US",
-            var loc when IsCanadianTerritory(loc) => "CA",
-            var loc when IsChineseTerritory(loc) => "CN",
-            _ => "US" // Default fallback
-        };
-    }
-
-    private static bool IsEuCountry(string country) =>
-        new[] { "DE", "FR", "IT", "ES", "NL", "BE", "AT", "SE", "DK", "FI" }.Contains(country.ToUpper());
-}
-```
-
-## Configuration Examples
-
-### E-commerce Product Entity
-
-```csharp
-[DbCollection("products", EnableSharding = true, ValidateSchema = true)]
-[DbShardKey("CategoryId", "ProductId", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionMiddle)]
-[DbIndex("idx_category_price", "CategoryId", "Price", Directions = new[] { 1, -1 })]
-[DbIndex("idx_brand_products", "BrandId", "IsActive")]
-[DbIndex("idx_search_products", "Name", "Description", IsTextIndex = true)]
-[DbIndex("idx_featured", "IsFeatured", "DisplayOrder")]
-[DbIndex("idx_inventory", "Sku", IsUnique = true)]
-[DbIndex("idx_region_compliance", "Region", "DataClassification")]
-public class Product : BaseEntity
-{
-    [DbField("sku")]
-    public string Sku { get; set; } = string.Empty;
-
-    [DbField("name")]
-    public string Name { get; set; } = string.Empty;
-
-    [DbField("description")]
-    public string Description { get; set; } = string.Empty;
-
-    [DbField("price")]
-    public decimal Price { get; set; }
-
-    [DbField("category_id")]
-    public DbObjectId CategoryId { get; set; }
-
-    [DbField("brand_id")]
-    public DbObjectId? BrandId { get; set; }
-
-    [DbField("is_featured")]
-    public bool IsFeatured { get; set; } = false;
-
-    [DbField("display_order")]
-    public int DisplayOrder { get; set; } = 0;
-
-    [DbField("data_classification")]
-    public string DataClassification { get; set; } = "public";
-
-    [DbFieldIgnore]
-    public decimal TaxAmount => Price * 0.15m;
-}
-```
-
-### Multi-Tenant SaaS Entity
-
-```csharp
-[DbCollection("tenant_data", EnableSharding = true)]
-[DbShardKey("TenantId", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
-[DbIndex("idx_tenant_lookup", "TenantId", "EntityType", "EntityId")]
-[DbIndex("idx_tenant_search", "TenantId", "SearchableText", IsTextIndex = true)]
-[DbIndex("idx_data_retention", "Region", "CreatedOnUtc", TtlExpirationSeconds = 2592000)] // 30 days
-public class TenantData : BaseEntity
-{
-    [DbField("tenant_id")]
-    public DbObjectId TenantId { get; set; }
-
-    [DbField("entity_type")]
-    public string EntityType { get; set; } = string.Empty;
-
-    [DbField("entity_id")]
-    public DbObjectId EntityId { get; set; }
-
-    [DbField("data_payload")]
-    public Dictionary<string, object> DataPayload { get; set; } = new();
-
-    [DbField("searchable_text")]
-    public string SearchableText { get; set; } = string.Empty;
-
-    [DbField("data_sensitivity")]
-    public string DataSensitivity { get; set; } = "normal";
-}
-```
-
-## Best Practices
-
-### 1. Entity Design
-
-```csharp
-// GOOD: Clear attribute usage and proper inheritance
-[DbCollection("customers", EnableSharding = true)]
-[DbShardKey("Email", IncludeRegion = true, RegionStrategy = RegionShardingStrategy.RegionFirst)]
-[DbIndex("idx_email_region", "Email", "Region", IsUnique = true)]
 public class Customer : BaseEntity
 {
-    [DbField("email")]
+    public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
 
-    [DbField("first_name")]
-    public string FirstName { get; set; } = string.Empty;
-
-    // Computed properties should be ignored
-    [DbFieldIgnore]
-    public string FullName => $"{FirstName} {LastName}";
+    // Inherited properties:
+    // - Id (string) - Primary key
+    // - CreatedOnUtc (DateTime) - Creation timestamp
+    // - UpdatedOnUtc (DateTime) - Last modification timestamp
 }
+
+// Using entity status
+customer.Status = EntityStatus.Active;
 ```
 
-### 2. Regional Compliance
+### Entity Collections
 
 ```csharp
-// GOOD: Explicit region handling
-public async Task<Customer> CreateCustomerAsync(string email, string location)
+using OElite.Restme.Utils;
+
+public class CustomerCollection : IEntityCollection<Customer>
 {
-    var customer = new Customer
-    {
-        Email = email,
-        Region = RegionHelper.DetermineRegionFromLocation(location),
-        CreatedOnUtc = DateTime.UtcNow,
-        IsActive = true
-    };
-
-    return await _repository.CreateAsync(customer);
+    public List<Customer> Items { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int PageIndex { get; set; }
+    public int PageSize { get; set; }
 }
 ```
 
-### 3. Index Strategy
+## Security Features
+
+### Encryption and Hashing
 
 ```csharp
-// GOOD: Strategic index placement with priorities
-[DbIndex("idx_primary_lookup", "UserId", "EntityId", Priority = 1)]
-[DbIndex("idx_search", "SearchText", IsTextIndex = true, Priority = 2)]
-[DbIndex("idx_cleanup", "ExpiresAt", TtlExpirationSeconds = 0, Priority = 3)]
+// MD5 hashing
+string hash = EncryptHelper.Md5Encrypt("password123");
+byte[] hashBytes = EncryptHelper.Md5Encrypt(dataBytes);
+
+// DES/3DES encryption
+byte[] key = EncryptHelper.GetDesKey();
+string encrypted = EncryptHelper.DesEncrypt("sensitive data", key);
+string decrypted = EncryptHelper.DesDecrypt(encrypted, key);
+
+// TOTP (Time-based One-Time Password)
+string totpCode = TotpEncrypt.GenerateTotp(secretKey);
+bool isValid = TotpEncrypt.ValidateTotp(userCode, secretKey, timeWindow: 30);
 ```
 
-### 4. Configuration Validation
+### Boolean Utilities
 
 ```csharp
-// Validate entity configurations at startup
-public static void ValidateConfigurations()
+// Parse various boolean representations
+bool result = BooleanUtils.ParseBoolean("true");     // true
+bool result = BooleanUtils.ParseBoolean("yes");      // true
+bool result = BooleanUtils.ParseBoolean("1");        // true
+bool result = BooleanUtils.ParseBoolean("on");       // true
+
+// With default values
+bool result = BooleanUtils.ParseBoolean(null, defaultValue: false);
+```
+
+## Web & HTTP Utilities
+
+### HTTP Content Handling
+
+```csharp
+// Custom form-encoded content
+var formContent = new OEliteFormUrlEncodedContent(parameters);
+
+// RESTful HTTP content
+var restContent = new OEliteRestfulHttpContent(data);
+
+// HTTP response message extensions
+HttpResponseMessage response = await httpClient.GetAsync(url);
+string content = await response.ReadAsStringAsync();
+```
+
+### Web Crawling
+
+```csharp
+// HTML parsing with HtmlAgilityPack integration
+var htmlDoc = WebCrawlerUtils.LoadHtmlDocument(url);
+string extractedText = WebCrawlerUtils.ExtractText(htmlContent);
+var links = WebCrawlerUtils.ExtractLinks(htmlDoc);
+
+// URL and query processing
+var parameters = QueryUtils.ParseQueryString(requestUrl);
+string encoded = QueryUtils.BuildQueryString(parameterDict);
+```
+
+## File and Stream Utilities
+
+```csharp
+// File operations
+byte[] fileBytes = FileUtils.ReadAllBytes(filePath);
+string fileContent = FileUtils.ReadAllText(filePath);
+bool exists = FileUtils.Exists(filePath);
+
+// Stream processing
+byte[] streamData = StreamUtils.ReadAllBytes(inputStream);
+string streamText = StreamUtils.ReadAllText(inputStream);
+```
+
+## Error Handling
+
+```csharp
+using OElite.Restme.Utils;
+
+try
 {
-    var entityTypes = Assembly.GetExecutingAssembly()
-        .GetTypes()
-        .Where(t => t.IsSubclassOf(typeof(BaseEntity)))
-        .ToArray();
-
-    var validation = EntityAttributeScanner.ValidateEntityConfigurations(entityTypes);
-
-    if (!validation.IsValid)
-    {
-        throw new InvalidOperationException(
-            $"Configuration validation failed: {string.Join(", ", validation.ValidationErrors)}");
-    }
+    // Operation that might fail
+    ProcessUserData(userData);
+}
+catch (OEliteException ex)
+{
+    // Handle OElite-specific exceptions
+    RestmeLogger.LogError(ex.Message, ex);
 }
 ```
 
-## API Reference
+## Integration
 
-### Core Attributes
+OElite.Restme.Utils serves as the foundation for other Restme packages:
 
-#### DbCollectionAttribute
-```csharp
-[DbCollection(string collectionName,
-    bool EnableSharding = false,
-    bool EnablePreSplitting = false,
-    int PreSplitChunks = 64,
-    bool ValidateSchema = false,
-    int TtlExpirationSeconds = 0,
-    int BootstrapPriority = 100)]
-```
+- **OElite.Restme.MongoDb**: Uses base entities and utilities
+- **OElite.Restme.Redis**: Leverages caching and serialization utilities
+- **OElite.Restme.S3**: Uses file and stream utilities
+- **OElite.Common**: Extends utilities with domain-specific functionality
 
-#### DbShardKeyAttribute
-```csharp
-[DbShardKey(params string[] fields,
-    bool[] IsHashed = null,
-    int[] Directions = null,
-    bool IsUnique = false,
-    bool IncludeRegion = false,
-    RegionShardingStrategy RegionStrategy = RegionShardingStrategy.RegionFirst)]
-```
+## Requirements
 
-#### DbIndexAttribute
-```csharp
-[DbIndex(string name, params string[] fields,
-    int[] Directions = null,
-    bool IsUnique = false,
-    bool IsSparse = false,
-    bool CreateInBackground = false,
-    int Priority = 100,
-    bool IsTextIndex = false,
-    bool IsHashedIndex = false,
-    int TtlExpirationSeconds = 0)]
-```
+- .NET 8.0, 9.0, or 10.0
+- HtmlAgilityPack.NetCore 1.5.0.1+
+- Newtonsoft.Json 13.0.3+
+- Microsoft.Extensions.Logging.Abstractions 9.0.0+
 
-### Factory Methods
+## Thread Safety
 
-```csharp
-// GDPR-compliant shard key
-DbShardKeyAttribute.ForGdprCompliance("CustomerId");
-
-// Multi-tenant shard key
-DbShardKeyAttribute.ForTenant("TenantId", "EntityId");
-
-// Analytics shard key
-DbShardKeyAttribute.ForAnalytics("EntityId", "EventDate");
-
-// Unique index
-DbIndexAttribute.Unique("idx_unique_field", "FieldName");
-
-// TTL index
-DbIndexAttribute.Ttl("idx_cleanup", "ExpiresAt", 3600);
-```
-
-## 📚 Detailed Documentation
-
-For comprehensive guides on specific features, see the detailed documentation:
-
-### Core Features Documentation
-- **[Data Attributes & Configuration](docs/DATA-ATTRIBUTES-CONFIGURATION.md)** - Complete guide to using database attributes and entity configuration
-- **[Region-Aware Sharding](../OElite.Restme.MongoDb/docs/REGION-AWARE-SHARDING.md)** - Geographic data management and GDPR compliance
-- **[BaseEntity Enhancements](docs/DATA-ATTRIBUTES-CONFIGURATION.md#baseentity-enhancements)** - Enhanced base entity functionality
-- **[Best Practices](docs/DATA-ATTRIBUTES-CONFIGURATION.md#best-practices)** - Recommended patterns and approaches
-
-### Quick Reference
-- **[Attribute Reference](docs/DATA-ATTRIBUTES-CONFIGURATION.md#database-attributes)** - Complete attribute documentation
-- **[Configuration Examples](docs/DATA-ATTRIBUTES-CONFIGURATION.md#examples)** - Real-world implementation examples
-- **[Sharding Strategies](docs/DATA-ATTRIBUTES-CONFIGURATION.md#sharding-configuration)** - Region-aware sharding patterns
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
+Most utility methods are thread-safe. Thread utilities are provided for concurrent operations and background processing scenarios.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support and questions:
-- Create an issue in the repository
-- Contact the OElite development team
-- Check the documentation wiki
-
----
-
-**Version**: 2.1.0
-**Last Updated**: 2024
-**Compatibility**: .NET 9.0+
+Copyright © OElite Limited. All rights reserved.

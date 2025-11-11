@@ -1,5 +1,8 @@
 # OElite.Restme.Hosting
 
+[![NuGet Version](https://img.shields.io/nuget/v/OElite.Restme.Hosting.svg)](https://www.nuget.org/packages/OElite.Restme.Hosting)
+[![Target Framework](https://img.shields.io/badge/.NET-8%2C%209%2C%2010-blue)](https://dotnet.microsoft.com/)
+
 ASP.NET Core integration extensions for **OElite.Restme** - provides dependency injection, IDistributedCache adapters, and middleware for seamless integration with Hosting/ASP.NET Core applications.
 
 ## Purpose
