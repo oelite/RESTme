@@ -1,30 +1,30 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
   # Define projects as multi-line string (easier to manage than space-separated)
-PROJECTS: |
-     OElite.Restme
-     OElite.Restme.Redis
-     OElite.Restme.RabbitMQ
-     OElite.Restme.Azure
-     OElite.Restme.S3
-     OElite.Restme.ClickHouse
-     OElite.Restme.Kafka
-     OElite.Restme.OpenSearch
-     OElite.Restme.Utils
-     OElite.Restme.MongoDb
-     OElite.Restme.RateLimiting
-     OElite.Restme.Hosting
+  PROJECTS: |
+    OElite.Restme
+    OElite.Restme.Redis
+    OElite.Restme.RabbitMQ
+    OElite.Restme.Azure
+    OElite.Restme.S3
+    OElite.Restme.ClickHouse
+    OElite.Restme.Kafka
+    OElite.Restme.OpenSearch
+    OElite.Restme.Utils
+    OElite.Restme.MongoDb
+    OElite.Restme.RateLimiting
+    OElite.Restme.Hosting
 
-INTEGRATION_TEST_PROJECTS: |
-     OElite.Restme.MongoDb.IntegrationTests
-     OElite.Restme.ClickHouse.IntegrationTests
-     OElite.Restme.Kafka.IntegrationTests
-     OElite.Restme.OpenSearch.IntegrationTests
+  INTEGRATION_TEST_PROJECTS: |
+    OElite.Restme.MongoDb.IntegrationTests
+    OElite.Restme.ClickHouse.IntegrationTests
+    OElite.Restme.Kafka.IntegrationTests
+    OElite.Restme.OpenSearch.IntegrationTests
 
-UNIT_TEST_PROJECTS: |
-     OElite.Restme.ClickHouse.UnitTests
-     OElite.Restme.Kafka.UnitTests
-     OElite.Restme.OpenSearch.UnitTests
+  UNIT_TEST_PROJECTS: |
+    OElite.Restme.ClickHouse.UnitTests
+    OElite.Restme.Kafka.UnitTests
+    OElite.Restme.OpenSearch.UnitTests
 
 stages:
   - version
