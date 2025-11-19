@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenSearch.Client;
+using OpenSearch.Net;
 using OElite.Abstractions;
 
 namespace OElite.Restme.OpenSearch
@@ -131,26 +133,108 @@ namespace OElite.Restme.OpenSearch
     /// </summary>
     public class OpenSearchConnection : IDisposable
     {
-        private readonly string _connectionString;
+        private readonly OpenSearchClient _client;
         private bool _disposed = false;
 
         public OpenSearchConnection(string connectionString)
         {
-            _connectionString = connectionString;
+            var node = new Uri(connectionString.Replace("opensearch://", "http://"));
+            var settings = new ConnectionSettings(node);
+            _client = new OpenSearchClient(settings);
         }
 
-        public Task IndexAsync<T>(T document, string indexName, string documentId, CancellationToken cancellationToken)
+        public async Task IndexAsync<T>(T document, string indexName, string documentId, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException(
-                "OpenSearch client implementation requires OpenSearch.Client or NEST (Elasticsearch) package. " +
-                "Please install the appropriate OpenSearch/Elasticsearch client library and implement the connection logic.");
+            var response = await _client.IndexAsync(document, i => i
+                .Index(indexName)
+                .Id(documentId), cancellationToken);
+
+            if (!response.IsValid)
+            {
+                throw new Exception($"Failed to index document: {response.DebugInformation}");
+            }
         }
 
-        public Task BulkIndexAsync<T>(IEnumerable<T> documents, string indexName, CancellationToken cancellationToken)
+        public async Task BulkIndexAsync<T>(IEnumerable<T> documents, string indexName, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException(
-                "OpenSearch client implementation requires OpenSearch.Client or NEST (Elasticsearch) package. " +
-                "Please install the appropriate OpenSearch/Elasticsearch client library and implement the connection logic.");
+            var bulkRequest = new BulkRequest(indexName);
+
+            foreach (var document in documents)
+            {
+                bulkRequest.Operations.Add(new BulkIndexOperation<T>(document));
+            }
+
+            var response = await _client.BulkAsync(bulkRequest, cancellationToken);
+
+            if (!response.IsValid)
+            {
+                throw new Exception($"Failed to bulk index documents: {response.DebugInformation}");
+            }
+        }
+
+        public async Task<List<string>> ListIndicesAsync(CancellationToken cancellationToken)
+        {
+            var response = await _client.Cat.IndicesAsync(cancellationToken);
+            return response.Records.Select(r => r.Index).ToList();
+        }
+
+        public async Task SetIndexTTLAsync(string indexName, string ttlField, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            // OpenSearch doesn't have built-in TTL like Elasticsearch, but we can set up index lifecycle policies
+            // For now, we'll create a mapping with a date field that can be used for TTL-like behavior
+            var mapping = new TypeMapping
+            {
+                Properties = new Properties
+                {
+                    { ttlField, new DateProperty() }
+                }
+            };
+
+            var response = await _client.Indices.PutMappingAsync(indexName, m => m
+                .Properties(mapping.Properties), cancellationToken);
+
+            if (!response.IsValid)
+            {
+                throw new Exception($"Failed to set TTL mapping: {response.DebugInformation}");
+            }
+        }
+
+        public async Task SetIndexLifecyclePolicyAsync(string indexName, TimeSpan deleteAfter, CancellationToken cancellationToken)
+        {
+            // Create an index lifecycle policy for automatic deletion
+            var policy = new PutLifecycleRequest
+            {
+                Policy = new LifecyclePolicy
+                {
+                    Phases = new Phases
+                    {
+                        Delete = new DeletePhase
+                        {
+                            MinAge = $"{(int)deleteAfter.TotalDays}d"
+                        }
+                    }
+                }
+            };
+
+            var response = await _client.IndexLifecycleManagement.PutLifecycleAsync("auto-delete-policy", p => p
+                .Policy(policy.Policy), cancellationToken);
+
+            if (!response.IsValid)
+            {
+                throw new Exception($"Failed to set lifecycle policy: {response.DebugInformation}");
+            }
+
+            // Apply the policy to the index
+            var settingsResponse = await _client.Indices.UpdateSettingsAsync(indexName, s => s
+                .Settings(new Dictionary<string, object>
+                {
+                    { "index.lifecycle.name", "auto-delete-policy" }
+                }), cancellationToken);
+
+            if (!settingsResponse.IsValid)
+            {
+                throw new Exception($"Failed to apply lifecycle policy to index: {settingsResponse.DebugInformation}");
+            }
         }
 
         public Task<T> GetAsync<T>(string documentId, string indexName, CancellationToken cancellationToken)

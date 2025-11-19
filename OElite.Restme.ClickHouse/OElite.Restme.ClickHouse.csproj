@@ -20,6 +20,7 @@
 
 
   <ItemGroup>
+    <PackageReference Include="ClickHouse.Client" Version="7.0.0" />
     <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
   </ItemGroup>
 

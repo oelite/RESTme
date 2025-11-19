@@ -18,6 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="OpenSearch.Client" Version="1.6.0" />
     <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
   </ItemGroup>
 
