@@ -20,6 +20,17 @@ namespace OElite.Restme.Kafka
         public KafkaProvider(string connectionString, RestConfig config)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
+
+            // Check if Confluent.Kafka library is available
+            try
+            {
+                var testConfig = new Confluent.Kafka.ProducerConfig();
+            }
+            catch
+            {
+                throw new NotImplementedException("Confluent.Kafka library is not available. Please install the Confluent.Kafka NuGet package.");
+            }
+
             _connection = new KafkaConnection(connectionString);
         }
 
