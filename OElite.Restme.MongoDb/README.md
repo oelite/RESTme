@@ -2658,7 +2658,7 @@ For comprehensive guides on specific features, see the detailed documentation:
 
 **Version**: 2.3.0
 **Last Updated**: 2024
-**Compatibility**: .NET 9.0+
+**Compatibility**: .NET 10.0+
 
 ## 🚀 High-Performance Update Operations
 

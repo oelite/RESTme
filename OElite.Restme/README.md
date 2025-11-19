@@ -520,7 +520,7 @@ catch (RestmeException ex)
 
 ## License
 
-Copyright © OElite Limited. All rights reserved.
+Copyright © Phanes Technology Ltd. All rights reserved.
 
 ## Support
 

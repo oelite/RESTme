@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 using OElite.Abstractions;
@@ -79,5 +79,8 @@ namespace OElite
         IStorageProvider? StorageProvider { get; }
         IHttpProvider? HttpProvider { get; }
         ILogProvider? LogProvider { get; }
+        IColumnarProvider? ColumnarProvider { get; }
+        IStreamingProvider? StreamingProvider { get; }
+        ISearchProvider? SearchProvider { get; }
     }
 }

@@ -48,5 +48,20 @@ namespace OElite.Providers
         {
             return new DefaultLogProvider();
         }
+
+        public IColumnarProvider CreateColumnarProvider(string connectionString, RestConfig config)
+        {
+            throw new NotImplementedException("Columnar operations not supported by RabbitMQ provider. Use ClickHouse provider instead.");
+        }
+
+        public IStreamingProvider CreateStreamingProvider(string connectionString, RestConfig config)
+        {
+            throw new NotImplementedException("Streaming operations not supported by RabbitMQ provider. Use Kafka provider instead.");
+        }
+
+        public ISearchProvider CreateSearchProvider(string connectionString, RestConfig config)
+        {
+            throw new NotImplementedException("Search operations not supported by RabbitMQ provider. Use OpenSearch provider instead.");
+        }
     }
 }

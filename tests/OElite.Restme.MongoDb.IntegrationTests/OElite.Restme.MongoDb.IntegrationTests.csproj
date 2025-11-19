@@ -29,11 +29,12 @@
         <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
         <PackageReference Include="MongoDB.Driver" Version="2.28.0" />
+        <PackageReference Include="Testcontainers.MongoDb" Version="3.10.0" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\OElite.Restme.MongoDb\OElite.Restme.MongoDb.csproj" />
-        <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
+        <ProjectReference Include="..\..\OElite.Restme.MongoDb\OElite.Restme.MongoDb.csproj" />
+        <ProjectReference Include="..\..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
     </ItemGroup>
 
     <ItemGroup>

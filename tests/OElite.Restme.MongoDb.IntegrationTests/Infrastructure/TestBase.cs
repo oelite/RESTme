@@ -2,37 +2,50 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using OElite.Restme.MongoDb;
+using Testcontainers.MongoDb;
+using DotNet.Testcontainers.Builders;
+using Xunit;
 
 namespace OElite.Restme.MongoDb.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// Base class for all integration tests providing MongoDB setup and cleanup
 /// </summary>
-public abstract class TestBase : IDisposable
+public abstract class TestBase : IAsyncLifetime
 {
-    protected readonly IMongoDatabase Database;
-    protected readonly TestMongoDbCentre DbCentre;
+    protected IMongoDatabase Database = null!;
+    protected TestMongoDbCentre DbCentre = null!;
     protected readonly ILogger Logger;
-    protected readonly string TestDatabaseName;
+    protected string TestDatabaseName = null!;
 
-    private readonly MongoClient _mongoClient;
+    private MongoClient _mongoClient = null!;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly MongoDbContainer _mongoContainer;
     private bool _disposed;
 
     protected TestBase()
     {
-        // Load configuration
-        var configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json")
-            .Build();
-
-        var connectionString = configuration.GetConnectionString("MongoDB")
-            ?? throw new InvalidOperationException("MongoDB connection string not found in configuration");
-
-        // Setup logging
+        // Setup logging first
         _loggerFactory = LoggerFactory.Create(builder =>
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         Logger = _loggerFactory.CreateLogger(GetType());
+
+        // Setup MongoDB test container
+        _mongoContainer = new MongoDbBuilder()
+            .WithImage("mongo:8.0.15")
+            .WithPortBinding(27017, true)
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(27017))
+            .Build();
+
+        Logger.LogInformation("MongoDB test container initialized");
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _mongoContainer.StartAsync();
+        var connectionString = _mongoContainer.GetConnectionString();
+
+        Logger.LogInformation("MongoDB container started: {ConnectionString}", connectionString);
 
         // Setup MongoDB client
         _mongoClient = new MongoClient(connectionString);
@@ -42,13 +55,16 @@ public abstract class TestBase : IDisposable
         Database = _mongoClient.GetDatabase(TestDatabaseName);
 
         // Initialize TestMongoDbCentre
-        // Replace the database name in the connection string with our test database name
-        var builder = new UriBuilder(connectionString);
-        builder.Path = $"/{TestDatabaseName}";
-        var testConnectionString = builder.ToString();
+        var testConnectionString = $"{connectionString}/{TestDatabaseName}";
         DbCentre = new TestMongoDbCentre(testConnectionString);
 
         Logger.LogInformation("Test database created: {DatabaseName}", TestDatabaseName);
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _mongoContainer.DisposeAsync();
+        Logger.LogInformation("MongoDB container disposed");
     }
 
     /// <summary>
@@ -114,6 +130,8 @@ public abstract class TestBase : IDisposable
         return DbCentre.GetCollection<T>(collectionName);
     }
 
+    // IAsyncLifetime handles disposal via DisposeAsync()
+    // Keeping IDisposable for backward compatibility with test framework
     public void Dispose()
     {
         Dispose(true);
@@ -124,17 +142,6 @@ public abstract class TestBase : IDisposable
     {
         if (!_disposed && disposing)
         {
-            try
-            {
-                // Drop the test database
-                _mongoClient.DropDatabase(TestDatabaseName);
-                Logger.LogInformation("Test database dropped: {DatabaseName}", TestDatabaseName);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error dropping test database: {DatabaseName}", TestDatabaseName);
-            }
-
             _loggerFactory?.Dispose();
             _disposed = true;
         }

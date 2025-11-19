@@ -6,15 +6,16 @@ A powerful, modular .NET library that provides a unified interface for HTTP requ
 
 - **Unified API**: Single `Rest` class for all operations
 - **Modular Architecture**: Load only the backends you need
-- **Multiple Backend Support**: Redis, RabbitMQ, Azure Blob Storage, S3-compatible providers
+- **Multiple Backend Support**: Redis, RabbitMQ, Azure Blob Storage, S3-compatible providers, ClickHouse, Kafka, OpenSearch
 - **Cache Providers**: Redis, Azure Blob Storage, S3 (perfect for CDN scenarios)
+- **Analytics & Search**: ClickHouse for time-series analytics, OpenSearch for full-text search
 - **S3-Compatible**: Support for Backblaze B2, MinIO, DigitalOcean Spaces, and more
 - **Async/Await**: Full async support throughout
 - **Dynamic Loading**: Providers loaded automatically when packages are referenced
 - **Type Safety**: Strong typing with generic methods
 - **JSON Serialization**: Built-in JSON handling with custom serialization support
 - **Stream Support**: Direct stream handling for file operations
-- **Expiry Support**: TTL for cache operations
+- **Expiry Support**: TTL for cache operations, table TTL in ClickHouse, topic retention in Kafka, index lifecycle in OpenSearch
 - **CDN Ready**: Proper cache headers for CDN integration
 
 ## 📦 NuGet Packages
@@ -37,6 +38,15 @@ Install-Package OElite.Restme.Azure
 
 # S3-compatible storage (AWS S3, Backblaze B2, MinIO, etc.)
 Install-Package OElite.Restme.S3
+
+# ClickHouse for columnar analytics and time-series
+Install-Package OElite.Restme.ClickHouse
+
+# Kafka for streaming and event processing
+Install-Package OElite.Restme.Kafka
+
+# OpenSearch for search and analytics
+Install-Package OElite.Restme.OpenSearch
 ```
 
 ## 🏗️ Architecture
@@ -147,7 +157,100 @@ await rest.DomeAsync<User>("user.created", async (user) => {
 });
 ```
 
-### 6. Base Providers (No additional packages required)
+### 6. ClickHouse Analytics
+
+```csharp
+// Add OElite.Restme.ClickHouse package
+var rest = new Rest("clickhouse://localhost:8123", new RestConfig
+{
+    OperationMode = RestMode.ClickHouse
+});
+
+// LINQ-style queries (automatically translated to SQL)
+var activeUsers = await rest.QueryAsync<UserEvent>(
+    e => e.Timestamp > DateTime.UtcNow.AddHours(-1) &&
+         e.EventType == "login");
+
+// Time-series analytics
+var hourlyStats = await rest.TimeSeriesAsync<UserEvent>(
+    "user_events",
+    DateTime.UtcNow.AddDays(-7),
+    DateTime.UtcNow,
+    "hour");
+
+// Aggregation queries
+var userAnalytics = await rest.AggregateAsync(
+    "user_events",
+    "SELECT UserId, count() as EventCount, uniq(EventType) as UniqueEvents GROUP BY UserId");
+
+// Raw SQL for complex queries
+var results = await rest.QueryAsync<UserAnalytics>(
+    "SELECT UserId, count() as TotalEvents FROM user_events WHERE Timestamp >= @start GROUP BY UserId",
+    new { start = DateTime.UtcNow.AddDays(-30) }
+);
+```
+
+### 7. Kafka Streaming
+
+```csharp
+// Add OElite.Restme.Kafka package
+var rest = new Rest("kafka://localhost:9092", new RestConfig
+{
+    OperationMode = RestMode.Kafka
+});
+
+// Publish messages
+await rest.PublishAsync(new OrderEvent { OrderId = "123", Amount = 99.99m }, "orders", "user123");
+
+// Batch publish
+var events = GenerateOrderEvents(1000);
+await rest.PublishAsync(events, "orders", order => order.UserId);
+
+// Subscribe to topics
+await rest.SubscribeAsync<OrderEvent>("orders", "order-processor",
+    async (order) => {
+        await ProcessOrderAsync(order);
+    });
+
+// Stream processing
+var orderStream = await rest.ProcessAsync<OrderEvent>("orders", "analytics");
+await foreach (var order in orderStream.Messages)
+{
+    await UpdateAnalyticsAsync(order);
+}
+```
+
+### 8. OpenSearch
+
+```csharp
+// Add OElite.Restme.OpenSearch package
+var rest = new Rest("opensearch://localhost:9200", new RestConfig
+{
+    OperationMode = RestMode.OpenSearch
+});
+
+// Index documents
+await rest.IndexAsync(new Product { Id = "123", Name = "Laptop", Price = 1299.99m }, "products");
+
+// Bulk index
+await rest.IndexAsync(products, "products");
+
+// Full-text search
+var results = await rest.SearchAsync<Product>("high performance laptop",
+    new[] { "name", "description" });
+
+// Advanced search with queries
+var expensiveProducts = await rest.SearchAsync<Product>(
+    new SearchQuery {
+        Query = "price:[1000 TO *] AND category:electronics",
+        PageSize = 50
+    }, "products");
+
+// Get by ID
+var product = await rest.GetAsync<Product>("123", "products");
+```
+
+### 9. Base Providers (No additional packages required)
 
 Use built-in base providers for simple scenarios without external infrastructure.
 
@@ -188,6 +291,10 @@ await restInMemoryQueue.DomeAsync<User>("events.user.created", async user => {
 - `RestMode.RedisCacheClient` - Redis caching
 - `RestMode.AzureStorageClient` - Azure Blob Storage
 - `RestMode.S3Client` - S3-compatible storage
+- `RestMode.RabbitMq` - RabbitMQ message queuing
+- `RestMode.ClickHouse` - ClickHouse columnar analytics
+- `RestMode.Kafka` - Kafka streaming
+- `RestMode.OpenSearch` - OpenSearch full-text search
 - `RestMode.RabbitMq` - RabbitMQ message queuing
 - `RestMode.MemoryAsCache` - In-memory cache (base provider)
 - `RestMode.LocalFileSystemAsStorage` - Local filesystem storage (base provider)
@@ -272,6 +379,37 @@ var user = await rest.FindmeAsync<User>("user:123", async (u) => {
     // Process user data
     return true;
 });
+```
+
+### Expiry & Lifecycle Management
+
+Restme provides comprehensive expiry configuration across all supported platforms:
+
+#### ClickHouse TTL (Time To Live)
+```csharp
+// Set TTL on table data
+await rest.SetTableTTLAsync("events", "created_at + INTERVAL 30 DAY");
+
+// Create TTL index for automatic cleanup
+await rest.CreateTTLIndexAsync("logs", "timestamp", TimeSpan.FromDays(90));
+```
+
+#### Kafka Topic Retention
+```csharp
+// Configure topic retention policy
+await rest.SetTopicRetentionAsync("user-events", TimeSpan.FromDays(7));
+
+// Set message expiry based on timestamp
+await rest.SetMessageExpiryAsync("temp-data", TimeSpan.FromHours(24));
+```
+
+#### OpenSearch Index Lifecycle
+```csharp
+// Set TTL on documents
+await rest.SetIndexTTLAsync("logs-*", "timestamp", TimeSpan.FromDays(30));
+
+// Configure automatic index deletion
+await rest.SetIndexLifecyclePolicyAsync("temp-data", TimeSpan.FromDays(90));
 ```
 
 ### Message Queuing

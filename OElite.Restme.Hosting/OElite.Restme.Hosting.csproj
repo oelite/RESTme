@@ -6,8 +6,8 @@
         <VersionPrefix>2.1.0</VersionPrefix>
         <PackageTags>OElite;Restme;AspNetCore;DependencyInjection;Cache;Redis</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
-        <Authors>OElite Limited</Authors>
-        <Copyright>OElite Limited</Copyright>
+        <Authors>Phanes Technology Ltd</Authors>
+        <Copyright>Phanes Technology Ltd</Copyright>
         <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
         <Title>OElite.Restme.Hosting</Title>
         <Nullable>enable</Nullable>

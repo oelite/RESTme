@@ -295,4 +295,4 @@ Most utility methods are thread-safe. Thread utilities are provided for concurre
 
 ## License
 
-Copyright © OElite Limited. All rights reserved.
+Copyright © Phanes Technology Ltd. All rights reserved.

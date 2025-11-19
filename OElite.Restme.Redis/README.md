@@ -382,4 +382,4 @@ RedisCacheProvider is thread-safe and designed for concurrent operations:
 
 ## License
 
-Copyright © OElite Limited. All rights reserved.
+Copyright © Phanes Technology Ltd. All rights reserved.

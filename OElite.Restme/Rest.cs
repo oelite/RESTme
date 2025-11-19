@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Web;
 using Microsoft.Extensions.Logging;
 using OElite.Abstractions;
+using OElite.Base;
 
 namespace OElite
 {
@@ -31,6 +32,9 @@ namespace OElite
         public IStorageProvider? StorageProvider { get; private set; }
         public IHttpProvider? HttpProvider { get; private set; }
         public ILogProvider? LogProvider { get; private set; }
+        public IColumnarProvider? ColumnarProvider { get; private set; }
+        public IStreamingProvider? StreamingProvider { get; private set; }
+        public ISearchProvider? SearchProvider { get; private set; }
 
 
         public Rest(Uri? baseUri = null,
@@ -117,6 +121,15 @@ namespace OElite
                     case RestMode.S3AsCache:
                         InitializeCacheProvider();
                         break;
+                    case RestMode.ClickHouse:
+                        InitializeColumnarProvider();
+                        break;
+                    case RestMode.Kafka:
+                        InitializeStreamingProvider();
+                        break;
+                    case RestMode.OpenSearch:
+                        InitializeSearchProvider();
+                        break;
                     case RestMode.Http:
                     case RestMode.HttpRest:
                     default:
@@ -147,6 +160,9 @@ namespace OElite
                     RestMode.RabbitMq => "OElite.Restme.RabbitMQ",
                     RestMode.AzureAsStorage or RestMode.AzureAsCache => "OElite.Restme.Azure",
                     RestMode.S3AsStorage or RestMode.S3AsCache => "OElite.Restme.S3",
+                    RestMode.ClickHouse => "OElite.Restme.ClickHouse",
+                    RestMode.Kafka => "OElite.Restme.Kafka",
+                    RestMode.OpenSearch => "OElite.Restme.OpenSearch",
                     _ => null
                 };
 
@@ -514,6 +530,72 @@ namespace OElite
                 Logger?.LogError(ex, "Failed to initialize HTTP provider");
                 // HTTP provider should always be available as fallback
                 HttpProvider = new OElite.Base.HttpClientProvider(Configuration, Logger);
+            }
+        }
+
+        private void InitializeColumnarProvider()
+        {
+            try
+            {
+                var factory = ServiceLocator.GetFactory("clickhouse");
+                if (factory != null)
+                {
+                    ColumnarProvider = factory.CreateColumnarProvider(ConnectionString ?? "", Configuration);
+                }
+                else
+                {
+                    // Fallback to default implementation that throws helpful error
+                    ColumnarProvider = new DefaultColumnarProvider();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "Failed to initialize columnar provider");
+                throw new OEliteException($"Failed to initialize ClickHouse provider: {ex.Message}", ex);
+            }
+        }
+
+        private void InitializeStreamingProvider()
+        {
+            try
+            {
+                var factory = ServiceLocator.GetFactory("kafka");
+                if (factory != null)
+                {
+                    StreamingProvider = factory.CreateStreamingProvider(ConnectionString ?? "", Configuration);
+                }
+                else
+                {
+                    // Fallback to default implementation that throws helpful error
+                    StreamingProvider = new DefaultStreamingProvider();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "Failed to initialize streaming provider");
+                throw new OEliteException($"Failed to initialize Kafka provider: {ex.Message}", ex);
+            }
+        }
+
+        private void InitializeSearchProvider()
+        {
+            try
+            {
+                var factory = ServiceLocator.GetFactory("opensearch");
+                if (factory != null)
+                {
+                    SearchProvider = factory.CreateSearchProvider(ConnectionString ?? "", Configuration);
+                }
+                else
+                {
+                    // Fallback to default implementation that throws helpful error
+                    SearchProvider = new DefaultSearchProvider();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "Failed to initialize search provider");
+                throw new OEliteException($"Failed to initialize OpenSearch provider: {ex.Message}", ex);
             }
         }
 

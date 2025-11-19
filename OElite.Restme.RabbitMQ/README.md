@@ -622,4 +622,4 @@ RabbitMQProvider is thread-safe for most operations:
 
 ## License
 
-Copyright © OElite Limited. All rights reserved.
+Copyright © Phanes Technology Ltd. All rights reserved.

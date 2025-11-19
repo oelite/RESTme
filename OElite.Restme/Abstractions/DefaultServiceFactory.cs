@@ -48,6 +48,21 @@ namespace OElite.Abstractions
         {
             return new DefaultLogProvider(_logger);
         }
+
+        public IColumnarProvider CreateColumnarProvider(string connectionString, RestConfig config)
+        {
+            throw new NotImplementedException("ClickHouse provider not loaded. Please reference OElite.Restme.ClickHouse package.");
+        }
+
+        public IStreamingProvider CreateStreamingProvider(string connectionString, RestConfig config)
+        {
+            throw new NotImplementedException("Kafka provider not loaded. Please reference OElite.Restme.Kafka package.");
+        }
+
+        public ISearchProvider CreateSearchProvider(string connectionString, RestConfig config)
+        {
+            throw new NotImplementedException("OpenSearch provider not loaded. Please reference OElite.Restme.OpenSearch package.");
+        }
     }
 
     /// <summary>
