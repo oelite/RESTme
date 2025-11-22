@@ -98,10 +98,10 @@ await cacheProvider.ExpiremeAsync("user:123");
 ### Storage Operations
 ```csharp
 // Store data
-await rest.StoremAsync("documents/report.pdf", fileData);
+await rest.SetAsync("documents/report.pdf", fileData);
 
 // Retrieve data
-var fileData = await rest.RetrievemeAsync<byte[]>("documents/report.pdf");
+var fileData = await rest.GetAsync<byte[]>("documents/report.pdf");
 
 // Check if exists
 var exists = await rest.ExistsInStorage("documents/report.pdf");

@@ -192,10 +192,10 @@ var rest = new Rest("DefaultEndpointsProtocol=https", config, RestMode.Azure);
 var rest = new Rest("DefaultEndpointsProtocol=https;AccountName=...;RootPath=my-app/uploads", RestMode.Azure);
 
 // Store data (rootPath is automatically prefixed)
-await rest.StoremAsync("documents/report.pdf", fileData); // Stored as "my-app/uploads/documents/report.pdf"
+await rest.SetAsync("documents/report.pdf", fileData); // Stored as "my-app/uploads/documents/report.pdf"
 
 // Retrieve data
-var fileData = await rest.RetrievemeAsync<byte[]>("documents/report.pdf");
+var fileData = await rest.GetAsync<byte[]>("documents/report.pdf");
 
 // Use as cache (CDN-ready)
 var cacheProvider = rest.GetProvider<ICacheProvider>();
@@ -245,7 +245,7 @@ var minioConfig = new RestConfig
 var rest = new Rest("s3://", minioConfig, RestMode.S3);
 
 // Store and cache operations (rootPath is automatically prefixed)
-await rest.StoremAsync("files/document.pdf", fileData); // Stored as "my-app/uploads/files/document.pdf"
+await rest.SetAsync("files/document.pdf", fileData); // Stored as "my-app/uploads/files/document.pdf"
 var cacheProvider = rest.GetProvider<ICacheProvider>();
 await cacheProvider.SetAsync("cache:key", data, TimeSpan.FromHours(2)); // Cached as "dev/cache/cache:key"
 ```
@@ -508,7 +508,7 @@ var restLocalFs = new Rest(
     endPointOrConnectionString: "/var/data/myapp", // optional base directory; omit to use default
     configuration: new RestConfig { OperationMode = RestMode.LocalFileSystem }
 );
-await restLocalFs.StoremAsync("docs/report.pdf", fileBytes);
+await restLocalFs.SetAsync("docs/report.pdf", fileBytes);
 
 // In-memory queue (single-process)
 var restInMemoryQueue = new Rest(
@@ -522,8 +522,8 @@ var restLocalFs = new Rest(
     endPointOrConnectionString: "/var/data/myapp", // optional base directory; omit to use default
     configuration: new RestConfig { OperationMode = RestMode.LocalFileSystemAsStorage }
 );
-await restLocalFs.StoremAsync("docs/report.pdf", fileBytes);
-var file = await restLocalFs.RetrievemeAsync<byte[]>("docs/report.pdf");
+await restLocalFs.SetAsync("docs/report.pdf", fileBytes);
+var file = await restLocalFs.GetAsync<byte[]>("docs/report.pdf");
 
 // In-memory queue (single-process)
 var restInMemoryQueue = new Rest(
@@ -689,10 +689,10 @@ Direct stream handling for file operations:
 ```csharp
 // Store stream directly
 using var fileStream = File.OpenRead("document.pdf");
-await rest.StoremAsync("documents/report.pdf", fileStream);
+await rest.SetAsync("documents/report.pdf", fileStream);
 
 // Retrieve as stream
-var stream = await rest.RetrievemeAsync<Stream>("documents/report.pdf");
+var stream = await rest.GetAsync<Stream>("documents/report.pdf");
 ```
 
 ### Cache Operations
@@ -862,12 +862,12 @@ The `RootPath` parameter allows you to organize your storage with logical path p
 var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;RootPath=my-app/uploads", RestMode.S3);
 
 // Operations automatically use the root path
-await rest.StoremAsync("documents/file.pdf", data); // Stored as "my-app/uploads/documents/file.pdf"
+await rest.SetAsync("documents/file.pdf", data); // Stored as "my-app/uploads/documents/file.pdf"
 var cacheProvider = rest.GetProvider<ICacheProvider>();
 await cacheProvider.SetAsync("user:123", userData); // Cached as "my-app/uploads/user:123"
 
 // Root path is applied to all operations (GET, PUT, DELETE, EXISTS)
-var file = await rest.RetrievemeAsync<byte[]>("documents/file.pdf"); // Retrieves from "my-app/uploads/documents/file.pdf"
+var file = await rest.GetAsync<byte[]>("documents/file.pdf"); // Retrieves from "my-app/uploads/documents/file.pdf"
 ```
 
 **Connection String Parameters:**
@@ -1482,7 +1482,7 @@ public class DocumentService
         if (cached != null) return cached;
 
         // Fetch from storage
-        var document = await _storage.RetrievemeAsync<byte[]>($"documents/{documentId}");
+        var document = await _storage.GetAsync<byte[]>($"documents/{documentId}");
 
         // Cache for future requests
         await _cache.CachemeAsync($"doc:{documentId}", document, TimeSpan.FromHours(1));
@@ -1493,7 +1493,7 @@ public class DocumentService
     public async Task SaveDocumentAsync(string documentId, byte[] data)
     {
         // Save to storage
-        await _storage.StoremAsync($"documents/{documentId}", data);
+        await _storage.SetAsync($"documents/{documentId}", data);
 
         // Invalidate cache
         await _cache.RemoveAsync($"doc:{documentId}");

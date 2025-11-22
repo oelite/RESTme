@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <PackageId>OElite.Restme.OpenSearch</PackageId>
-    <AssemblyVersion>2.1.0</AssemblyVersion>
-    <VersionPrefix>2.1.0</VersionPrefix>
+    <AssemblyVersion>2.1.1</AssemblyVersion>
+    <VersionPrefix>2.1.1</VersionPrefix>
     <Authors>OElite Team</Authors>
     <Company>Phanes Technology Ltd</Company>
     <Description>OpenSearch integration package for the Restme framework, providing search and analytics operations.</Description>

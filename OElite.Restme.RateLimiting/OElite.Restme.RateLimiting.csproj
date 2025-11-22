@@ -7,8 +7,8 @@
     <LangVersion>latest</LangVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>OElite.Restme.RateLimiting</PackageId>
-    <AssemblyVersion>2.1.0</AssemblyVersion>
-    <VersionPrefix>2.1.0</VersionPrefix>
+    <AssemblyVersion>2.1.1</AssemblyVersion>
+    <VersionPrefix>2.1.1</VersionPrefix>
     <Authors>Phanes Technology Ltd</Authors>
     <Copyright>Phanes Technology Ltd</Copyright>
     <Description>Production-grade rate limiting middleware for ASP.NET Core applications with support for distributed scenarios, memory and Redis storage, and flexible configuration.</Description>
