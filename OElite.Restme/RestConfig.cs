@@ -34,16 +34,18 @@ namespace OElite.Restme
         public bool UseRestConvertForCollectionSerialization { get; set; }
         public int DefaultTimeout { get; set; }
 
-        public RestConfig(JsonSerializerSettings? jsonSerializerSettings = null, Encoding? encoding = null,
+        public RestConfig(RestMode restMode, JsonSerializerSettings? jsonSerializerSettings = null,
+            Encoding? encoding = null,
             bool useRestConvertForCollectionSerialization = true, int timeout = 0)
         {
+            OperationMode = restMode;
             SerializerSettings = jsonSerializerSettings ??
-                                  new JsonSerializerSettings()
-                                  {
-                                      ContractResolver = new OEliteJsonResolver(),
-                                      NullValueHandling = NullValueHandling.Ignore,
-                                      MissingMemberHandling = MissingMemberHandling.Ignore
-                                  };
+                                 new JsonSerializerSettings()
+                                 {
+                                     ContractResolver = new OEliteJsonResolver(),
+                                     NullValueHandling = NullValueHandling.Ignore,
+                                     MissingMemberHandling = MissingMemberHandling.Ignore
+                                 };
             DefaultEncoding = encoding ?? Encoding.UTF8;
             UseRestConvertForCollectionSerialization = useRestConvertForCollectionSerialization;
             DefaultTimeout = timeout > 0 ? timeout : 0;
@@ -79,6 +81,7 @@ namespace OElite.Restme
                         var creds = uri.UserInfo.Split(':');
                         AuthSecret = creds.Length > 1 ? creds[1] : creds[0];
                     }
+
                     Endpoint = $"{uri.Host}:{uri.Port}";
                     InstanceName = uri.AbsolutePath.TrimStart('/');
                 }
@@ -91,6 +94,7 @@ namespace OElite.Restme
                         AuthKey = creds[0]; // username
                         AuthSecret = creds[1]; // password
                     }
+
                     Endpoint = $"{uri.Host}:{uri.Port}";
                     InstanceName = uri.AbsolutePath.TrimStart('/'); // vhost
                 }
@@ -104,6 +108,7 @@ namespace OElite.Restme
                         AuthKey = creds[0]; // username
                         AuthSecret = creds[1]; // password
                     }
+
                     Endpoint = $"{uri.Host}:{uri.Port}";
                     InstanceName = uri.AbsolutePath.TrimStart('/'); // database
                 }
@@ -117,6 +122,7 @@ namespace OElite.Restme
                         AuthKey = creds[0]; // SASL username
                         AuthSecret = creds[1]; // SASL password
                     }
+
                     Endpoint = $"{uri.Host}:{uri.Port}";
                 }
                 else if (ConnectionString.StartsWith("opensearch://"))
@@ -129,6 +135,7 @@ namespace OElite.Restme
                         AuthKey = creds[0]; // username
                         AuthSecret = creds[1]; // password
                     }
+
                     Endpoint = $"{uri.Host}:{uri.Port}";
                 }
                 // Add more common URI patterns as needed

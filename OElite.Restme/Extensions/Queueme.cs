@@ -3,7 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using OElite.Restme.Abstractions;
 
-namespace OElite.Restme;
+// ReSharper disable once CheckNamespace
+namespace OElite;
 
 public static class QueueProviderExtensions
 {
@@ -90,7 +91,9 @@ public static class QueueProviderExtensions
         {
             // Convert synchronous delegates to async for the provider
             Func<T, Task<bool>>? asyncQueueTask = queueTask != null ? (t) => Task.FromResult(queueTask(t)) : null;
-            Func<Task<bool>>? asyncDeliverCompleteCondition = deliverCompleteCondition != null ? () => Task.FromResult(deliverCompleteCondition()) : null;
+            Func<Task<bool>>? asyncDeliverCompleteCondition = deliverCompleteCondition != null
+                ? () => Task.FromResult(deliverCompleteCondition())
+                : null;
 
             // Use the provider directly for consuming
             queueProvider.StartConsumingAsync<T>(asyncQueueTask, asyncDeliverCompleteCondition,
@@ -117,7 +120,8 @@ public static class QueueProviderExtensions
         {
             // Use the provider directly for consuming with cancellation token
             await queueProvider.StartConsumingAsync<T>(queueTask, deliverCompleteCondition,
-                exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType, cancellationToken);
+                exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType,
+                cancellationToken);
         }
         catch (Exception? ex) when (!(ex is OperationCanceledException))
         {
@@ -140,11 +144,14 @@ public static class QueueProviderExtensions
         {
             // Convert synchronous delegates to async for the provider
             Func<T, Task<bool>>? asyncQueueTask = queueTask != null ? (t) => Task.FromResult(queueTask(t)) : null;
-            Func<Task<bool>>? asyncDeliverCompleteCondition = deliverCompleteCondition != null ? () => Task.FromResult(deliverCompleteCondition()) : null;
+            Func<Task<bool>>? asyncDeliverCompleteCondition = deliverCompleteCondition != null
+                ? () => Task.FromResult(deliverCompleteCondition())
+                : null;
 
             // Use the provider directly for consuming with cancellation token
             await queueProvider.StartConsumingAsync<T>(asyncQueueTask, asyncDeliverCompleteCondition,
-                exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType, cancellationToken);
+                exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType,
+                cancellationToken);
         }
         catch (Exception? ex) when (!(ex is OperationCanceledException))
         {

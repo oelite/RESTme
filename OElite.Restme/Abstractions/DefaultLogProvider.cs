@@ -18,7 +18,7 @@ public class DefaultLogProvider : ILogProvider
     /// <summary>
     /// Configuration used to create this provider
     /// </summary>
-    public RestConfig Configuration => new RestConfig();
+    public RestConfig Configuration => new(RestMode.LocalFileSystem);
 
     /// <summary>
     /// Capabilities supported by this provider

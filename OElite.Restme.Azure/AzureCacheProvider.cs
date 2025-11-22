@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using OElite;
 using OElite.Restme;
 using OElite.Restme.Abstractions;
 using OElite.Restme.Azure;
@@ -130,7 +131,7 @@ namespace OElite.Providers
                 if (typeof(T) == typeof(string))
                     return (T)(object)textValue;
 
-                return textValue.JsonDeserialize<T>();
+                return StringUtils.JsonDeserialize<T>(textValue);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
@@ -157,7 +158,7 @@ namespace OElite.Providers
                 if (typeof(T) == typeof(string))
                     textValue = value.ToString()!;
                 else
-                    textValue = value.JsonSerialize();
+                    textValue = StringUtils.JsonSerialize(value);
 
                 // Set cache control headers for CDN scenarios
                 blob.Properties.CacheControl = "public, max-age=3600"; // Default 1 hour

@@ -42,6 +42,12 @@ public abstract class KafkaTestBase : IAsyncLifetime
 
         _kafkaContainer = new KafkaBuilder()
             .WithImage("confluentinc/cp-kafka:7.9.0")
+            // Fix replication factor for single-node testing
+            .WithEnvironment("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
+            .WithEnvironment("KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR", "1")
+            .WithEnvironment("KAFKA_TRANSACTION_STATE_LOG_MIN_ISR", "1")
+            .WithEnvironment("KAFKA_DEFAULT_REPLICATION_FACTOR", "1")
+            .WithEnvironment("KAFKA_MIN_INSYNC_REPLICAS", "1")
             .Build();
         //
         // // 1. COMMAND OVERRIDE: Forces the storage format before running the main script.
@@ -92,9 +98,9 @@ public abstract class KafkaTestBase : IAsyncLifetime
             Logger.LogInformation("Kafka container started: {BootstrapServers}", bootstrapServers);
 
             // Configure Rest with Kafka
-            Rest = new Rest($"kafka://{bootstrapServers}", new RestConfig
+            Rest = new Rest(new RestConfig(RestMode.Kafka)
             {
-                OperationMode = RestMode.Kafka
+                ConnectionString = $"kafka://{bootstrapServers}"
             });
 
             Logger.LogInformation("Rest instance created. StreamingProvider: {ProviderType}",

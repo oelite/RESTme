@@ -21,11 +21,10 @@ public class TestBase : IDisposable
     {
         await _azuriteContainer.StartAsync();
 
-        Config = new RestConfig
+        Config = new RestConfig(RestMode.Azure)
         {
             ConnectionString =
-                $"DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:{_azuriteContainer.GetMappedPublicPort(10000)}/devstoreaccount1;QueueEndpoint=http://localhost:{_azuriteContainer.GetMappedPublicPort(10001)}/devstoreaccount1;TableEndpoint=http://localhost:{_azuriteContainer.GetMappedPublicPort(10002)}/devstoreaccount1;",
-            OperationMode = RestMode.Azure
+                $"DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:{_azuriteContainer.GetMappedPublicPort(10000)}/devstoreaccount1;QueueEndpoint=http://localhost:{_azuriteContainer.GetMappedPublicPort(10001)}/devstoreaccount1;TableEndpoint=http://localhost:{_azuriteContainer.GetMappedPublicPort(10002)}/devstoreaccount1;"
         };
         Restme = new Rest(Config.ConnectionString, Config);
     }

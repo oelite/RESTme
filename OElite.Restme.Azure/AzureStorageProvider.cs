@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using OElite;
 using OElite.Restme;
 using OElite.Restme.Abstractions;
 using OElite.Restme.Azure;
@@ -97,7 +98,7 @@ namespace OElite.Providers
                 if (typeof(T) == typeof(string))
                     return (T)Convert.ChangeType(jsonStringValue, typeof(T));
 
-                return jsonStringValue.JsonDeserialize<T>();
+                return StringUtils.JsonDeserialize<T>(jsonStringValue);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {

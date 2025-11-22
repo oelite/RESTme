@@ -52,11 +52,13 @@ Install-Package OElite.Restme.OpenSearch
 
 ## 🏗️ Architecture
 
-OElite.Restme uses a modular architecture where the core library provides abstractions and backend-specific implementations are loaded dynamically:
+OElite.Restme uses a modern **provider pattern architecture** where the core library provides abstractions and backend-specific implementations are loaded dynamically. The `Rest` class serves as an orchestrator that delegates operations to specialized providers:
 
 ```
 OElite.Restme (Core)
-├── Abstractions (ICacheProvider, IStorageProvider, etc.)
+├── Rest Class (Orchestrator)
+├── Provider Abstractions (IHttpProvider, ICacheProvider, IStorageProvider, etc.)
+├── HttpClientProvider (Built-in HTTP implementation)
 ├── Default Providers (Fallback implementations)
 └── Service Locator (Dynamic provider loading)
 
@@ -64,30 +66,76 @@ Backend Packages:
 ├── OElite.Restme.Redis (Redis cache provider)
 ├── OElite.Restme.RabbitMQ (RabbitMQ queue provider)
 ├── OElite.Restme.Azure (Azure Blob Storage provider)
-└── OElite.Restme.S3 (S3-compatible storage provider)
+├── OElite.Restme.S3 (S3-compatible storage provider)
+├── OElite.Restme.ClickHouse (Columnar analytics provider)
+├── OElite.Restme.Kafka (Streaming provider)
+└── OElite.Restme.OpenSearch (Search provider)
 ```
+
+### Provider Pattern Benefits
+
+- **🎯 Separation of Concerns**: HTTP, caching, storage, and messaging operations are handled by specialized providers
+- **🔌 Extensibility**: Easy to add new providers without modifying core architecture
+- **🧪 Testability**: Mock individual providers for unit testing
+- **⚡ Performance**: Optimized implementations per provider type
+- **🔄 Flexibility**: Mix and match providers based on requirements
+
+### HttpClientProvider Features
+
+The built-in **HttpClientProvider** offers enhanced HTTP functionality:
+
+- **✅ HttpRequestContext Support**: Rich context passing with headers, parameters, BaseUri, and timeout
+- **✅ Enhanced Response Processing**: `HttpResponseMessage<T>` with metadata (headers, status codes, timestamps)
+- **✅ Configuration Integration**: Supports `UseRestConvertForCollectionSerialization` and custom serialization
+- **✅ Content Type Handling**: Automatic JSON/Form encoding based on RestMode (Http vs HttpRest)
+- **✅ Stream Support**: Handle file uploads/downloads with stream types
+- **✅ Error Handling**: Comprehensive exception handling and logging support
 
 ## 🚀 Quick Start
 
 ### 1. HTTP Client (No additional packages required)
 
 ```csharp
-using OElite;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 // Initialize HTTP client
 var rest = new Rest("https://api.example.com", new RestConfig { OperationMode = RestMode.Http });
 
+// Get HTTP provider using modern provider pattern
+var httpProvider = rest.GetProvider<IHttpProvider>();
+
 // GET request
-var user = await rest.GetAsync<User>("/users/123");
+var user = await httpProvider.GetAsync<User>("/users/123");
 
 // POST request with data
-var newUser = await rest.PostAsync<User>("/users", userData);
+var newUser = await httpProvider.PostAsync<User>("/users", userData);
 
 // PUT request
-var updatedUser = await rest.PutAsync<User>("/users/123", updatedData);
+var updatedUser = await httpProvider.PutAsync<User>("/users/123", updatedData);
 
 // DELETE request
-await rest.DeleteAsync("/users/123");
+await httpProvider.DeleteAsync<bool>("/users/123");
+
+// Enhanced HTTP requests with full response details
+var response = await httpProvider.HttpRequestFullWithDetailsAsync<User>(
+    HttpMethod.Get, "/users/123");
+
+if (response?.Data != null)
+{
+    Console.WriteLine($"Status: {response.StatusCode}");
+    Console.WriteLine($"Headers: {response.ResponseHeaders?.Count}");
+    Console.WriteLine($"User: {response.Data.Name}");
+}
+```
+
+#### Alternative: Direct CRUD Operations (Backward Compatible)
+```csharp
+// For simple operations, you can still use direct CRUD methods
+var user = await rest.GetAsync<User>("/users/123");
+var newUser = await rest.PostAsync<User>("/users", userData);
+var updatedUser = await rest.PutAsync<User>("/users/123", updatedData);
+await rest.DeleteAsync<bool>("/users/123");
 ```
 
 ### 2. Redis Caching
@@ -103,14 +151,26 @@ var config = new RestConfig
 };
 var rest = new Rest("localhost:6379", config, RestMode.Redis);
 
-// Cache data with expiry
-await rest.CachemeAsync("user:123", userData, 60); // 60 minutes
+// Get cache provider
+var cacheProvider = rest.GetProvider<ICacheProvider>();
 
-// Retrieve cached data
-var cachedUser = await rest.FindmeAsync<User>("user:123");
+// Cache data with expiry (using ICacheProvider directly)
+await cacheProvider.SetAsync("user:123", userData, TimeSpan.FromMinutes(60));
+
+// Cache data with expiry (using CachemeAsync extension)
+var success = await cacheProvider.CachemeAsync("user:123", userData, expiryInSeconds: 3600); // 60 minutes
+
+// Retrieve cached data (using ICacheProvider directly)
+var cachedUser = await cacheProvider.GetAsync<User>("user:123");
+
+// Retrieve cached data (using FindmeAsync extension with validation)
+var cachedUserWithValidation = await cacheProvider.FindmeAsync<User>("user:123");
 
 // Remove from cache
-await rest.RemovemeAsync("user:123");
+await cacheProvider.RemoveAsync("user:123");
+
+// Force expiry (using ExpiremeAsync extension)
+await cacheProvider.ExpiremeAsync("user:123");
 ```
 
 ### 3. Azure Blob Storage
@@ -138,7 +198,8 @@ await rest.StoremAsync("documents/report.pdf", fileData); // Stored as "my-app/u
 var fileData = await rest.RetrievemeAsync<byte[]>("documents/report.pdf");
 
 // Use as cache (CDN-ready)
-await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(1));
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+await cacheProvider.SetAsync("cache:key", data, TimeSpan.FromHours(1));
 ```
 
 ### 4. S3-Compatible Storage
@@ -185,7 +246,8 @@ var rest = new Rest("s3://", minioConfig, RestMode.S3);
 
 // Store and cache operations (rootPath is automatically prefixed)
 await rest.StoremAsync("files/document.pdf", fileData); // Stored as "my-app/uploads/files/document.pdf"
-await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(2)); // Cached as "dev/cache/cache:key"
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+await cacheProvider.SetAsync("cache:key", data, TimeSpan.FromHours(2)); // Cached as "dev/cache/cache:key"
 ```
 
 ### 5. RabbitMQ Message Queuing
@@ -639,20 +701,92 @@ Advanced caching with expiry and CDN support:
 
 ```csharp
 // Cache with custom expiry
-await rest.CachemeAsync("user:123", userData, TimeSpan.FromMinutes(30));
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+await cacheProvider.SetAsync("user:123", userData, TimeSpan.FromMinutes(30));
 
 // Check if cached
-var exists = await rest.ExistsmeAsync("user:123");
+var exists = await cacheProvider.ExistsAsync("user:123");
 
 // Set expiry
-await rest.ExpiremeAsync("user:123", TimeSpan.FromHours(1));
+await cacheProvider.SetExpiryAsync("user:123", TimeSpan.FromHours(1));
+
+// Force expiry (using ExpiremeAsync extension)
+await cacheProvider.ExpiremeAsync("user:123");
 
 // Find with callback
-var user = await rest.FindmeAsync<User>("user:123", async (u) => {
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+var user = await cacheProvider.FindmeAsync<User>("user:123", additionalValidation: async (u) => {
     // Process user data
     return true;
 });
 ```
+
+## Cache Extension Methods
+
+Restme provides powerful extension methods for advanced cache operations with direct data storage and expiry management:
+
+### CachemeAsync - Store with Expiry
+```csharp
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+
+// Store with default expiry (60 seconds)
+var success = await cacheProvider.CachemeAsync("user:123", userData);
+
+// Store with custom expiry (1 hour)
+var success = await cacheProvider.CachemeAsync("user:123", userData, expiryInSeconds: 3600);
+
+// Store using query object as key (MD5 hash generated automatically)
+var query = new { UserId = 123, IncludeProfile = true };
+var success = await cacheProvider.CachemeAsync(query, userData, expiryInSeconds: 1800);
+```
+
+### FindmeAsync - Retrieve with Validation
+```csharp
+// Simple retrieval
+var user = await cacheProvider.FindmeAsync<User>("user:123");
+
+// With additional validation
+var user = await cacheProvider.FindmeAsync<User>("user:123",
+    additionalValidation: async (u) => u.IsActive && u.LastLoginDate > DateTime.UtcNow.AddDays(-30));
+
+// With refresh action for cache misses
+var user = await cacheProvider.FindmeAsync<User>("user:123",
+    refreshAction: async () => await userService.GetUserFromDatabaseAsync(123));
+
+// Using query object as key
+var query = new { UserId = 123, IncludeProfile = true };
+var user = await cacheProvider.FindmeAsync<User>(query,
+    refreshAction: async () => await userService.GetUserWithProfileAsync(123));
+```
+
+### ExpiremeAsync - Force Expiry
+```csharp
+// Force expiry by removing from cache
+await cacheProvider.ExpiremeAsync("user:123");
+
+// Force expiry using query object
+var query = new { UserId = 123 };
+await cacheProvider.ExpiremeAsync<User>(query);
+```
+
+### Direct Data Storage Benefits
+
+The updated extension methods provide:
+
+- **✅ Zero Data Tampering**: User data stored exactly as provided (no ResponseMessage wrapper)
+- **✅ Provider-Optimized Expiry**: Each provider uses native expiry mechanisms
+- **✅ Consistent API**: Same interface across Memory, Redis, and S3 providers
+- **✅ Automatic Key Generation**: MD5 hashing for complex query objects
+- **✅ Type Safety**: Strongly-typed generic methods
+- **✅ Background Refresh**: Non-blocking cache refresh for expired items
+
+### Expiry Validation Per Provider
+
+| Provider | Expiry Mechanism | Cleanup Method |
+|----------|------------------|----------------|
+| **MemoryCache** | In-memory tuple with timer | Automatic timer-based cleanup |
+| **RedisCache** | Native Redis TTL | Redis-managed expiry |
+| **S3Cache** | Object metadata validation | Background async removal |
 
 ### Expiry & Lifecycle Management
 
@@ -729,7 +863,8 @@ var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;RootPath=my-app/uploads
 
 // Operations automatically use the root path
 await rest.StoremAsync("documents/file.pdf", data); // Stored as "my-app/uploads/documents/file.pdf"
-await rest.CachemeAsync("user:123", userData); // Cached as "my-app/uploads/user:123"
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+await cacheProvider.SetAsync("user:123", userData); // Cached as "my-app/uploads/user:123"
 
 // Root path is applied to all operations (GET, PUT, DELETE, EXISTS)
 var file = await rest.RetrievemeAsync<byte[]>("documents/file.pdf"); // Retrieves from "my-app/uploads/documents/file.pdf"
@@ -1361,7 +1496,7 @@ public class DocumentService
         await _storage.StoremAsync($"documents/{documentId}", data);
 
         // Invalidate cache
-        await _cache.RemovemeAsync($"doc:{documentId}");
+        await _cache.RemoveAsync($"doc:{documentId}");
 
         // Publish event
         await _queue.QueuemeAsync("document.saved", new { DocumentId = documentId });

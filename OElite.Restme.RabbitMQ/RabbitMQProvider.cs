@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using OElite;
 using OElite.Restme;
 using OElite.Restme.Abstractions;
 using RabbitMQ.Client;
@@ -111,29 +112,43 @@ namespace OElite.Providers
         {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Handle exchange-only publishing (for fanout, topic exchanges with pre-bound queues)
+                bool isExchangeOnlyPublish = !string.IsNullOrEmpty(exchangeName) && queueName == null;
+
                 if (string.IsNullOrEmpty(exchangeName))
                     exchangeName = "";
 
-                cancellationToken.ThrowIfCancellationRequested();
-                if (string.IsNullOrEmpty(queueName))
-                    queueName = await DeclareQueueAsync(cancellationToken: cancellationToken);
-
-                if (string.IsNullOrEmpty(routingKey))
-                    routingKey = queueName;
-
-                // Declare exchange if provided
-                if (!string.IsNullOrEmpty(exchangeName))
+                if (!isExchangeOnlyPublish)
                 {
-                    await DeclareExchangeAsync(exchangeName, exchangeType, isDurable, autoDelete, cancellationToken);
+                    // Traditional queue-based publishing
+                    if (string.IsNullOrEmpty(queueName))
+                        queueName = await DeclareQueueAsync(cancellationToken: cancellationToken);
+
+                    if (string.IsNullOrEmpty(routingKey))
+                        routingKey = queueName;
+
+                    // Declare exchange if provided
+                    if (!string.IsNullOrEmpty(exchangeName))
+                    {
+                        await DeclareExchangeAsync(exchangeName, exchangeType, isDurable, autoDelete, cancellationToken);
+                    }
+
+                    // Declare queue
+                    await DeclareQueueAsync(queueName, isDurable, isExclusive, autoDelete, cancellationToken);
+
+                    // Bind queue to exchange if exchange is provided
+                    if (!string.IsNullOrEmpty(exchangeName))
+                    {
+                        await BindQueueAsync(queueName, exchangeName, routingKey, cancellationToken);
+                    }
                 }
-
-                // Declare queue
-                await DeclareQueueAsync(queueName, isDurable, isExclusive, autoDelete, cancellationToken);
-
-                // Bind queue to exchange if exchange is provided
-                if (!string.IsNullOrEmpty(exchangeName))
+                else
                 {
-                    await BindQueueAsync(queueName, exchangeName, routingKey, cancellationToken);
+                    // Exchange-only publishing (assume exchange and bindings already exist)
+                    if (string.IsNullOrEmpty(routingKey))
+                        routingKey = "";
                 }
 
                 var jsonMessage = message.JsonSerialize(Configuration.UseRestConvertForCollectionSerialization, Configuration.SerializerSettings);
@@ -196,7 +211,7 @@ namespace OElite.Providers
                     {
                         var body = ea.Body.ToArray();
                         var message = Encoding.UTF8.GetString(body);
-                        var deserializedMessage = message.JsonDeserialize<T>();
+                        var deserializedMessage = StringUtils.JsonDeserialize<T>(message);
 
                         var success = await messageHandler(deserializedMessage);
 

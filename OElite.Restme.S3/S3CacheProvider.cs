@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon;
+using OElite;
+using Amazon.Runtime;
 using OElite.Restme;
 using OElite.Restme.Abstractions;
 
@@ -34,41 +37,33 @@ namespace OElite.Providers
 
         public S3CacheProvider(RestConfig config) : base(config)
         {
-
             // Use pre-parsed config values directly
             var accessKey = config.AuthKey;
             var secretKey = config.AuthSecret;
 
-            // Parse connection string for additional configuration if needed
+            // Always parse connection string if provided to get endpoint and configuration settings
             S3Configuration? parsedConfig = null;
+            if (!string.IsNullOrEmpty(config.ConnectionString))
+            {
+                parsedConfig = S3ConnectionStringParser.ParseConnectionString(config);
+
+                // Use connection string credentials as fallback if not provided in config
+                accessKey = accessKey ?? parsedConfig.AccessKeyId;
+                secretKey = secretKey ?? parsedConfig.SecretAccessKey;
+            }
+
+            // Validate that we have credentials from either config or connection string
             if (string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
             {
-                if (!string.IsNullOrEmpty(config.ConnectionString))
-                {
-                    parsedConfig = S3ConnectionStringParser.ParseConnectionString(config.ConnectionString);
-                    accessKey = accessKey ?? parsedConfig.AccessKeyId;
-                    secretKey = secretKey ?? parsedConfig.SecretAccessKey;
-                }
-                else
-                {
-                    throw new InvalidOperationException("S3 credentials not provided. Set AuthKey and AuthSecret in RestConfig, or provide a connection string.");
-                }
+                throw new InvalidOperationException(
+                    "S3 credentials not provided. Set AuthKey and AuthSecret in RestConfig, or provide a connection string.");
             }
+
 
             // Create AWS S3 client configuration
             var s3Config = new AmazonS3Config();
 
-            // Use config values with fallbacks to parsed connection string
-            if (!string.IsNullOrEmpty(config.Endpoint))
-            {
-                s3Config.ServiceURL = config.Endpoint;
-            }
-            else if (parsedConfig?.ServiceUrl != null)
-            {
-                s3Config.ServiceURL = parsedConfig.ServiceUrl;
-            }
-
-            // Set region from config or parsed connection string
+            // Set region FIRST - must be done before setting ServiceURL to prevent AWS SDK from overriding
             if (!string.IsNullOrEmpty(config.Region))
             {
                 s3Config.RegionEndpoint = RegionEndpoint.GetBySystemName(config.Region);
@@ -82,19 +77,38 @@ namespace OElite.Providers
                 s3Config.RegionEndpoint = RegionEndpoint.USEast1; // Default
             }
 
-            // Set additional S3 config from parsed connection string if available
+            // Set additional S3 config from parsed connection string if available (before ServiceURL)
             if (parsedConfig != null)
             {
                 s3Config.ForcePathStyle = parsedConfig.ForcePathStyle;
                 s3Config.UseHttp = parsedConfig.UseHttp;
             }
 
+            // Set ServiceURL LAST - after region and other settings to prevent overriding
+            if (!string.IsNullOrEmpty(config.Endpoint))
+            {
+                s3Config.ServiceURL = config.Endpoint;
+            }
+            else if (parsedConfig?.ServiceUrl != null)
+            {
+                s3Config.ServiceURL = parsedConfig.ServiceUrl;
+            }
+
+
             _s3Client = new AmazonS3Client(accessKey, secretKey, s3Config);
             _bucketName = config.InstanceName ?? parsedConfig?.BucketName ?? "restme-cache";
             _s3Config = parsedConfig ?? new S3Configuration { RootPath = config.RootPath };
 
-            // Ensure bucket exists
-            _ = Task.Run(async () => await EnsureBucketExistsAsync());
+            // Ensure bucket exists synchronously for reliable initialization
+            try
+            {
+                EnsureBucketExistsAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"Warning: Could not ensure bucket exists: {ex.Message}");
+                // Continue anyway - bucket might be created later or already exist
+            }
         }
 
         private async Task EnsureBucketExistsAsync()
@@ -119,7 +133,8 @@ namespace OElite.Providers
         }
 
 
-        public override async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class
+        public override async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
+            where T : class
         {
             ThrowIfDisposed();
             ValidateKey(key, "GetAsync");
@@ -137,7 +152,48 @@ namespace OElite.Providers
 
                 cancellationToken.ThrowIfCancellationRequested();
                 using var response = await _s3Client.GetObjectAsync(request, cancellationToken);
-                return HandleStreamType<T>(response.ResponseStream);
+
+                // Check for expiry in object metadata
+                if (response.Metadata.Count > 0)
+                {
+                    // S3 metadata keys are case-insensitive and may have the x-amz-meta- prefix stripped
+                    var expiryKey = response.Metadata.Keys.FirstOrDefault(k =>
+                        k.Equals("expiry-utc", StringComparison.OrdinalIgnoreCase) ||
+                        k.Equals("x-amz-meta-expiry-utc", StringComparison.OrdinalIgnoreCase));
+
+                    if (expiryKey != null)
+                    {
+                        var expiryString = response.Metadata[expiryKey];
+                        if (TryParseExpiryTime(expiryString, out var expiryTime) && DateTime.UtcNow > expiryTime)
+                        {
+                            // Object has expired, remove it and return null
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await RemoveAsync(key, cancellationToken);
+                                }
+                                catch
+                                {
+                                    // Ignore cleanup failures
+                                }
+                            }, cancellationToken);
+                            return null;
+                        }
+                    }
+                }
+
+                // Read content from S3
+                using var reader = new StreamReader(response.ResponseStream);
+                var content = await reader.ReadToEndAsync();
+
+                // Handle string type directly, otherwise deserialize from JSON
+                if (typeof(T) == typeof(string))
+                {
+                    return content as T;
+                }
+
+                return StringUtils.JsonDeserialize<T>(content);
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -150,7 +206,8 @@ namespace OElite.Providers
         }
 
 
-        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null, CancellationToken cancellationToken = default) where T : class
+        public override async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null,
+            CancellationToken cancellationToken = default) where T : class
         {
             ThrowIfDisposed();
             ValidateKey(key, "SetAsync");
@@ -160,22 +217,34 @@ namespace OElite.Providers
                 // Apply root path if specified
                 var finalKey = S3ConnectionStringParser.CombinePath(_s3Config.RootPath, key);
 
+                // Store user data directly without tampering
+                string content;
+                if (value is string stringValue)
+                {
+                    content = stringValue;
+                }
+                else
+                {
+                    content = StringUtils.JsonSerialize(value);
+                }
+
                 var request = new PutObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = finalKey
+                    Key = finalKey,
+                    ContentBody = content,
+                    ContentType = value is string ? "text/plain" : "application/json"
                 };
 
-                await HandleStreamPutAsync(value, async stream =>
-                {
-                    request.InputStream = stream;
-                });
-
-                // Set cache control headers for expiry
+                // Set cache control headers for expiry (informational)
                 if (expiry.HasValue)
                 {
+                    var expiryTime = DateTime.UtcNow.Add(expiry.Value);
                     request.Headers["Cache-Control"] = $"max-age={expiry.Value.TotalSeconds:F0}";
-                    request.Headers["Expires"] = DateTime.UtcNow.Add(expiry.Value).ToString("R");
+                    request.Headers["Expires"] = expiryTime.ToString("R");
+
+                    // Store expiry in object metadata for application-level validation
+                    request.Metadata["x-amz-meta-expiry-utc"] = expiryTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -233,7 +302,38 @@ namespace OElite.Providers
                 };
 
                 cancellationToken.ThrowIfCancellationRequested();
-                await _s3Client.GetObjectMetadataAsync(request, cancellationToken);
+                var response = await _s3Client.GetObjectMetadataAsync(request, cancellationToken);
+
+                // Check for expiry in object metadata
+                if (response.Metadata.Count > 0)
+                {
+                    // S3 metadata keys are case-insensitive and may have the x-amz-meta- prefix stripped
+                    var expiryKey = response.Metadata.Keys.FirstOrDefault(k =>
+                        k.Equals("expiry-utc", StringComparison.OrdinalIgnoreCase) ||
+                        k.Equals("x-amz-meta-expiry-utc", StringComparison.OrdinalIgnoreCase));
+
+                    if (expiryKey != null)
+                    {
+                        var expiryString = response.Metadata[expiryKey];
+                        if (TryParseExpiryTime(expiryString, out var expiryTime) && DateTime.UtcNow > expiryTime)
+                        {
+                            // Object has expired, remove it and return false
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await RemoveAsync(key, cancellationToken);
+                                }
+                                catch
+                                {
+                                    // Ignore cleanup failures
+                                }
+                            }, cancellationToken);
+                            return false;
+                        }
+                    }
+                }
+
                 return true;
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -247,7 +347,8 @@ namespace OElite.Providers
         }
 
 
-        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
+        public override async Task<bool> SetExpiryAsync(string key, TimeSpan expiry,
+            CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(key, "SetExpiryAsync");
@@ -267,8 +368,10 @@ namespace OElite.Providers
                     MetadataDirective = S3MetadataDirective.REPLACE
                 };
 
+                var expiryTime = DateTime.UtcNow.Add(expiry);
                 copyRequest.Metadata.Add("Cache-Control", $"max-age={expiry.TotalSeconds:F0}");
-                copyRequest.Metadata.Add("Expires", DateTime.UtcNow.Add(expiry).ToString("R"));
+                copyRequest.Metadata.Add("Expires", expiryTime.ToString("R"));
+                copyRequest.Metadata.Add("x-amz-meta-expiry-utc", expiryTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
 
                 cancellationToken.ThrowIfCancellationRequested();
                 await _s3Client.CopyObjectAsync(copyRequest, cancellationToken);
@@ -280,42 +383,27 @@ namespace OElite.Providers
             }
         }
 
-        /// <summary>
-        /// Common implementation for handling Stream types in GetAsync
-        /// </summary>
-        protected T? HandleStreamType<T>(Stream responseStream) where T : class
-        {
-            if (!typeof(Stream).IsAssignableFrom(typeof(T)))
-                return null;
-
-            var bytes = FileUtils.ReadStreamToEnd(responseStream);
-
-            T? result;
-            if (typeof(T).GetTypeInfo().IsAbstract)
-            {
-                result = (T)Activator.CreateInstance(typeof(MemoryStream), bytes)!;
-            }
-            else
-                result = (T)Activator.CreateInstance(typeof(T), bytes)!;
-
-            return result;
-        }
 
         /// <summary>
-        /// Common implementation for handling Stream types in PutAsync
+        /// Parses the expiry time string stored in S3 metadata with proper UTC handling
         /// </summary>
-        protected async Task<bool> HandleStreamPutAsync<T>(T value, Func<Stream, Task> uploadAction) where T : class
+        private static bool TryParseExpiryTime(string expiryString, out DateTime expiryTime)
         {
-            if (typeof(Stream).IsAssignableFrom(typeof(T)))
+            // Try parsing as exact UTC format first (the format we store)
+            if (DateTime.TryParseExact(expiryString, "yyyy-MM-ddTHH:mm:ss.fffZ",
+                null, System.Globalization.DateTimeStyles.RoundtripKind, out expiryTime))
             {
-                if (value is not Stream stream)
-                    return false;
-
-                stream.Position = 0;
-                await uploadAction(stream);
                 return true;
             }
 
+            // Fallback to general parsing with UTC assumption
+            if (DateTime.TryParse(expiryString, null, System.Globalization.DateTimeStyles.AssumeUniversal, out expiryTime))
+            {
+                expiryTime = expiryTime.ToUniversalTime();
+                return true;
+            }
+
+            expiryTime = default;
             return false;
         }
 

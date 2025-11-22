@@ -12,7 +12,7 @@ namespace OElite.Restme.OpenSearch.UnitTests
         {
             // Arrange
             var connectionString = "opensearch://localhost:9200";
-            var config = new RestConfig { OperationMode = RestMode.OpenSearch };
+            var config = new RestConfig(RestMode.OpenSearch);
 
             // Act
             var provider = new OpenSearchProvider(config);
@@ -57,10 +57,9 @@ namespace OElite.Restme.OpenSearch.UnitTests
 
             // Act
             var provider = factory.CreateSearchProvider(
-                new RestConfig
+                new RestConfig(RestMode.OpenSearch)
                 {
-                    ConnectionString = "opensearch://localhost:9200",
-                    OperationMode = RestMode.OpenSearch
+                    ConnectionString = "opensearch://localhost:9200"
                 });
 
             // Assert
@@ -75,7 +74,7 @@ namespace OElite.Restme.OpenSearch.UnitTests
             var factory = new OpenSearchServiceFactory();
 
             // Act
-            var result = factory.CreateCacheProvider(new RestConfig());
+            var result = factory.CreateCacheProvider(new RestConfig(RestMode.OpenSearch));
 
             // Assert
             Assert.Null(result);

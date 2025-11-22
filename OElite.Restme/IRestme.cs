@@ -8,7 +8,7 @@ namespace OElite.Restme
 {
     public interface IRestme : IDisposable
     {
-        Uri? BaseUri { get; set; }
+        RestConfig Configuration { get; }
         string? RequestUrlPath { get; set; }
 
         void Add(string key, string value);
@@ -19,14 +19,6 @@ namespace OElite.Restme
         void AddAuthorizationHeader(string token, string authTypePrefix = "Bearer ");
 
 
-        T? HttpRequest<T>(HttpMethod method, string? keyOrRelativePath = null);
-        Task<T?> HttpRequestAsync<T>(HttpMethod method, string? keyOrRelativePath = null);
-
-        HttpResponseMessage<T?>? HttpRequestFull<T>(HttpMethod method, string? keyOrRelativePath = null,
-            object? dataObject = null);
-
-        Task<HttpResponseMessage<T?>?> HttpRequestFullAsync<T>(HttpMethod method, string? keyOrRelativePath = null,
-            object? dataObject = null);
 
         T? Get<T>(string? keyOrRelativePath = null, object? dataObject = null) where T : class;
         Task<T?> GetAsync<T>(string? keyOrRelativePath = null, object? dataObject = null) where T : class;

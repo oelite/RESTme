@@ -1,46 +1,35 @@
-using System.Text;
-using OElite.Providers;
-using Testcontainers.Minio;
-using DotNet.Testcontainers.Builders;
+using System;
+using System.Linq;
 using OElite.Restme.Abstractions;
 using Xunit;
 
 namespace OElite.Restme.S3.IntegrationTests;
 
-public class S3CacheIntegrationTests : IAsyncLifetime
+// Test data structures for complex object testing
+public class LargeTestObject
 {
-    private readonly MinioContainer _minioContainer = new MinioBuilder()
-        .WithImage("minio/minio:latest")
-        .WithPortBinding(9000, true)
-        .WithPortBinding(9001, true)
-        .WithEnvironment("MINIO_ROOT_USER", "minioadmin")
-        .WithEnvironment("MINIO_ROOT_PASSWORD", "minioadmin")
-        .WithCommand("server", "/data", "--console-address", ":9001")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(9000))
-        .Build();
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public byte[] Data { get; set; } = Array.Empty<byte>();
+    public NestedTestObject[] NestedObjects { get; set; } = Array.Empty<NestedTestObject>();
+}
 
-    private RestConfig? _config;
-    private S3CacheProvider? _cacheProvider;
+public class NestedTestObject
+{
+    public int Index { get; set; }
+    public string Value { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; }
+}
 
-    public async Task InitializeAsync()
+public class S3CacheIntegrationTests : TestBase
+{
+    private ICacheProvider? _cacheProvider;
+
+    public override async Task InitializeAsync()
     {
-        await _minioContainer.StartAsync();
-
-        _config = new RestConfig
-        {
-            ConnectionString = $"s3://localhost:{_minioContainer.GetMappedPublicPort(9000)}/test-cache-bucket",
-            AuthKey = "minioadmin",
-            AuthSecret = "minioadmin"
-        };
-
-        _cacheProvider = new S3CacheProvider(_config);
+        await base.InitializeAsync();
+        _cacheProvider = Rest.GetProvider<ICacheProvider>();
     }
-
-    public async Task DisposeAsync()
-    {
-        await _minioContainer.DisposeAsync();
-    }
-
 
 
     [Fact]
@@ -157,12 +146,12 @@ public class S3CacheIntegrationTests : IAsyncLifetime
     {
         // Arrange
         var key = $"s3-large-test-{Guid.NewGuid()}";
-        var largeObject = new
+        var largeObject = new LargeTestObject
         {
             Id = Guid.NewGuid(),
             Name = "Large Test Object for S3",
             Data = new byte[1024 * 10], // 10KB of data
-            NestedObjects = Enumerable.Range(0, 100).Select(i => new
+            NestedObjects = Enumerable.Range(0, 100).Select(i => new NestedTestObject
             {
                 Index = i,
                 Value = $"Item {i}",
@@ -173,14 +162,22 @@ public class S3CacheIntegrationTests : IAsyncLifetime
 
         // Act
         await _cacheProvider!.SetAsync(key, largeObject, expiry);
-        var retrieved = await _cacheProvider!.GetAsync<dynamic>(key);
+        var retrieved = await _cacheProvider!.GetAsync<LargeTestObject>(key);
 
         // Assert
         Assert.NotNull(retrieved);
-        Assert.Equal(largeObject.Id.ToString(), retrieved!.Id.ToString());
+        Assert.Equal(largeObject.Id, retrieved!.Id);
         Assert.Equal(largeObject.Name, retrieved.Name);
-        Assert.Equal(largeObject.Data.Length, ((byte[])retrieved.Data).Length);
-        Assert.Equal(largeObject.NestedObjects.Length, ((object[])retrieved.NestedObjects).Length);
+        Assert.Equal(largeObject.Data.Length, retrieved.Data.Length);
+        Assert.Equal(largeObject.NestedObjects.Length, retrieved.NestedObjects.Length);
+
+        // Verify nested objects
+        for (int i = 0; i < Math.Min(5, largeObject.NestedObjects.Length); i++) // Check first 5 items
+        {
+            Assert.Equal(largeObject.NestedObjects[i].Index, retrieved.NestedObjects[i].Index);
+            Assert.Equal(largeObject.NestedObjects[i].Value, retrieved.NestedObjects[i].Value);
+            Assert.Equal(largeObject.NestedObjects[i].Timestamp, retrieved.NestedObjects[i].Timestamp);
+        }
     }
 
     [Fact]
@@ -201,9 +198,9 @@ public class S3CacheIntegrationTests : IAsyncLifetime
         // Wait for expiry
         await Task.Delay(3000); // Wait longer than expiry
 
-        // Assert - Should still exist in S3 (S3 doesn't auto-expire, but cache layer should handle)
+        // Assert - Should return false for expired items (application-level expiry validation)
         var stillExists = await _cacheProvider!.ExistsAsync(key);
-        Assert.True(stillExists); // S3 storage persists, cache expiry is handled at application level
+        Assert.False(stillExists); // Application-level expiry validation should return false for expired items
     }
 
     [Fact]
@@ -214,9 +211,10 @@ public class S3CacheIntegrationTests : IAsyncLifetime
 
         // Assert
         Assert.NotNull(config);
-        Assert.Equal("s3://localhost:9000/test-cache-bucket", config.ConnectionString);
-        Assert.Equal("minioadmin", config.AuthKey);
-        Assert.Equal("minioadmin", config.AuthSecret);
+        Assert.Contains("endpoint=http://localhost:", config.ConnectionString);
+        Assert.Contains("bucket=test-bucket", config.ConnectionString);
+        Assert.Equal("AKIAIOSFODNN7EXAMPLE", config.AuthKey);
+        Assert.Equal("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", config.AuthSecret);
     }
 
     [Fact]
@@ -250,6 +248,4 @@ public class S3CacheIntegrationTests : IAsyncLifetime
         Assert.NotNull(restmeProvider);
         Assert.IsAssignableFrom<IRestmeProvider>(restmeProvider);
     }
-
-
 }

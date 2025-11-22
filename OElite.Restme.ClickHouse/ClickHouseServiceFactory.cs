@@ -1,4 +1,5 @@
 using OElite.Restme.Abstractions;
+using System.Runtime.CompilerServices;
 
 namespace OElite.Restme.ClickHouse
 {
@@ -9,6 +10,16 @@ namespace OElite.Restme.ClickHouse
     {
         static ClickHouseServiceFactory()
         {
+            ServiceLocator.RegisterFactory("clickhouse", new ClickHouseServiceFactory());
+        }
+
+        /// <summary>
+        /// Module initializer to ensure factory registration happens when assembly loads
+        /// </summary>
+        [ModuleInitializer]
+        public static void Initialize()
+        {
+            // Force static constructor to run
             ServiceLocator.RegisterFactory("clickhouse", new ClickHouseServiceFactory());
         }
 

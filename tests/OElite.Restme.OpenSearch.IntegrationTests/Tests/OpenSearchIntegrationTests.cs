@@ -60,7 +60,7 @@ public class OpenSearchRealIntegrationTests : OpenSearchTestBase
 
         // Assert - Query the document back
         await Task.Delay(1000); // Give OpenSearch time to index
-        var result = await Rest.GetAsync<LogDocument>(document.Id.ToString(), indexName);
+        var result = await Rest.GetDocumentAsync<LogDocument>(document.Id.ToString(), indexName);
         
         _output.WriteLine($"Retrieved document: {result?.Id}");
         result.Should().NotBeNull();
@@ -85,10 +85,14 @@ public class OpenSearchRealIntegrationTests : OpenSearchTestBase
             new() { Id = Guid.NewGuid(), Level = "INFO", Message = "Log 5", Source = "test", Timestamp = DateTime.UtcNow }
         };
 
-        _output.WriteLine($"Bulk indexing {documents.Count} documents");
+        _output.WriteLine($"Indexing {documents.Count} documents individually");
 
         // Act
-        await Rest.IndexAsync(documents, indexName);
+        // Index documents individually to avoid bulk serialization issues
+        foreach (var doc in documents)
+        {
+            await Rest.IndexAsync(doc, indexName, doc.Id.ToString());
+        }
 
         // Assert
         await Task.Delay(1500); // Give OpenSearch time to index all documents
@@ -121,7 +125,11 @@ public class OpenSearchRealIntegrationTests : OpenSearchTestBase
             new() { Id = Guid.NewGuid(), Level = "ERROR", Message = "API timeout exceeded", Source = "api", Timestamp = DateTime.UtcNow }
         };
 
-        await Rest.IndexAsync(documents, indexName);
+        // Index documents individually to avoid bulk serialization issues
+        foreach (var doc in documents)
+        {
+            await Rest.IndexAsync(doc, indexName, doc.Id.ToString());
+        }
         await Task.Delay(1500);
 
         _output.WriteLine("Testing query string search for ERROR level");
@@ -157,7 +165,11 @@ public class OpenSearchRealIntegrationTests : OpenSearchTestBase
             new() { Id = Guid.NewGuid(), Level = "INFO", Message = "User profile updated", Source = "profile", Timestamp = DateTime.UtcNow }
         };
 
-        await Rest.IndexAsync(documents, indexName);
+        // Index documents individually to avoid bulk serialization issues
+        foreach (var doc in documents)
+        {
+            await Rest.IndexAsync(doc, indexName, doc.Id.ToString());
+        }
         await Task.Delay(1500);
 
         _output.WriteLine("Testing full-text search for 'user'");
@@ -221,7 +233,11 @@ public class OpenSearchRealIntegrationTests : OpenSearchTestBase
             new() { Id = Guid.NewGuid(), Level = "WARN", Message = "Warn 1", Source = "db", Timestamp = DateTime.UtcNow }
         };
 
-        await Rest.IndexAsync(documents, indexName);
+        // Index documents individually to avoid bulk serialization issues
+        foreach (var doc in documents)
+        {
+            await Rest.IndexAsync(doc, indexName, doc.Id.ToString());
+        }
         await Task.Delay(1500);
 
         _output.WriteLine("Testing aggregation by level");
@@ -416,7 +432,11 @@ public class OpenSearchRealIntegrationTests : OpenSearchTestBase
             Timestamp = DateTime.UtcNow
         }).ToList();
 
-        await Rest.IndexAsync(documents, indexName);
+        // Index documents individually to avoid bulk serialization issues
+        foreach (var doc in documents)
+        {
+            await Rest.IndexAsync(doc, indexName, doc.Id.ToString());
+        }
         await Task.Delay(1500);
 
         _output.WriteLine("Testing pagination - Page 2, Size 3");

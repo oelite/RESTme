@@ -13,7 +13,7 @@ namespace OElite.Restme.Base
     /// </summary>
     public class MemoryCacheProvider : ICacheProvider
     {
-        private readonly ConcurrentDictionary<string, CacheItem> _cache;
+        private readonly ConcurrentDictionary<string, (object Data, DateTime ExpiryOnUtc)> _cache;
         private readonly Timer _cleanupTimer;
         private bool _disposed = false;
 
@@ -25,7 +25,7 @@ namespace OElite.Restme.Base
         /// <summary>
         /// Configuration used to create this provider
         /// </summary>
-        public RestConfig Configuration => new RestConfig();
+        public RestConfig Configuration => new(RestMode.Memory);
 
         /// <summary>
         /// Capabilities supported by this provider
@@ -34,7 +34,7 @@ namespace OElite.Restme.Base
 
         public MemoryCacheProvider()
         {
-            _cache = new ConcurrentDictionary<string, CacheItem>();
+            _cache = new ConcurrentDictionary<string, (object Data, DateTime ExpiryOnUtc)>();
             _cleanupTimer = new Timer(CleanupExpiredItems, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
 
@@ -43,33 +43,31 @@ namespace OElite.Restme.Base
             if (string.IsNullOrEmpty(key))
                 return Task.FromResult<T?>(null);
 
-            if (_cache.TryGetValue(key, out var cacheItem))
+            if (_cache.TryGetValue(key, out var cacheEntry))
             {
-                if (cacheItem.IsExpired)
+                // Check expiry
+                if (DateTime.UtcNow > cacheEntry.ExpiryOnUtc)
                 {
                     _cache.TryRemove(key, out _);
                     return Task.FromResult<T?>(null);
                 }
 
-                if (cacheItem.Value is T typedValue)
-                    return Task.FromResult<T?>(typedValue);
-
-                if (cacheItem.Value is ResponseMessage responseMessage)
-                    return Task.FromResult(GetOriginalData<T>(responseMessage));
+                return Task.FromResult(cacheEntry.Data as T);
             }
 
             return Task.FromResult<T?>(null);
         }
 
-        public Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null, CancellationToken cancellationToken = default) where T : class
+        public Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null,
+            CancellationToken cancellationToken = default) where T : class
         {
             if (string.IsNullOrEmpty(key) || value == null)
                 return Task.FromResult(false);
 
             var expiryTime = expiry.HasValue ? DateTime.UtcNow.Add(expiry.Value) : DateTime.MaxValue;
-            var cacheItem = new CacheItem(value, expiryTime);
+            var cacheEntry = (Data: (object)value, ExpiryOnUtc: expiryTime);
 
-            _cache.AddOrUpdate(key, cacheItem, (k, v) => cacheItem);
+            _cache.AddOrUpdate(key, cacheEntry, (k, v) => cacheEntry);
             return Task.FromResult(true);
         }
 
@@ -86,13 +84,14 @@ namespace OElite.Restme.Base
             if (string.IsNullOrEmpty(key))
                 return Task.FromResult(false);
 
-            if (_cache.TryGetValue(key, out var cacheItem))
+            if (_cache.TryGetValue(key, out var cacheEntry))
             {
-                if (cacheItem.IsExpired)
+                if (DateTime.UtcNow > cacheEntry.ExpiryOnUtc)
                 {
                     _cache.TryRemove(key, out _);
                     return Task.FromResult(false);
                 }
+
                 return Task.FromResult(true);
             }
 
@@ -104,24 +103,16 @@ namespace OElite.Restme.Base
             if (string.IsNullOrEmpty(key))
                 return Task.FromResult(false);
 
-            if (_cache.TryGetValue(key, out var cacheItem))
+            if (_cache.TryGetValue(key, out var currentEntry))
             {
-                var newExpiryTime = DateTime.UtcNow.Add(expiry);
-                var updatedItem = new CacheItem(cacheItem.Value, newExpiryTime);
-                _cache.TryUpdate(key, updatedItem, cacheItem);
+                var updatedEntry = (Data: currentEntry.Data, ExpiryOnUtc: DateTime.UtcNow.Add(expiry));
+                _cache.TryUpdate(key, updatedEntry, currentEntry);
                 return Task.FromResult(true);
             }
 
             return Task.FromResult(false);
         }
 
-        public T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class
-        {
-            if (responseMessage?.Data is T directData)
-                return directData;
-
-            return responseMessage?.Data as T;
-        }
 
         private void CleanupExpiredItems(object? state)
         {
@@ -129,7 +120,7 @@ namespace OElite.Restme.Base
 
             foreach (var kvp in _cache)
             {
-                if (kvp.Value.IsExpired)
+                if (DateTime.UtcNow > kvp.Value.ExpiryOnUtc)
                     keysToRemove.Add(kvp.Key);
             }
 
@@ -149,18 +140,5 @@ namespace OElite.Restme.Base
             }
         }
 
-        private class CacheItem
-        {
-            public object Value { get; }
-            public DateTime ExpiryTime { get; }
-
-            public bool IsExpired => DateTime.UtcNow > ExpiryTime;
-
-            public CacheItem(object value, DateTime expiryTime)
-            {
-                Value = value;
-                ExpiryTime = expiryTime;
-            }
-        }
     }
 }

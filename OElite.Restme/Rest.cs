@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.Extensions.Logging;
@@ -22,9 +23,9 @@ namespace OElite.Restme
         internal Dictionary<string, IRestmeProvider> InstantiatedProviders = new();
         public RestConfig Configuration { get; private set; }
 
-        public Uri? BaseUri { get; set; }
         public string? RequestUrlPath { get; set; }
         public bool Initialized { get; private set; }
+        public Uri? BaseUri { get; set; }
 
 
         /// <summary>
@@ -42,10 +43,22 @@ namespace OElite.Restme
                     ? $"{typeof(T).Name}:default"
                     : $"{typeof(T).Name}:{name}";
 
-                // Check if provider is already cached
+                // Check if provider is already cached and still usable
                 if (InstantiatedProviders.TryGetValue(providerKey, out var cachedProvider))
                 {
-                    return cachedProvider as T;
+                    // Check if the cached provider is disposed or unusable
+                    if (IsProviderDisposedOrUnusable(cachedProvider))
+                    {
+                        Logger?.LogDebug(
+                            "Cached provider {ProviderKey} is disposed, removing and creating new instance",
+                            providerKey);
+                        InstantiatedProviders.Remove(providerKey);
+                        // Continue to create a new instance below
+                    }
+                    else
+                    {
+                        return cachedProvider as T;
+                    }
                 }
 
                 // Special handling for LogProvider - always available
@@ -62,6 +75,14 @@ namespace OElite.Restme
                     var httpProvider = new HttpClientProvider(Configuration, Logger);
                     InstantiatedProviders[providerKey] = httpProvider;
                     return httpProvider as T;
+                }
+
+                // Special handling for Memory cache provider - built-in implementation always available
+                if (typeof(T) == typeof(ICacheProvider) && Configuration.OperationMode == RestMode.Memory)
+                {
+                    var memoryCacheProvider = new MemoryCacheProvider();
+                    InstantiatedProviders[providerKey] = memoryCacheProvider;
+                    return memoryCacheProvider as T;
                 }
 
                 // Get factory based on current mode
@@ -118,11 +139,19 @@ namespace OElite.Restme
         }
 
 
+        public Rest(RestConfig? config = null, ILogger? logger = null)
+        {
+            Configuration = config ?? new RestConfig(RestMode.Memory);
+            Logger = logger;
+
+            this.PrepareRestMode();
+        }
+
         public Rest(Uri? baseUri = null,
             string? urlPath = null, RestConfig? config = null, ILogger? logger = null,
             Dictionary<string, string>? @params = null, Dictionary<string, List<string>>? headers = null)
         {
-            Configuration = config ?? new RestConfig();
+            Configuration = config ?? new RestConfig(RestMode.Memory);
             Params = @params ?? new Dictionary<string, string>();
             Headers = headers ?? new Dictionary<string, List<string>>();
             BaseUri = baseUri!;
@@ -138,7 +167,7 @@ namespace OElite.Restme
         public Rest(string? endPointOrConnectionString, RestConfig? configuration = null, ILogger? logger = null,
             Dictionary<string, string>? @params = null, Dictionary<string, List<string>>? headers = null)
         {
-            Configuration = configuration ?? new RestConfig();
+            Configuration = configuration ?? new RestConfig(RestMode.Memory);
             Params = @params ?? new Dictionary<string, string>();
             Headers = headers ?? new Dictionary<string, List<string>>();
 
@@ -455,27 +484,6 @@ namespace OElite.Restme
             AddHeader("Authorization", $"{authTypePrefix}{token}");
         }
 
-        public T? HttpRequest<T>(HttpMethod method, string? relativeUrlPath = null)
-        {
-            return HttpRequestAsync<T>(method, relativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
-        }
-
-        public Task<T?> HttpRequestAsync<T>(HttpMethod method, string? relativePath = null)
-        {
-            switch (CurrentMode)
-            {
-                case RestMode.Http:
-                case RestMode.HttpRest:
-                    return Task.Run(() =>
-                        RestmeHttpExtensions.HttpRequestAsync<T>(this, method, relativePath)
-                            .WaitAndGetResult(Configuration.DefaultTimeout));
-                case RestMode.Azure:
-                case RestMode.Redis:
-                default:
-                    throw new NotSupportedException(
-                        "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
-            }
-        }
 
         #region GET
 
@@ -500,7 +508,12 @@ namespace OElite.Restme
                 {
                     case RestMode.Http:
                     case RestMode.HttpRest:
-                        return this.HttpGetAsync<T>(keyOrRelativeUrlPath)
+                        var httpProvider = GetProvider<IHttpProvider>();
+                        if (httpProvider == null)
+                            throw new InvalidOperationException("HTTP provider not available for HTTP operations.");
+
+                        var context = CreateHttpRequestContext();
+                        return httpProvider.GetAsync<T>(keyOrRelativeUrlPath, ObjAsParam)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
 
                     case RestMode.Azure:
@@ -574,7 +587,11 @@ namespace OElite.Restme
                 {
                     case RestMode.Http:
                     case RestMode.HttpRest:
-                        return HttpRequestAsync<T>(HttpMethod.Put, keyOrRelativeUrlPath)
+                        var httpProvider = GetProvider<IHttpProvider>();
+                        if (httpProvider == null)
+                            throw new InvalidOperationException("HTTP provider not available for HTTP operations.");
+
+                        return httpProvider.PutAsync<T>(keyOrRelativeUrlPath, ObjAsParam, expiryInMinutes)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
 
                     case RestMode.Azure:
@@ -650,7 +667,11 @@ namespace OElite.Restme
                 {
                     case RestMode.Http:
                     case RestMode.HttpRest:
-                        return HttpRequestAsync<T>(HttpMethod.Delete, keyOrRelativeUrlPath)
+                        var httpProvider = GetProvider<IHttpProvider>();
+                        if (httpProvider == null)
+                            throw new InvalidOperationException("HTTP provider not available for HTTP operations.");
+
+                        return httpProvider.DeleteAsync<T>(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
 
                     case RestMode.Azure:
@@ -728,9 +749,13 @@ namespace OElite.Restme
                 {
                     case RestMode.Http:
                     case RestMode.HttpRest:
+                        var httpProvider = GetProvider<IHttpProvider>();
+                        if (httpProvider == null)
+                            throw new InvalidOperationException("HTTP provider not available for HTTP operations.");
+
                         if (dataObject != null)
                             ObjAsParam = dataObject;
-                        return HttpRequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath)
+                        return httpProvider.PostAsync<T>(keyOrRelativeUrlPath, ObjAsParam, expiryInMinutes)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
 
                     case RestMode.Azure:
@@ -870,6 +895,92 @@ namespace OElite.Restme
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Create HTTP request context from current Rest state
+        /// </summary>
+        /// <returns>HttpRequestContext with current Rest configuration</returns>
+        private HttpRequestContext CreateHttpRequestContext()
+        {
+            return new HttpRequestContext
+            {
+                BaseUri = BaseUri,
+                Parameters = Params ?? new Dictionary<string, string>(),
+                Headers = Headers ?? new Dictionary<string, List<string>>(),
+                DataObject = ObjAsParam,
+                TimeoutMs = Configuration.DefaultTimeout
+            };
+        }
+
+        /// <summary>
+        /// Check if a cached provider is disposed or unusable
+        /// </summary>
+        /// <param name="provider">The provider to check</param>
+        /// <returns>True if the provider is disposed or unusable, false if still usable</returns>
+        private bool IsProviderDisposedOrUnusable(IRestmeProvider provider)
+        {
+            if (provider == null)
+                return true;
+
+            try
+            {
+                // Test if provider is still usable by accessing a safe property first
+                var providerName = provider.ProviderName;
+                var capabilities = provider.Capabilities;
+
+                // For providers that implement specific capabilities, try to perform a lightweight operation
+                // that would fail if the underlying resources are disposed
+                if (provider is IQueueProvider queueProvider)
+                {
+                    // Try to declare a temporary queue to test if the connection is still alive
+                    // This will throw an exception if the provider is disposed
+                    var testTask = queueProvider.DeclareQueueAsync($"disposal-test-{Guid.NewGuid():N}",
+                        isDurable: false, isExclusive: true, autoDelete: true);
+
+                    // Use a very short timeout to avoid hanging
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+                    testTask.Wait(cts.Token);
+                }
+                // Add similar checks for other provider types as needed
+                // else if (provider is IStorageProvider storageProvider) { ... }
+                // else if (provider is ISearchProvider searchProvider) { ... }
+
+                return false; // Provider is still usable
+            }
+            catch (ObjectDisposedException)
+            {
+                return true;
+            }
+            catch (NullReferenceException)
+            {
+                return true;
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("disposed") || ex.Message.Contains("closed"))
+            {
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout occurred, which suggests the provider may be hanging or disposed
+                return true;
+            }
+            catch (AggregateException ex) when (ex.InnerExceptions.Any(inner =>
+                                                    inner is ObjectDisposedException ||
+                                                    inner is InvalidOperationException ioe &&
+                                                    (ioe.Message.Contains("disposed") ||
+                                                     ioe.Message.Contains("closed")) ||
+                                                    inner is OperationCanceledException))
+            {
+                return true;
+            }
+            catch
+            {
+                // Any other unexpected exception suggests the provider is unusable
+                Logger?.LogWarning("Provider {ProviderType} threw unexpected exception during disposal check",
+                    provider.GetType().Name);
+                return true;
+            }
         }
 
         #endregion

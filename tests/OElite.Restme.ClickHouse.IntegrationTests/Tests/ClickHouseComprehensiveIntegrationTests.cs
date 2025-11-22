@@ -46,10 +46,9 @@ public class ClickHouseComprehensiveIntegrationTests : ClickHouseTestBase
     {
         // Arrange
         var factory = new ClickHouseServiceFactory();
-        var config = new RestConfig
+        var config = new RestConfig(RestMode.ClickHouse)
         {
-            ConnectionString = "clickhouse://localhost:8123/default",
-            OperationMode = RestMode.ClickHouse
+            ConnectionString = "clickhouse://localhost:8123/default"
         };
 
         // Act
@@ -378,7 +377,8 @@ public class ClickHouseComprehensiveIntegrationTests : ClickHouseTestBase
         insertTime.Should().BeLessThan(TimeSpan.FromSeconds(30));
         queryTime.Should().BeLessThan(TimeSpan.FromSeconds(10));
 
-        _output.WriteLine($"✅ Performance test passed - Insert: {insertTime.TotalMilliseconds}ms, Query: {queryTime.TotalMilliseconds}ms");
+        _output.WriteLine(
+            $"✅ Performance test passed - Insert: {insertTime.TotalMilliseconds}ms, Query: {queryTime.TotalMilliseconds}ms");
     }
 
     #endregion
@@ -402,8 +402,8 @@ public class ClickHouseComprehensiveIntegrationTests : ClickHouseTestBase
     public async Task InvalidConnectionString_ShouldThrowMeaningfulException()
     {
         // Act & Assert - ClickHouse should throw HttpRequestException for connection errors
-        var invalidRest = new Rest("clickhouse://invalid-host:8123/test",
-            new RestConfig { OperationMode = RestMode.ClickHouse });
+        var invalidRest = new Rest(new RestConfig(RestMode.ClickHouse)
+            { ConnectionString = "clickhouse://invalid-host:8123/test" });
 
         var exception = await Assert.ThrowsAsync<HttpRequestException>(async () =>
             await invalidRest.QueryAsync<UserEvent>("SELECT 1"));

@@ -33,10 +33,5 @@ namespace OElite.Restme.Abstractions
         /// Set expiry for existing key
         /// </summary>
         Task<bool> SetExpiryAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Get original data from ResponseMessage wrapper
-        /// </summary>
-        T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class;
     }
 }

@@ -55,11 +55,13 @@ public abstract class ClickHouseTestBase : IAsyncLifetime
 
         // Configure Rest with ClickHouse using the container's connection string with authentication
         var mappedPort = _clickHouseContainer.GetMappedPublicPort(8123);
-        var clickHouseConnectionString = $"clickhouse://test_user:test_password@localhost:{mappedPort}/{TestDatabaseName}";
+        var clickHouseConnectionString =
+            $"clickhouse://test_user:test_password@localhost:{mappedPort}/{TestDatabaseName}";
 
-        Rest = new Rest(clickHouseConnectionString, new RestConfig
+        Rest = new Rest(clickHouseConnectionString, new RestConfig(RestMode.ClickHouse)
         {
-            OperationMode = RestMode.ClickHouse
+            ConnectionString = clickHouseConnectionString,
+            InstanceName = TestDatabaseName
         });
 
         Logger.LogInformation("Rest configured with connection: {ConnectionString}", clickHouseConnectionString);
@@ -81,7 +83,8 @@ public abstract class ClickHouseTestBase : IAsyncLifetime
         {
             // Use the same authentication configuration as our Rest client
             var mappedPort = _clickHouseContainer.GetMappedPublicPort(8123);
-            connectionString = $"Host=localhost;Port={mappedPort};Database={TestDatabaseName};Username=test_user;Password=test_password;Compress=false";
+            connectionString =
+                $"Host=localhost;Port={mappedPort};Database={TestDatabaseName};Username=test_user;Password=test_password;Compress=false";
         }
 
         await using var connection = new ClickHouseConnection(connectionString);

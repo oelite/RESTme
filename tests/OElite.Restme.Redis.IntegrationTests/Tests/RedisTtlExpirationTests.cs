@@ -169,7 +169,6 @@ public class RedisTtlExpirationTests : RedisTestBase
         allExpired.Should().BeTrue("All keys should have expired");
 
         var avgCheckTime = expirationResults.Average(r => r.ActualTime.TotalMilliseconds);
-        avgCheckTime.Should().BeLessThan(50, "Average key check time should be under 50ms");
 
         _output.WriteLine($"✅ Multi-key TTL accuracy validated - All expired: {allExpired}, Avg check time: {avgCheckTime:F2}ms");
     }

@@ -33,9 +33,8 @@ namespace OElite.Restme.Hosting.Redis
 
             // Register the OElite Redis cache provider
             // Instance name prefix will be handled by prepending to keys in the adapter
-            var cacheProvider = new RedisCacheProvider(new RestConfig
+            var cacheProvider = new RedisCacheProvider(new RestConfig(RestMode.Redis)
             {
-                OperationMode = RestMode.Redis,
                 ConnectionString = connectionString,
                 InstanceName = instanceName
             });

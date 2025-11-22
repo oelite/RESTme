@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using OElite.Restme.Base;
+using OElite.Restme.Utils;
 
 namespace OElite.Restme.Abstractions;
 
@@ -21,7 +22,7 @@ internal class DefaultHttpProvider : IHttpProvider
     /// <summary>
     /// Configuration used to create this provider
     /// </summary>
-    public RestConfig Configuration => new RestConfig();
+    public RestConfig Configuration => new (RestMode.Http);
 
     /// <summary>
     /// Capabilities supported by this provider
@@ -37,6 +38,16 @@ internal class DefaultHttpProvider : IHttpProvider
     public void Dispose()
     {
         _httpProvider.Dispose();
+    }
+
+    public Task<T?> HttpRequestAsync<T>(HttpMethod method, string? keyOrRelativePath, HttpRequestContext context)
+    {
+        return _httpProvider.HttpRequestAsync<T>(method, keyOrRelativePath, context);
+    }
+
+    public Task<HttpResponseMessage?> HttpRequestFullAsync<T>(HttpMethod method, string? keyOrRelativePath, HttpRequestContext context)
+    {
+        return _httpProvider.HttpRequestFullAsync<T>(method, keyOrRelativePath, context);
     }
 
     public Task<T?> HttpRequestAsync<T>(HttpMethod method, string? keyOrRelativePath = null, object? dataObject = null)
@@ -67,5 +78,15 @@ internal class DefaultHttpProvider : IHttpProvider
     public Task<T?> DeleteAsync<T>(string? keyOrRelativePath = null)
     {
         return _httpProvider.DeleteAsync<T>(keyOrRelativePath);
+    }
+
+    public Task<HttpResponseMessage<T>?> HttpRequestFullWithDetailsAsync<T>(HttpMethod method, string? keyOrRelativePath, HttpRequestContext context)
+    {
+        return _httpProvider.HttpRequestFullWithDetailsAsync<T>(method, keyOrRelativePath, context);
+    }
+
+    public Task<HttpResponseMessage<T>?> HttpRequestFullWithDetailsAsync<T>(HttpMethod method, string? keyOrRelativePath = null, object? dataObject = null)
+    {
+        return _httpProvider.HttpRequestFullWithDetailsAsync<T>(method, keyOrRelativePath, dataObject);
     }
 }

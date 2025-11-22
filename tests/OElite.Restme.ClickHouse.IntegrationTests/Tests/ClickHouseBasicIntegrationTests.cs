@@ -46,10 +46,9 @@ public class ClickHouseBasicIntegrationTests : ClickHouseTestBase
     {
         // Arrange
         var factory = new ClickHouseServiceFactory();
-        var config = new RestConfig
+        var config = new RestConfig(RestMode.ClickHouse)
         {
-            ConnectionString = "clickhouse://localhost:8123/default",
-            OperationMode = RestMode.ClickHouse
+            ConnectionString = "clickhouse://localhost:8123/default"
         };
 
         // Act

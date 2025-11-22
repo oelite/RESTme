@@ -46,10 +46,9 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
     {
         // Arrange
         var factory = new KafkaServiceFactory();
-        var config = new RestConfig
+        var config = new RestConfig(RestMode.Kafka)
         {
-            ConnectionString = "kafka://localhost:9092",
-            OperationMode = RestMode.Kafka
+            ConnectionString = "kafka://localhost:9092"
         };
 
         // Act
@@ -69,7 +68,7 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
         var factory = new KafkaServiceFactory();
 
         // Act
-        var cacheProvider = factory.CreateCacheProvider(new RestConfig());
+        var cacheProvider = factory.CreateCacheProvider(new RestConfig(RestMode.Kafka));
 
         // Assert
         cacheProvider.Should().BeNull();
@@ -154,7 +153,8 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
                 lock (receivedMessages)
                 {
                     receivedMessages.Add(msg);
-                    _output.WriteLine($"Received message {receivedMessages.Count}/{messageCount} from user: {msg.UserId}");
+                    _output.WriteLine(
+                        $"Received message {receivedMessages.Count}/{messageCount} from user: {msg.UserId}");
                 }
 
                 // Stop after receiving all messages
@@ -422,7 +422,8 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
         stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(30));
         throughput.Should().BeGreaterThan(100); // At least 100 messages/second
 
-        _output.WriteLine($"✅ High throughput test passed: {messageCount} messages in {stopwatch.Elapsed.TotalMilliseconds:F0}ms");
+        _output.WriteLine(
+            $"✅ High throughput test passed: {messageCount} messages in {stopwatch.Elapsed.TotalMilliseconds:F0}ms");
         _output.WriteLine($"   Throughput: {throughput:F0} messages/second");
     }
 
@@ -434,7 +435,8 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
         const int concurrentProducers = 10;
         const int messagesPerProducer = 50;
 
-        _output.WriteLine($"Performance test: {concurrentProducers} concurrent producers, {messagesPerProducer} messages each...");
+        _output.WriteLine(
+            $"Performance test: {concurrentProducers} concurrent producers, {messagesPerProducer} messages each...");
 
         var producerTasks = Enumerable.Range(1, concurrentProducers)
             .Select(async producerId =>
@@ -464,7 +466,8 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
         stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(60));
 
         var throughput = totalMessages / stopwatch.Elapsed.TotalSeconds;
-        _output.WriteLine($"✅ Concurrent publishing test passed: {totalMessages} messages in {stopwatch.Elapsed.TotalMilliseconds:F0}ms");
+        _output.WriteLine(
+            $"✅ Concurrent publishing test passed: {totalMessages} messages in {stopwatch.Elapsed.TotalMilliseconds:F0}ms");
         _output.WriteLine($"   Throughput: {throughput:F0} messages/second");
     }
 
@@ -528,7 +531,10 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
             await Rest.SubscribeAsync<UserActivityMessage>(
                 topicName,
                 invalidConsumerGroup,
-                async (msg) => { /* Do nothing */ },
+                async (msg) =>
+                {
+                    /* Do nothing */
+                },
                 cancellationToken: cts.Token);
         });
 

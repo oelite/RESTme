@@ -47,9 +47,8 @@ public abstract class OpenSearchTestBase : IAsyncLifetime
 
         // Configure Rest with OpenSearch with authentication and explicit mode
         Logger.LogInformation("Container connection string: {ConnectionString}", connectionString);
-        Rest = new Rest(connectionString, new RestConfig
+        Rest = new Rest(connectionString, new RestConfig(RestMode.OpenSearch)
         {
-            OperationMode = RestMode.OpenSearch,
             AuthKey = "admin",
             AuthSecret = "admin"
         });

@@ -66,7 +66,7 @@ var rest = new Rest("https://s3.amazonaws.com",
         AuthKey = "YOUR_ACCESS_KEY",
         AuthSecret = "YOUR_SECRET_KEY",
         Region = "us-west-2",
-        BucketName = "my-bucket"
+        InstanceName = "my-bucket"
     });
 
 // Get providers using generic factory pattern
@@ -86,7 +86,7 @@ var config = new RestConfig
     AuthSecret = "YOUR_SECRET_KEY",
     Endpoint = "https://s3.amazonaws.com",
     Region = "us-west-2",
-    BucketName = "my-bucket"
+    InstanceName = "my-bucket"
 };
 var directProvider = new S3StorageProvider("s3://", config);
 ```
@@ -196,7 +196,7 @@ var config = new RestConfig
     AuthSecret = "SECRET_KEY",       // S3 Secret Access Key
     Endpoint = "https://s3.amazonaws.com", // S3 endpoint
     Region = "us-east-1",            // AWS region
-    BucketName = "my-bucket"         // S3 bucket name
+    InstanceName = "my-bucket"       // S3 bucket name
 };
 var storageProvider = new S3StorageProvider("s3://", config);
 ```
@@ -286,7 +286,7 @@ var rest = new Rest("https://s3.amazonaws.com", new RestConfig
     AuthKey = "access-key",
     AuthSecret = "secret-key",
     Region = "us-west-2",
-    BucketName = "my-bucket"
+    InstanceName = "my-bucket"
 });
 
 // Get named providers for different purposes
@@ -376,21 +376,21 @@ public class MultiBucketStorageService
         var productionRest = new Rest("https://s3.amazonaws.com", new RestConfig
         {
             OperationMode = RestMode.S3,
-            BucketName = "production-data",
+            InstanceName = "production-data",
             Region = "us-west-2"
         });
 
         var stagingRest = new Rest("https://s3.amazonaws.com", new RestConfig
         {
             OperationMode = RestMode.S3,
-            BucketName = "staging-data",
+            InstanceName = "staging-data",
             Region = "us-east-1"
         });
 
         var backupRest = new Rest("https://s3.amazonaws.com", new RestConfig
         {
             OperationMode = RestMode.S3,
-            BucketName = "backup-storage",
+            InstanceName = "backup-storage",
             Region = "eu-west-1"
         });
 
@@ -601,6 +601,50 @@ public class TieredStorageService
     }
 }
 ```
+
+## Cache Expiry Validation
+
+### S3 Cache Expiry Management
+
+S3CacheProvider implements comprehensive expiry validation using S3 object metadata to ensure cached data expires correctly:
+
+```csharp
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+
+// Store with expiry - metadata automatically added
+await cacheProvider.SetAsync("user:123", userData, TimeSpan.FromHours(2));
+
+// Retrieval automatically validates expiry
+var user = await cacheProvider.GetAsync<User>("user:123"); // null if expired
+
+// Check existence respects expiry
+var exists = await cacheProvider.ExistsAsync("user:123"); // false if expired
+
+// Update expiry for existing object
+await cacheProvider.SetExpiryAsync("user:123", TimeSpan.FromMinutes(30));
+```
+
+### How S3 Expiry Works
+
+1. **Metadata Storage**: Expiry timestamps stored as `x-amz-meta-expiry-utc` in ISO 8601 format
+2. **Automatic Validation**: `GetAsync` and `ExistsAsync` check expiry before returning data
+3. **Background Cleanup**: Expired objects are automatically removed asynchronously
+4. **Fail-Safe Design**: Cleanup failures don't affect cache operations
+
+### Expiry vs TTL Behavior
+
+| Provider | Expiry Mechanism | Automatic Cleanup |
+|----------|------------------|-------------------|
+| MemoryCache | In-memory tuple with timer | ✅ Timer-based |
+| RedisCache | Native Redis TTL | ✅ Redis-managed |
+| S3Cache | Object metadata validation | ✅ Background removal |
+
+### Direct Storage Benefits
+
+- **Zero Data Tampering**: User data stored exactly as provided
+- **Provider-Optimized**: Each provider uses its native expiry features
+- **Consistent API**: Same expiry behavior across all cache providers
+- **Performance Optimized**: No wrapper serialization/deserialization overhead
 
 ## Performance Considerations
 

@@ -66,7 +66,7 @@ var cacheProvider = rest.GetProvider<ICacheProvider>(); // Returns null if not a
 if (httpProvider != null)
 {
     // Use HTTP provider
-    var response = await rest.GetAsync<ApiResponse>("/users/123");
+    var response = await httpProvider.GetAsync<ApiResponse>("/users/123");
 }
 ```
 
@@ -83,20 +83,27 @@ var apiClient = new Rest("https://api.example.com",
         OperationMode = RestMode.Http
     });
 
+// Get HTTP provider
+var httpProvider = apiClient.GetProvider<IHttpProvider>();
+
 // GET request
-var response = await apiClient.GetAsync<ApiResponse>("/users/123");
+var response = await httpProvider.GetAsync<ApiResponse>("/users/123");
 
 // POST request
 var createUser = new CreateUserRequest { Name = "John", Email = "john@example.com" };
-var newUser = await apiClient.PostAsync<User>("/users", createUser);
+var newUser = await httpProvider.PostAsync<User>("/users", createUser);
 
-// PUT request with custom headers
-var headers = new Dictionary<string, string>
+// PUT request with HttpRequestContext
+var context = new HttpRequestContext
 {
-    ["Authorization"] = "Bearer your-token",
-    ["Content-Type"] = "application/json"
+    Headers = new Dictionary<string, List<string>>
+    {
+        ["Authorization"] = new List<string> { "Bearer your-token" },
+        ["Content-Type"] = new List<string> { "application/json" }
+    },
+    DataObject = updateData
 };
-var updatedUser = await apiClient.PutAsync<User>("/users/123", updateData, headers);
+var updatedUser = await httpProvider.HttpRequestAsync<User>(HttpMethod.Put, "/users/123", context);
 ```
 
 ### 4. Redis Cache Operations
@@ -121,9 +128,9 @@ if (cacheProvider != null)
     await cacheProvider.RemoveAsync("user:123");
 }
 
-// Or use convenience methods (backward compatible)
-await redisRest.Put("user:123", userObject, TimeSpan.FromMinutes(30));
-var cachedUser = await redisRest.Get<User>("user:123");
+// Or use convenience methods through provider (recommended)
+await cacheProvider.SetAsync("user:123", userObject, TimeSpan.FromMinutes(30));
+var cachedUser = await cacheProvider.GetAsync<User>("user:123");
 ```
 
 ### 5. S3 Storage Operations
@@ -391,7 +398,8 @@ var client = new Rest("https://api.example.com",
 
 try
 {
-    var result = await client.GetAsync<ApiResponse>("/data");
+    var httpProvider = client.GetProvider<IHttpProvider>();
+    var result = await httpProvider.GetAsync<ApiResponse>("/data");
 }
 catch (RestmeTimeoutException ex)
 {
@@ -438,7 +446,14 @@ var customHeaders = new Dictionary<string, string>
     ["X-Request-ID"] = Guid.NewGuid().ToString()
 };
 
-var response = await client.GetAsync<ApiResponse>("/protected-data", customHeaders);
+var httpProvider = client.GetProvider<IHttpProvider>();
+var context = new HttpRequestContext
+{
+    Headers = customHeaders.ToDictionary(
+        kvp => kvp.Key,
+        kvp => new List<string> { kvp.Value })
+};
+var response = await httpProvider.HttpRequestAsync<ApiResponse>(HttpMethod.Get, "/protected-data", context);
 ```
 
 ### Streaming and Large File Handling

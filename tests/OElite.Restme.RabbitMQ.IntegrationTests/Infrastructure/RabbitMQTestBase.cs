@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using OElite;
 using OElite.Restme;
 using OElite.Restme.Abstractions;
+using RabbitMQ.Client;
 using Testcontainers.RabbitMq;
 using Xunit;
 
@@ -38,22 +40,13 @@ public abstract class RabbitMQTestBase : IAsyncLifetime
                    .SetMinimumLevel(LogLevel.Information));
         Logger = _loggerFactory.CreateLogger(GetType());
 
-        // Initialize RabbitMQ test container with enterprise configuration
+        // Initialize RabbitMQ test container with minimal configuration
         _rabbitMqContainer = new RabbitMqBuilder()
-            .WithImage("rabbitmq:3.13-management")
-            .WithUsername("testuser")
-            .WithPassword("testpass")
-            // Expose both AMQP and management ports
+            .WithImage("rabbitmq:3.13-management")  // Use lightweight Alpine
             .WithPortBinding(5672, true)
-            .WithPortBinding(15672, true)
-            // Wait for RabbitMQ to be ready
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
-            // Add health check configuration
-            .WithEnvironment("RABBITMQ_DEFAULT_USER", "testuser")
-            .WithEnvironment("RABBITMQ_DEFAULT_PASS", "testpass")
-            .WithEnvironment("RABBITMQ_DEFAULT_VHOST", "/")
-            // Enable management plugin for monitoring
-            .WithEnvironment("RABBITMQ_ENABLED_PLUGINS", "rabbitmq_management")
+            // Very basic wait strategy
+            .WithWaitStrategy(Wait.ForUnixContainer()
+                .UntilExternalTcpPortIsAvailable(5672))
             .Build();
 
         Logger.LogInformation("RabbitMQ test container initialized with management interface");
@@ -66,8 +59,9 @@ public abstract class RabbitMQTestBase : IAsyncLifetime
             Logger.LogInformation("Starting RabbitMQ container...");
             await _rabbitMqContainer.StartAsync();
 
-            // Wait a bit for RabbitMQ to fully initialize
-            await Task.Delay(2000);
+            // Wait longer for RabbitMQ to fully initialize
+            Logger.LogInformation("Waiting for RabbitMQ service to be ready...");
+            await Task.Delay(5000);
 
             var connectionString = _rabbitMqContainer.GetConnectionString();
             Logger.LogInformation("RabbitMQ container started: {ConnectionString}", connectionString);
@@ -78,19 +72,58 @@ public abstract class RabbitMQTestBase : IAsyncLifetime
                 throw new InvalidOperationException("RabbitMQ container failed to start properly");
             }
 
+            // Test connection to RabbitMQ with retry logic
+            await TestRabbitMQConnection(connectionString);
+
             // Configure Rest with RabbitMQ - ensure proper mode setting
-            Rest = new Rest(connectionString, new RestConfig
+            Rest = new Rest(connectionString, new RestConfig(RestMode.RabbitMq)
             {
-                OperationMode = RestMode.RabbitMq,
-                AuthKey = "testuser",
-                AuthSecret = "testpass"
+                AuthKey = "rabbitmq",
+                AuthSecret = "rabbitmq"
             });
 
+            Logger.LogInformation("Rest configuration created with mode: {Mode}, Connection: {Connection}",
+                Rest.Configuration.OperationMode, Rest.Configuration.ConnectionString);
+
             // Get and validate QueueProvider
+            Logger.LogInformation("About to get QueueProvider for mode: {Mode}", Rest.Configuration.OperationMode);
             QueueProvider = Rest.GetProvider<IQueueProvider>();
+            Logger.LogInformation("QueueProvider retrieved: {Provider}", QueueProvider?.GetType().Name ?? "NULL");
+
             if (QueueProvider == null)
             {
-                throw new InvalidOperationException("Failed to initialize RabbitMQ QueueProvider");
+                // Try to force factory loading by checking if RabbitMQ assembly is loaded
+                var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+                var rabbitMQAssemblies = loadedAssemblies.Where(a => a.FullName?.Contains("OElite.Restme.RabbitMQ") == true).ToList();
+                Logger.LogInformation("RabbitMQ assemblies loaded: {Assemblies}", string.Join(", ", rabbitMQAssemblies.Select(a => a.GetName().Name)));
+
+                // Check specifically for the provider assembly
+                var providerAssembly = loadedAssemblies.FirstOrDefault(a => a.FullName?.Contains("OElite.Restme.RabbitMQ") == true && !a.FullName.Contains("IntegrationTests"));
+                Logger.LogInformation("RabbitMQ provider assembly: {Assembly}", providerAssembly?.GetName().Name ?? "NOT FOUND");
+
+                // Check if the factory is registered
+                var factory = ServiceLocator.GetFactory("rabbitmq");
+                Logger.LogInformation("RabbitMQ factory found: {Factory}", factory?.GetType().Name ?? "NOT FOUND");
+
+                if (factory != null)
+                {
+                    // Test if factory can create IQueueProvider
+                    var canCreateQueue = factory.CanCreateProvider<IQueueProvider>();
+                    Logger.LogInformation("Factory can create IQueueProvider: {CanCreate}", canCreateQueue);
+
+                    // Try to create provider directly
+                    try
+                    {
+                        var provider = factory.CreateProvider<IQueueProvider>(Rest.Configuration);
+                        Logger.LogInformation("Direct factory provider creation: {Provider}", provider?.GetType().Name ?? "NULL");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, "Factory provider creation failed");
+                    }
+                }
+
+                throw new InvalidOperationException($"Failed to initialize RabbitMQ QueueProvider. Mode: {Rest.Configuration.OperationMode}, Connection: {connectionString}");
             }
 
             Logger.LogInformation("Rest instance created successfully. QueueProvider: {ProviderType}",
@@ -184,6 +217,46 @@ public abstract class RabbitMQTestBase : IAsyncLifetime
         {
             Logger.LogError(ex, "RabbitMQ connection validation failed");
             throw new InvalidOperationException("Failed to validate RabbitMQ connection", ex);
+        }
+    }
+
+    /// <summary>
+    /// Test RabbitMQ connection with retry logic
+    /// </summary>
+    protected virtual async Task TestRabbitMQConnection(string connectionString)
+    {
+        const int maxRetries = 5;
+        var retryDelay = TimeSpan.FromSeconds(2);
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                Logger.LogInformation("Testing RabbitMQ connection (attempt {Attempt}/{MaxRetries})", attempt, maxRetries);
+
+                var factory = new global::RabbitMQ.Client.ConnectionFactory();
+                factory.Uri = new Uri(connectionString);
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                using var connection = await factory.CreateConnectionAsync(cancellationToken: cts.Token);
+                using var channel = await connection.CreateChannelAsync(cancellationToken: cts.Token);
+
+                Logger.LogInformation("✅ RabbitMQ connection test successful");
+                return;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("❌ RabbitMQ connection test failed (attempt {Attempt}/{MaxRetries}): {Message}",
+                    attempt, maxRetries, ex.Message);
+
+                if (attempt == maxRetries)
+                {
+                    throw new InvalidOperationException($"Failed to connect to RabbitMQ after {maxRetries} attempts: {ex.Message}", ex);
+                }
+
+                await Task.Delay(retryDelay);
+                retryDelay = TimeSpan.FromMilliseconds(retryDelay.TotalMilliseconds * 1.5); // Exponential backoff
+            }
         }
     }
 

@@ -20,60 +20,43 @@ public static class CacheProviderExtensions
 
     public static async Task<bool> ExpiremeAsync(this ICacheProvider cacheProvider, string? uid, bool invalidateGracePeriod = true, CancellationToken cancellationToken = default)
     {
-        var obj = await cacheProvider.GetAsync<ResponseMessage>(uid, cancellationToken);
-        if (obj is not { Data: not null }) return false;
+        if (string.IsNullOrEmpty(uid))
+            return false;
 
-        if (invalidateGracePeriod)
-        {
-            await cacheProvider.RemoveAsync(uid, cancellationToken);
-        }
-        else
-        {
-            obj.ExpiryOnUtc = DateTime.UtcNow.AddMilliseconds(-1);
-            if (invalidateGracePeriod)
-            {
-                obj.GraceTillUtc = obj.ExpiryOnUtc;
-            }
+        // Check if the key exists
+        var exists = await cacheProvider.ExistsAsync(uid, cancellationToken);
+        if (!exists)
+            return false;
 
-            await cacheProvider.SetAsync(uid, obj, cancellationToken: cancellationToken);
-        }
-
+        // With direct data storage, we simply remove the cache entry
+        // The gracePeriod parameter is ignored since we no longer have ResponseMessage wrapper
+        await cacheProvider.RemoveAsync(uid, cancellationToken);
         return true;
     }
 
 
-    public static async Task<ResponseMessage?> CachemeAsync(this ICacheProvider cacheProvider, string? uid, object data,
+    public static async Task<bool> CachemeAsync<T>(this ICacheProvider cacheProvider, string? uid, T data,
         int expiryInSeconds = -1,
-        int graceInSeconds = -1, CancellationToken cancellationToken = default)
+        int graceInSeconds = -1, CancellationToken cancellationToken = default) where T : class
     {
-        if (!uid.IsNotNullOrEmpty())
+        if (!uid.IsNotNullOrEmpty() || data == null)
         {
-            return null;
+            return false;
         }
-
-        var expiry = expiryInSeconds > 0
-            ? DateTime.UtcNow.AddSeconds(expiryInSeconds)
-            : DateTime.UtcNow.AddSeconds(DefaultCacheExpiryInSeconds);
-        var grace = graceInSeconds > 0 ? expiry.AddSeconds(graceInSeconds) : expiry;
-        var graceInMinutes = (grace - DateTime.UtcNow).Minutes;
 
         try
         {
-            var responseMessage = new ResponseMessage(data)
-            {
-                ExpiryOnUtc = expiry,
-                GraceTillUtc = grace
-            };
+            var expiry = expiryInSeconds > 0
+                ? TimeSpan.FromSeconds(expiryInSeconds)
+                : TimeSpan.FromSeconds(DefaultCacheExpiryInSeconds);
 
-            var expiryTimeSpan = graceInMinutes > 0 ? (TimeSpan?)TimeSpan.FromMinutes(graceInMinutes) : null;
-            var success = await cacheProvider.SetAsync(uid, responseMessage, expiryTimeSpan, cancellationToken);
-            var result = success ? responseMessage : null;
-
-            return result;
+            // Note: graceInSeconds is ignored in direct data storage - provider-level expiry handles this
+            var success = await cacheProvider.SetAsync(uid, data, expiry, cancellationToken);
+            return success;
         }
-        catch (Exception? ex)
+        catch (Exception ex)
         {
-            return null;
+            return false;
         }
     }
 
@@ -82,74 +65,61 @@ public static class CacheProviderExtensions
         Func<T, Task<bool>>? additionalValidation = null,
         Func<Task<T>>? refreshAction = null, CancellationToken cancellationToken = default) where T : class?
     {
-        var obj = await cacheProvider.GetAsync<ResponseMessage>(uid, cancellationToken);
-        if (obj is null)
+        if (string.IsNullOrEmpty(uid))
         {
-            if (refreshAction == null) return null;
-            return await refreshAction();
+            return refreshAction != null ? await refreshAction() : null;
         }
 
-        var result = cacheProvider.GetOriginalData<T>(obj);
+        var result = await cacheProvider.GetAsync<T>(uid, cancellationToken);
+        if (result is null)
+        {
+            return refreshAction != null ? await refreshAction() : null;
+        }
 
+        // Run additional validation if provided
         var customValidationResult = additionalValidation == null || await additionalValidation.Invoke(result);
-
         if (!customValidationResult)
         {
-            if (refreshAction == null) return null;
-            return await refreshAction();
+            return refreshAction != null ? await refreshAction() : null;
         }
 
-        if (returnExpired)
-        {
-            return result;
-        }
-
-        if (returnInGrace && obj.GraceTillUtc >= DateTime.UtcNow)
-        {
-            if (obj.ExpiryOnUtc <= DateTime.UtcNow && refreshAction != null)
-            {
-                refreshAction().RunInBackgroundAndForget();
-            }
-
-            return result;
-        }
-
-        if (obj.ExpiryOnUtc >= DateTime.UtcNow) return result;
-
-        return refreshAction != null ? await refreshAction() : null;
+        // With direct data storage, provider-level expiry validation handles expiry checks
+        // returnExpired and returnInGrace parameters are simplified since we don't have ResponseMessage wrapper
+        return result;
     }
 
 
     public static Task<T?> FindmeAsync<T>(this ICacheProvider cacheProvider, object queryObject, bool returnExpired = false,
         bool returnInGrace = true,
         Func<T, Task<bool>>? additionalValidation = null,
-        Func<Task<T>>? refreshAction = null) where T : class?
+        Func<Task<T>>? refreshAction = null, CancellationToken cancellationToken = default) where T : class?
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
         var json = queryObject.JsonSerialize(serializeInResponseMessageWrapper: false);
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
         var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
 
-        return cacheProvider.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction);
+        return cacheProvider.FindmeAsync(md5, returnExpired, returnInGrace, additionalValidation, refreshAction, cancellationToken);
     }
 
-    public static Task<ResponseMessage?> CachemeAsync(this ICacheProvider cacheProvider, object queryObject, object data,
+    public static Task<bool> CachemeAsync<T>(this ICacheProvider cacheProvider, object queryObject, T data,
         int expiryInSeconds = -1,
-        int graceInSeconds = -1)
+        int graceInSeconds = -1, CancellationToken cancellationToken = default) where T : class
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
+        if (data == null) throw new ArgumentNullException(nameof(data));
         var json = queryObject.JsonSerialize(serializeInResponseMessageWrapper: false);
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
         var md5 = EncryptHelper.Md5Encrypt($"{data.GetType().Name}:{json}");
-        return cacheProvider.CachemeAsync(md5, data, expiryInSeconds, graceInSeconds);
+        return cacheProvider.CachemeAsync(md5, data, expiryInSeconds, graceInSeconds, cancellationToken);
     }
 
-    public static Task<bool> ExpiremeAsync<T>(this ICacheProvider cacheProvider, object queryObject, bool invalidateGracePeriod = true)
+    public static Task<bool> ExpiremeAsync<T>(this ICacheProvider cacheProvider, object queryObject, bool invalidateGracePeriod = true, CancellationToken cancellationToken = default)
     {
         if (queryObject == null) throw new ArgumentNullException(nameof(queryObject));
-        var json = queryObject.JsonSerialize();
+        var json = StringUtils.JsonSerialize(queryObject);
         if (json.IsNullOrEmpty()) throw new OEliteException("No valid query object identified");
         var md5 = EncryptHelper.Md5Encrypt($"{typeof(T).Name}:{json}");
-        return cacheProvider.ExpiremeAsync(md5, invalidateGracePeriod);
+        return cacheProvider.ExpiremeAsync(md5, invalidateGracePeriod, cancellationToken);
     }
 }

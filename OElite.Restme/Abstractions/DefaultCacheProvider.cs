@@ -17,7 +17,7 @@ public class DefaultCacheProvider : ICacheProvider
     /// <summary>
     /// Configuration used to create this provider
     /// </summary>
-    public RestConfig Configuration => new RestConfig();
+    public RestConfig Configuration => new(RestMode.Memory);
 
     /// <summary>
     /// Capabilities supported by this provider
@@ -51,10 +51,6 @@ public class DefaultCacheProvider : ICacheProvider
         throw new NotImplementedException("Redis provider not loaded. Please reference OElite.Restme.Redis package.");
     }
 
-    public T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class
-    {
-        return responseMessage?.GetOriginalData<T>();
-    }
 
     // Cancellation token overloads
     public Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class

@@ -41,36 +41,12 @@ namespace OElite.Restme.Abstractions
         public abstract void Dispose();
 
         /// <summary>
-        /// Common implementation for GetOriginalData method
-        /// </summary>
-        public virtual T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class
-        {
-            if (responseMessage?.Data == null)
-                return null;
-
-            try
-            {
-                if (responseMessage.Data is T directData)
-                    return directData;
-
-                if (responseMessage.Data is string jsonString)
-                    return jsonString.JsonDeserialize<T>();
-
-                return responseMessage.Data.JsonSerialize().JsonDeserialize<T>();
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
         /// Validates cache key input
         /// </summary>
         protected static void ValidateKey(string key, string operation)
         {
-            if (string.IsNullOrEmpty(key))
-                throw new ArgumentException($"Cache key cannot be null or empty for {operation}", nameof(key));
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException($"Cache key cannot be null, empty, or whitespace for {operation}", nameof(key));
         }
 
         /// <summary>

@@ -17,7 +17,7 @@ public class DefaultQueueProvider : IQueueProvider
     /// <summary>
     /// Configuration used to create this provider
     /// </summary>
-    public RestConfig Configuration => new RestConfig();
+    public RestConfig Configuration => new (RestMode.Memory);
 
     /// <summary>
     /// Capabilities supported by this provider
