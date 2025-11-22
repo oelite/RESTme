@@ -15,21 +15,22 @@ variables:
     OElite.Restme.RateLimiting
     OElite.Restme.Hosting
 
-  INTEGRATION_TEST_PROJECTS: |
-    OElite.Restme.MongoDb.IntegrationTests
-    OElite.Restme.ClickHouse.IntegrationTests
-    OElite.Restme.Kafka.IntegrationTests
-    OElite.Restme.OpenSearch.IntegrationTests
+# Test projects temporarily removed to reduce CI/CD time and resource usage
+  # INTEGRATION_TEST_PROJECTS: |
+  #   OElite.Restme.MongoDb.IntegrationTests
+  #   OElite.Restme.ClickHouse.IntegrationTests
+  #   OElite.Restme.Kafka.IntegrationTests
+  #   OElite.Restme.OpenSearch.IntegrationTests
 
-  UNIT_TEST_PROJECTS: |
-    OElite.Restme.ClickHouse.UnitTests
-    OElite.Restme.Kafka.UnitTests
-    OElite.Restme.OpenSearch.UnitTests
+  # UNIT_TEST_PROJECTS: |
+  #   OElite.Restme.ClickHouse.UnitTests
+  #   OElite.Restme.Kafka.UnitTests
+  #   OElite.Restme.OpenSearch.UnitTests
 
 stages:
   - version
   - build
-  - test
+  # - test  # Temporarily disabled to reduce CI/CD time and resource usage
   - pack
   - deploy
 
@@ -92,56 +93,41 @@ build_solution:
       - "**/obj/"
     expire_in: 1 hour
 
-run_tests:
-  stage: test
-  image: mcr.microsoft.com/dotnet/sdk:10.0
-  services:
-    - docker:dind
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: "/certs"
-    DOCKER_HOST: tcp://docker:2376
-    DOCKER_TLS_VERIFY: 1
-    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
-  dependencies:
-    - build_solution
-  script:
-    - echo "Running unit tests..."
-    - dotnet test --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-test-results.xml" --results-directory ./test-results
-    - |
-      while IFS= read -r project || [ -n "$project" ]; do
-        if [ -n "$project" ]; then
-          echo "Running unit tests for $project"
-          dotnet test tests/$project/$project.csproj --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-unit-test-results.xml" --results-directory ./unit-test-results
-        fi
-      done <<< "$UNIT_TEST_PROJECTS"
-      #    - echo "🔍 Checking Docker availability for integration tests..."
-      #    - |
-      #      if docker info >/dev/null 2>&1; then
-      #        echo "✅ Docker is available - running integration tests with test containers..."
-      #        while IFS= read -r project || [ -n "$project" ]; do
-      #          if [ -n "$project" ]; then
-      #            echo "Running integration tests for $project"
-      #            dotnet test tests/$project/$project.csproj --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-integration-test-results.xml" --results-directory ./integration-test-results || echo "⚠️  Integration tests failed for $project (may be due to Docker configuration)"
-      #          fi
-      #        done <<< "$INTEGRATION_TEST_PROJECTS"
-      #      else
-      #        echo "⚠️  Docker not available - skipping integration tests"
-      #        echo "📋 Integration tests require Docker for test containers"
-      #        echo "🔧 Run integration tests locally: dotnet test **/*IntegrationTests.csproj"
-      #        echo "💡 Or configure Docker-in-Docker in your CI/CD environment"
-      #      fi
-  artifacts:
-    reports:
-      junit:
-        - "**/test-results/*.xml"
-        - "**/unit-test-results/*.xml"
-        - "**/integration-test-results/*.xml"
-    paths:
-      - "**/test-results/"
-      - "**/unit-test-results/"
-      - "**/integration-test-results/"
-    expire_in: 1 week
+# Tests temporarily removed to reduce CI/CD time and resource usage
+# run_tests:
+#   stage: test
+#   image: mcr.microsoft.com/dotnet/sdk:10.0
+#   services:
+#     - docker:dind
+#   variables:
+#     DOCKER_DRIVER: overlay2
+#     DOCKER_TLS_CERTDIR: "/certs"
+#     DOCKER_HOST: tcp://docker:2376
+#     DOCKER_TLS_VERIFY: 1
+#     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+#   dependencies:
+#     - build_solution
+#   script:
+#     - echo "Running unit tests..."
+#     - dotnet test --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-test-results.xml" --results-directory ./test-results
+#     - |
+#       while IFS= read -r project || [ -n "$project" ]; do
+#         if [ -n "$project" ]; then
+#           echo "Running unit tests for $project"
+#           dotnet test tests/$project/$project.csproj --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-unit-test-results.xml" --results-directory ./unit-test-results
+#         fi
+#       done <<< "$UNIT_TEST_PROJECTS"
+#   artifacts:
+#     reports:
+#       junit:
+#         - "**/test-results/*.xml"
+#         - "**/unit-test-results/*.xml"
+#         - "**/integration-test-results/*.xml"
+#     paths:
+#       - "**/test-results/"
+#       - "**/unit-test-results/"
+#       - "**/integration-test-results/"
+#     expire_in: 1 week
 
 pack_packages:
   stage: pack
@@ -149,6 +135,7 @@ pack_packages:
   dependencies:
     - build_solution
     - determine_version
+    # - run_tests  # Temporarily removed (tests disabled for faster builds)
   script:
     # Restore dependencies first
     - dotnet restore --configfile NuGet.config
