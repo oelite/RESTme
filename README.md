@@ -191,11 +191,12 @@ var rest = new Rest("DefaultEndpointsProtocol=https", config, RestMode.Azure);
 // Option 2: Legacy connection string (still supported)
 var rest = new Rest("DefaultEndpointsProtocol=https;AccountName=...;RootPath=my-app/uploads", RestMode.Azure);
 
-// Store data (rootPath is automatically prefixed)
-await rest.SetAsync("documents/report.pdf", fileData); // Stored as "my-app/uploads/documents/report.pdf"
+// Get storage provider and store data (rootPath is automatically prefixed)
+var storageProvider = rest.GetProvider<IStorageProvider>();
+await storageProvider.PutAsync("documents/report.pdf", fileData); // Stored as "my-app/uploads/documents/report.pdf"
 
 // Retrieve data
-var fileData = await rest.GetAsync<byte[]>("documents/report.pdf");
+var fileData = await storageProvider.GetAsync<byte[]>("documents/report.pdf");
 
 // Use as cache (CDN-ready)
 var cacheProvider = rest.GetProvider<ICacheProvider>();
@@ -244,8 +245,9 @@ var minioConfig = new RestConfig
 };
 var rest = new Rest("s3://", minioConfig, RestMode.S3);
 
-// Store and cache operations (rootPath is automatically prefixed)
-await rest.SetAsync("files/document.pdf", fileData); // Stored as "my-app/uploads/files/document.pdf"
+// Get providers for storage and cache operations (rootPath is automatically prefixed)
+var storageProvider = rest.GetProvider<IStorageProvider>();
+await storageProvider.PutAsync("files/document.pdf", fileData); // Stored as "my-app/uploads/files/document.pdf"
 var cacheProvider = rest.GetProvider<ICacheProvider>();
 await cacheProvider.SetAsync("cache:key", data, TimeSpan.FromHours(2)); // Cached as "dev/cache/cache:key"
 ```
@@ -508,7 +510,8 @@ var restLocalFs = new Rest(
     endPointOrConnectionString: "/var/data/myapp", // optional base directory; omit to use default
     configuration: new RestConfig { OperationMode = RestMode.LocalFileSystem }
 );
-await restLocalFs.SetAsync("docs/report.pdf", fileBytes);
+var storageProvider = restLocalFs.GetProvider<IStorageProvider>();
+await storageProvider.PutAsync("docs/report.pdf", fileBytes);
 
 // In-memory queue (single-process)
 var restInMemoryQueue = new Rest(
@@ -522,8 +525,9 @@ var restLocalFs = new Rest(
     endPointOrConnectionString: "/var/data/myapp", // optional base directory; omit to use default
     configuration: new RestConfig { OperationMode = RestMode.LocalFileSystemAsStorage }
 );
-await restLocalFs.SetAsync("docs/report.pdf", fileBytes);
-var file = await restLocalFs.GetAsync<byte[]>("docs/report.pdf");
+var storageProvider = restLocalFs.GetProvider<IStorageProvider>();
+await storageProvider.PutAsync("docs/report.pdf", fileBytes);
+var file = await storageProvider.GetAsync<byte[]>("docs/report.pdf");
 
 // In-memory queue (single-process)
 var restInMemoryQueue = new Rest(
@@ -687,12 +691,13 @@ await rest.DeleteAsync<MyData>("key");
 Direct stream handling for file operations:
 
 ```csharp
-// Store stream directly
+// Get storage provider and store stream directly
+var storageProvider = rest.GetProvider<IStorageProvider>();
 using var fileStream = File.OpenRead("document.pdf");
-await rest.SetAsync("documents/report.pdf", fileStream);
+await storageProvider.PutStreamAsync("documents/report.pdf", fileStream);
 
 // Retrieve as stream
-var stream = await rest.GetAsync<Stream>("documents/report.pdf");
+var stream = await storageProvider.GetStreamAsync("documents/report.pdf");
 ```
 
 ### Cache Operations
@@ -861,13 +866,14 @@ The `RootPath` parameter allows you to organize your storage with logical path p
 // Connection string with rootPath
 var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;RootPath=my-app/uploads", RestMode.S3);
 
-// Operations automatically use the root path
-await rest.SetAsync("documents/file.pdf", data); // Stored as "my-app/uploads/documents/file.pdf"
+// Get providers - operations automatically use the root path
+var storageProvider = rest.GetProvider<IStorageProvider>();
+await storageProvider.PutAsync("documents/file.pdf", data); // Stored as "my-app/uploads/documents/file.pdf"
 var cacheProvider = rest.GetProvider<ICacheProvider>();
 await cacheProvider.SetAsync("user:123", userData); // Cached as "my-app/uploads/user:123"
 
 // Root path is applied to all operations (GET, PUT, DELETE, EXISTS)
-var file = await rest.GetAsync<byte[]>("documents/file.pdf"); // Retrieves from "my-app/uploads/documents/file.pdf"
+var file = await storageProvider.GetAsync<byte[]>("documents/file.pdf"); // Retrieves from "my-app/uploads/documents/file.pdf"
 ```
 
 **Connection String Parameters:**
@@ -1493,7 +1499,7 @@ public class DocumentService
     public async Task SaveDocumentAsync(string documentId, byte[] data)
     {
         // Save to storage
-        await _storage.SetAsync($"documents/{documentId}", data);
+        await _storage.PutAsync($"documents/{documentId}", data);
 
         // Invalidate cache
         await _cache.RemoveAsync($"doc:{documentId}");

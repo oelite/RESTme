@@ -95,7 +95,7 @@ var directProvider = new S3StorageProvider("s3://", config);
 
 ```csharp
 // Store data in S3
-await storageProvider.SetAsync("documents/report.json", reportData);
+await storageProvider.PutAsync("documents/report.json", reportData);
 
 // Retrieve data from S3
 var report = await storageProvider.GetAsync<ReportData>("documents/report.json");
@@ -104,7 +104,7 @@ var report = await storageProvider.GetAsync<ReportData>("documents/report.json")
 bool exists = await storageProvider.ExistsAsync("documents/report.json");
 
 // Remove object
-await storageProvider.RemoveAsync("documents/report.json");
+await storageProvider.DeleteAsync("documents/report.json");
 ```
 
 ## Core Features
@@ -132,7 +132,7 @@ var document = new Document
 };
 
 // Store in S3 with organized key structure
-await storageProvider.SetAsync($"documents/{document.Id}/metadata.json", document);
+await storageProvider.PutAsync($"documents/{document.Id}/metadata.json", document);
 ```
 
 ### Stream Operations
@@ -142,7 +142,7 @@ Efficient handling of large files:
 ```csharp
 // Upload large file using stream
 using var fileStream = File.OpenRead("large-file.zip");
-await storageProvider.SetStreamAsync("uploads/large-file.zip", fileStream);
+await storageProvider.PutStreamAsync("uploads/large-file.zip", fileStream);
 
 // Download file as stream
 using var downloadStream = await storageProvider.GetStreamAsync("uploads/large-file.zip");
@@ -156,10 +156,10 @@ Organize objects with path-like keys:
 
 ```csharp
 // Organize files in logical hierarchy
-await storageProvider.SetAsync("users/123/profile/avatar.jpg", avatarData);
-await storageProvider.SetAsync("users/123/documents/resume.pdf", resumeData);
-await storageProvider.SetAsync("products/456/images/main.jpg", imageData);
-await storageProvider.SetAsync("products/456/specs/datasheet.pdf", specData);
+await storageProvider.PutAsync("users/123/profile/avatar.jpg", avatarData);
+await storageProvider.PutAsync("users/123/documents/resume.pdf", resumeData);
+await storageProvider.PutAsync("products/456/images/main.jpg", imageData);
+await storageProvider.PutAsync("products/456/specs/datasheet.pdf", specData);
 
 // List objects with prefix
 var userFiles = await storageProvider.ListObjectsAsync("users/123/");
@@ -175,7 +175,7 @@ var uploadTasks = new List<Task>();
 foreach (var file in files)
 {
     var key = $"batch-upload/{file.Name}";
-    uploadTasks.Add(storageProvider.SetAsync(key, file.Data));
+    uploadTasks.Add(storageProvider.PutAsync(key, file.Data));
 }
 await Task.WhenAll(uploadTasks);
 
@@ -341,11 +341,11 @@ public class FileStorageService
     public async Task<string> StoreMediaFileAsync(string fileName, Stream content, string mediaType)
     {
         var key = $"{mediaType}/{DateTime.UtcNow:yyyy/MM}/{Guid.NewGuid()}/{fileName}";
-        await _mediaStorage.SetStreamAsync(key, content);
+        await _mediaStorage.PutStreamAsync(key, content);
 
         // Also cache in CDN for quick access
         content.Position = 0;
-        await _cdnCache.SetStreamAsync($"cdn:{mediaType}:{Path.GetFileNameWithoutExtension(fileName)}", content);
+        await _cdnCache.PutStreamAsync($"cdn:{mediaType}:{Path.GetFileNameWithoutExtension(fileName)}", content);
 
         return key;
     }
@@ -667,7 +667,7 @@ await provider.GetAsync<Data>("file1");
 public async Task UploadLargeFileAsync(string filePath, string s3Key)
 {
     using var fileStream = File.OpenRead(filePath);
-    await _storage.SetStreamAsync(s3Key, fileStream);
+    await _storage.PutStreamAsync(s3Key, fileStream);
 }
 
 // Process large downloads in chunks

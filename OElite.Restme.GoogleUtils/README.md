@@ -73,7 +73,7 @@ var directProvider = new GoogleCloudStorageProvider("https://storage.googleapis.
 
 ```csharp
 // Store data in Google Cloud Storage
-await storageProvider.SetAsync("documents/report.json", reportData);
+await storageProvider.PutAsync("documents/report.json", reportData);
 
 // Retrieve data from Google Cloud Storage
 var report = await storageProvider.GetAsync<ReportData>("documents/report.json");
@@ -82,7 +82,7 @@ var report = await storageProvider.GetAsync<ReportData>("documents/report.json")
 bool exists = await storageProvider.ExistsAsync("documents/report.json");
 
 // Remove object
-await storageProvider.RemoveAsync("documents/report.json");
+await storageProvider.DeleteAsync("documents/report.json");
 ```
 
 ## Configuration Options
@@ -136,7 +136,7 @@ await storageProvider.SetWithMetadataAsync("data/analytics.json", analyticsData,
 
 // Stream operations for large files
 using var fileStream = File.OpenRead("large-dataset.csv");
-await storageProvider.SetStreamAsync("datasets/large-dataset.csv", fileStream);
+await storageProvider.PutStreamAsync("datasets/large-dataset.csv", fileStream);
 
 // Download as stream
 using var downloadStream = await storageProvider.GetStreamAsync("datasets/large-dataset.csv");

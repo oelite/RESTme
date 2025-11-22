@@ -72,7 +72,7 @@ var directProvider = new AzureStorageProvider("https://myaccount.blob.core.windo
 
 ```csharp
 // Store data in Azure Blob Storage
-await storageProvider.SetAsync("documents/report.json", reportData);
+await storageProvider.PutAsync("documents/report.json", reportData);
 
 // Retrieve data from Azure Blob Storage
 var report = await storageProvider.GetAsync<ReportData>("documents/report.json");
@@ -81,7 +81,7 @@ var report = await storageProvider.GetAsync<ReportData>("documents/report.json")
 bool exists = await storageProvider.ExistsAsync("documents/report.json");
 
 // Remove blob
-await storageProvider.RemoveAsync("documents/report.json");
+await storageProvider.DeleteAsync("documents/report.json");
 ```
 
 ## Configuration Options
@@ -123,11 +123,11 @@ Store and retrieve various blob types:
 
 ```csharp
 // Block blobs (default - for general files)
-await storageProvider.SetAsync("documents/file.pdf", pdfData);
+await storageProvider.PutAsync("documents/file.pdf", pdfData);
 
 // Stream operations for large files
 using var fileStream = File.OpenRead("large-file.zip");
-await storageProvider.SetStreamAsync("uploads/large-file.zip", fileStream);
+await storageProvider.PutStreamAsync("uploads/large-file.zip", fileStream);
 
 // Download as stream
 using var downloadStream = await storageProvider.GetStreamAsync("uploads/large-file.zip");
@@ -264,7 +264,7 @@ catch (OEliteException ex) when (ex.Message.Contains("AuthenticationFailed"))
 public async Task UploadLargeFileAsync(string filePath, string blobName)
 {
     using var fileStream = File.OpenRead(filePath);
-    await _storage.SetStreamAsync(blobName, fileStream);
+    await _storage.PutStreamAsync(blobName, fileStream);
 }
 
 // Download with progress tracking

@@ -97,17 +97,18 @@ await cacheProvider.ExpiremeAsync("user:123");
 
 ### Storage Operations
 ```csharp
-// Store data
-await rest.SetAsync("documents/report.pdf", fileData);
+// Get storage provider and store data
+var storageProvider = rest.GetProvider<IStorageProvider>();
+await storageProvider.PutAsync("documents/report.pdf", fileData);
 
 // Retrieve data
-var fileData = await rest.GetAsync<byte[]>("documents/report.pdf");
+var fileData = await storageProvider.GetAsync<byte[]>("documents/report.pdf");
 
 // Check if exists
-var exists = await rest.ExistsInStorage("documents/report.pdf");
+var exists = await storageProvider.ExistsAsync("documents/report.pdf");
 
 // Delete data
-await rest.Deleteme("documents/report.pdf");
+await storageProvider.DeleteAsync("documents/report.pdf");
 ```
 
 ### Generic Operations
