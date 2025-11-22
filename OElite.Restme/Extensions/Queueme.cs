@@ -1,12 +1,13 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using OElite.Restme.Abstractions;
 
-namespace OElite;
+namespace OElite.Restme;
 
-public static class RestmeMessageQueueExtensions
+public static class QueueProviderExtensions
 {
-    public static bool Queueme(this IRestme rest,
+    public static bool Queueme(this IQueueProvider queueProvider,
         object message,
         string? queueName = null, string? key = null,
         string? exchangeName = null,
@@ -16,26 +17,19 @@ public static class RestmeMessageQueueExtensions
     {
         try
         {
-            if (rest.QueueProvider == null)
-            {
-                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
-                return false;
-            }
-
-            // Use the new provider system
-            var result = rest.QueueProvider.PublishAsync(message, queueName, key, exchangeName,
+            // Use the provider directly for publishing
+            var result = queueProvider.PublishAsync(message, queueName, key, exchangeName,
                 isDurable, isExclusive, autoDelete, exchangeType, isMessagePersistent).Result;
 
             return result;
         }
         catch (Exception? ex)
         {
-            rest.LogError(ex.Message, ex);
             return false;
         }
     }
 
-    public static async Task<bool> QueuemeAsync(this IRestme rest,
+    public static async Task<bool> QueuemeAsync(this IQueueProvider queueProvider,
         object message,
         string? queueName = null, string? key = null,
         string? exchangeName = null,
@@ -46,26 +40,19 @@ public static class RestmeMessageQueueExtensions
     {
         try
         {
-            if (rest.QueueProvider == null)
-            {
-                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
-                return false;
-            }
-
-            // Use the new provider system with cancellation token
-            var result = await rest.QueueProvider.PublishAsync(message, queueName, key, exchangeName,
+            // Use the provider directly with cancellation token
+            var result = await queueProvider.PublishAsync(message, queueName, key, exchangeName,
                 isDurable, isExclusive, autoDelete, exchangeType, isMessagePersistent, cancellationToken);
 
             return result;
         }
         catch (Exception? ex) when (!(ex is OperationCanceledException))
         {
-            rest.LogError(ex.Message, ex);
             return false;
         }
     }
 
-    public static void Dome<T>(this IRestme rest,
+    public static void Dome<T>(this IQueueProvider queueProvider,
         Func<T, Task<bool>>? queueTask,
         Func<Task<bool>>? deliverCompleteCondition,
         string? exchangeName = null,
@@ -78,23 +65,17 @@ public static class RestmeMessageQueueExtensions
     {
         try
         {
-            if (rest.QueueProvider == null)
-            {
-                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
-                return;
-            }
-
-            // Use the new provider system for consuming
-            rest.QueueProvider.StartConsumingAsync<T>(queueTask, deliverCompleteCondition, 
+            // Use the provider directly for consuming
+            queueProvider.StartConsumingAsync<T>(queueTask, deliverCompleteCondition,
                 exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType).Wait();
         }
         catch (Exception? ex)
         {
-            rest.LogError(ex.Message, ex);
+            // Silent fail for provider-specific extensions
         }
     }
 
-    public static void Dome<T>(this IRestme rest,
+    public static void Dome<T>(this IQueueProvider queueProvider,
         Func<T, bool>? queueTask,
         Func<bool>? deliverCompleteCondition,
         string? exchangeName = null,
@@ -107,27 +88,21 @@ public static class RestmeMessageQueueExtensions
     {
         try
         {
-            if (rest.QueueProvider == null)
-            {
-                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
-                return;
-            }
-
             // Convert synchronous delegates to async for the provider
             Func<T, Task<bool>>? asyncQueueTask = queueTask != null ? (t) => Task.FromResult(queueTask(t)) : null;
             Func<Task<bool>>? asyncDeliverCompleteCondition = deliverCompleteCondition != null ? () => Task.FromResult(deliverCompleteCondition()) : null;
 
-            // Use the new provider system for consuming
-            rest.QueueProvider.StartConsumingAsync<T>(asyncQueueTask, asyncDeliverCompleteCondition, 
+            // Use the provider directly for consuming
+            queueProvider.StartConsumingAsync<T>(asyncQueueTask, asyncDeliverCompleteCondition,
                 exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType).Wait();
         }
         catch (Exception? ex)
         {
-            rest.LogError(ex.Message, ex);
+            // Silent fail for provider-specific extensions
         }
     }
 
-    public static async Task DomeAsync<T>(this IRestme rest,
+    public static async Task DomeAsync<T>(this IQueueProvider queueProvider,
         Func<T, Task<bool>>? queueTask,
         Func<Task<bool>>? deliverCompleteCondition,
         string? exchangeName = null,
@@ -140,23 +115,17 @@ public static class RestmeMessageQueueExtensions
     {
         try
         {
-            if (rest.QueueProvider == null)
-            {
-                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
-                return;
-            }
-
-            // Use the new provider system for consuming with cancellation token
-            await rest.QueueProvider.StartConsumingAsync<T>(queueTask, deliverCompleteCondition,
+            // Use the provider directly for consuming with cancellation token
+            await queueProvider.StartConsumingAsync<T>(queueTask, deliverCompleteCondition,
                 exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType, cancellationToken);
         }
         catch (Exception? ex) when (!(ex is OperationCanceledException))
         {
-            rest.LogError(ex.Message, ex);
+            // Silent fail for provider-specific extensions
         }
     }
 
-    public static async Task DomeAsync<T>(this IRestme rest,
+    public static async Task DomeAsync<T>(this IQueueProvider queueProvider,
         Func<T, bool>? queueTask,
         Func<bool>? deliverCompleteCondition,
         string? exchangeName = null,
@@ -169,23 +138,17 @@ public static class RestmeMessageQueueExtensions
     {
         try
         {
-            if (rest.QueueProvider == null)
-            {
-                rest.LogError("Queue provider not initialized. Please set CurrentMode to RabbitMq or reference OElite.Restme.RabbitMQ package.");
-                return;
-            }
-
             // Convert synchronous delegates to async for the provider
             Func<T, Task<bool>>? asyncQueueTask = queueTask != null ? (t) => Task.FromResult(queueTask(t)) : null;
             Func<Task<bool>>? asyncDeliverCompleteCondition = deliverCompleteCondition != null ? () => Task.FromResult(deliverCompleteCondition()) : null;
 
-            // Use the new provider system for consuming with cancellation token
-            await rest.QueueProvider.StartConsumingAsync<T>(asyncQueueTask, asyncDeliverCompleteCondition,
+            // Use the provider directly for consuming with cancellation token
+            await queueProvider.StartConsumingAsync<T>(asyncQueueTask, asyncDeliverCompleteCondition,
                 exchangeName, queueName, key, prefetchCount, isDurable, isExclusive, autoDelete, exchangeType, cancellationToken);
         }
         catch (Exception? ex) when (!(ex is OperationCanceledException))
         {
-            rest.LogError(ex.Message, ex);
+            // Silent fail for provider-specific extensions
         }
     }
 }

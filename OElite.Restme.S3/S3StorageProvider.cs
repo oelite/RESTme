@@ -2,10 +2,11 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Providers
 {
@@ -18,32 +19,68 @@ namespace OElite.Providers
         private readonly string _bucketName;
         private readonly S3Configuration _s3Config;
 
-        public S3StorageProvider(string connectionString, RestConfig config) : base(config)
-        {
-            // Parse connection string to extract S3 configuration
-            _s3Config = S3ConnectionStringParser.ParseConnectionString(connectionString);
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public override string ProviderName => "S3Storage";
 
-            // Use credentials from config or parsed connection string
-            var accessKey = !string.IsNullOrEmpty(_s3Config.AccessKeyId) ? _s3Config.AccessKeyId : config.RestKey;
-            var secretKey = !string.IsNullOrEmpty(_s3Config.SecretAccessKey)
-                ? _s3Config.SecretAccessKey
-                : config.RestSecret;
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public override ProviderCapabilities Capabilities => ProviderCapabilities.Storage;
+
+        public S3StorageProvider(RestConfig config) : base(config)
+        {
+            // Prioritize RestConfig authentication fields over connection string parsing
+            var accessKey = config.AuthKey;
+            var secretKey = config.AuthSecret;
+
+            // Parse connection string for additional configuration if needed
+            S3Configuration? parsedConfig = null;
+            if (string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
+            {
+                parsedConfig = S3ConnectionStringParser.ParseConnectionString(config.ConnectionString);
+                accessKey = parsedConfig.AccessKeyId ?? accessKey;
+                secretKey = parsedConfig.SecretAccessKey ?? secretKey;
+            }
 
             // Create AWS S3 client configuration
-            var s3Config = new AmazonS3Config
-            {
-                ServiceURL = _s3Config.ServiceUrl,
-                ForcePathStyle = _s3Config.ForcePathStyle,
-                UseHttp = _s3Config.UseHttp
-            };
+            var s3Config = new AmazonS3Config();
 
-            if (_s3Config.Region != null)
+            // Use config values with fallbacks to parsed connection string
+            if (!string.IsNullOrEmpty(config.Endpoint))
             {
-                s3Config.RegionEndpoint = _s3Config.Region;
+                s3Config.ServiceURL = config.Endpoint;
+            }
+            else if (parsedConfig?.ServiceUrl != null)
+            {
+                s3Config.ServiceURL = parsedConfig.ServiceUrl;
+            }
+
+            // Set region from config or parsed connection string
+            if (!string.IsNullOrEmpty(config.Region))
+            {
+                s3Config.RegionEndpoint = RegionEndpoint.GetBySystemName(config.Region);
+            }
+            else if (parsedConfig?.Region != null)
+            {
+                s3Config.RegionEndpoint = parsedConfig.Region;
+            }
+            else
+            {
+                s3Config.RegionEndpoint = RegionEndpoint.USEast1; // Default
+            }
+
+            // Set additional S3 config from parsed connection string if available
+            if (parsedConfig != null)
+            {
+                s3Config.ForcePathStyle = parsedConfig.ForcePathStyle;
+                s3Config.UseHttp = parsedConfig.UseHttp;
             }
 
             _s3Client = new AmazonS3Client(accessKey, secretKey, s3Config);
-            _bucketName = _s3Config.BucketName ?? "restme-storage";
+            _bucketName = config.InstanceName ?? parsedConfig?.BucketName ?? "restme-storage";
+            _s3Config = parsedConfig ?? new S3Configuration { RootPath = config.RootPath };
         }
 
         public override async Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : class

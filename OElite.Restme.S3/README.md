@@ -11,6 +11,8 @@ OElite.Restme.S3 provides comprehensive Amazon S3 and S3-compatible storage inte
 
 ## Features
 
+- **Generic Provider Factory**: Auto-registered via `ServiceLocator` with dual capability support
+- **Provider Capabilities**: `ProviderCapabilities.Cache | Storage` - S3 provides both caching and storage
 - **S3-Compatible Storage**: Full support for AWS S3 and S3-compatible providers (MinIO, DigitalOcean Spaces, etc.)
 - **Enterprise Performance**: Optimized for high-throughput scenarios and large file operations
 - **Flexible Configuration**: Support for multiple S3 endpoints, regions, and authentication methods
@@ -29,19 +31,64 @@ dotnet add package OElite.Restme.S3
 
 ## Quick Start
 
+### Provider Factory Auto-Registration
+
+OElite.Restme.S3 automatically registers itself with the service locator when loaded:
+
+```csharp
+// Automatic registration happens when assembly is loaded
+// The S3ServiceFactory registers itself as "s3" provider
+
+// Check provider capabilities
+var factory = ServiceLocator.GetFactory("s3");
+var capabilities = factory?.SupportedCapabilities;
+// capabilities == ProviderCapabilities.Cache | ProviderCapabilities.Storage
+
+// S3 supports both cache and storage providers!
+bool canCreateCache = factory?.CanCreateProvider<ICacheProvider>() ?? false;
+// canCreateCache == true
+
+bool canCreateStorage = factory?.CanCreateProvider<IStorageProvider>() ?? false;
+// canCreateStorage == true
+```
+
 ### Basic Configuration
 
 ```csharp
-using OElite.Providers;
+using OElite;
+using OElite.Abstractions;
 
-// AWS S3 configuration
-var connectionString = "region=us-west-2;bucket=my-bucket;accesskey=YOUR_ACCESS_KEY;secretkey=YOUR_SECRET_KEY";
-var config = new RestConfig();
-var storageProvider = new S3StorageProvider(connectionString, config);
+// Option 1: Using Rest with generic provider pattern (recommended)
+var rest = new Rest("https://s3.amazonaws.com",
+    configuration: new RestConfig
+    {
+        OperationMode = RestMode.S3,
+        AuthKey = "YOUR_ACCESS_KEY",
+        AuthSecret = "YOUR_SECRET_KEY",
+        Region = "us-west-2",
+        BucketName = "my-bucket"
+    });
 
-// MinIO configuration
-var minioConnection = "endpoint=https://minio.example.com:9000;bucket=my-bucket;accesskey=minioadmin;secretkey=minioadmin;forcepath=true";
-var minioProvider = new S3StorageProvider(minioConnection, config);
+// Get providers using generic factory pattern
+var storageProvider = rest.GetProvider<IStorageProvider>();
+var cacheProvider = rest.GetProvider<ICacheProvider>(); // S3 also supports caching!
+
+// NEW: Named providers for multiple buckets/purposes
+var documentsProvider = rest.GetProvider<IStorageProvider>("documents");
+var imagesProvider = rest.GetProvider<IStorageProvider>("images");
+var backupsProvider = rest.GetProvider<IStorageProvider>("backups");
+var cachingProvider = rest.GetProvider<ICacheProvider>("cdn-cache");
+
+// Option 2: Direct provider instantiation (still supported)
+var config = new RestConfig
+{
+    AuthKey = "YOUR_ACCESS_KEY",
+    AuthSecret = "YOUR_SECRET_KEY",
+    Endpoint = "https://s3.amazonaws.com",
+    Region = "us-west-2",
+    BucketName = "my-bucket"
+};
+var directProvider = new S3StorageProvider("s3://", config);
 ```
 
 ### Basic Storage Operations
@@ -139,8 +186,22 @@ var results = await Task.WhenAll(downloadTasks);
 
 ## Configuration Options
 
-### Connection String Format
+### Authentication Configuration
 
+#### Using RestConfig (Recommended)
+```csharp
+var config = new RestConfig
+{
+    AuthKey = "ACCESS_KEY",          // S3 Access Key ID
+    AuthSecret = "SECRET_KEY",       // S3 Secret Access Key
+    Endpoint = "https://s3.amazonaws.com", // S3 endpoint
+    Region = "us-east-1",            // AWS region
+    BucketName = "my-bucket"         // S3 bucket name
+};
+var storageProvider = new S3StorageProvider("s3://", config);
+```
+
+#### Legacy Connection String Format (Still Supported)
 ```csharp
 // AWS S3 (region-based)
 "region=us-east-1;bucket=my-bucket;accesskey=ACCESS_KEY;secretkey=SECRET_KEY"
@@ -211,6 +272,169 @@ await storageProvider.SetWithMetadataAsync("documents/file.pdf", pdfData, metada
 
 // Retrieve with metadata
 var (data, meta) = await storageProvider.GetWithMetadataAsync<byte[]>("documents/file.pdf");
+```
+
+### Named Storage and Cache Providers
+
+**NEW in v2.1.0**: Support for multiple provider instances using named providers:
+
+```csharp
+// Create Rest instance
+var rest = new Rest("https://s3.amazonaws.com", new RestConfig
+{
+    OperationMode = RestMode.S3,
+    AuthKey = "access-key",
+    AuthSecret = "secret-key",
+    Region = "us-west-2",
+    BucketName = "my-bucket"
+});
+
+// Get named providers for different purposes
+var documentsStorage = rest.GetProvider<IStorageProvider>("documents");
+var imagesStorage = rest.GetProvider<IStorageProvider>("images");
+var backupsStorage = rest.GetProvider<IStorageProvider>("backups");
+var archiveStorage = rest.GetProvider<IStorageProvider>("archive");
+
+// S3 also supports caching with named providers!
+var cdnCache = rest.GetProvider<ICacheProvider>("cdn");
+var apiCache = rest.GetProvider<ICacheProvider>("api-responses");
+var tempCache = rest.GetProvider<ICacheProvider>("temporary");
+
+// Use different providers for logical separation
+await documentsStorage.SetAsync("documents/contract-2024.pdf", contractData);
+await imagesStorage.SetAsync("users/123/avatar.jpg", avatarData);
+await backupsStorage.SetAsync("backups/database-2024-01-15.sql", backupData);
+await archiveStorage.SetAsync("archive/logs/2023/december.zip", logsData);
+
+// Use S3 as cache with TTL-like behavior via naming conventions
+await cdnCache.SetAsync("cache:images:product:123", imageData);
+await apiCache.SetAsync("cache:api:user:456", userApiData);
+await tempCache.SetAsync("temp:processing:789", tempData);
+
+// Default providers (backward compatible)
+var defaultStorage = rest.GetProvider<IStorageProvider>(); // Same as GetProvider<IStorageProvider>("default")
+var defaultCache = rest.GetProvider<ICacheProvider>(); // Same as GetProvider<ICacheProvider>("default")
+
+// Named providers enable organized storage architecture
+public class FileStorageService
+{
+    private readonly IStorageProvider _documentsStorage;
+    private readonly IStorageProvider _mediaStorage;
+    private readonly IStorageProvider _archiveStorage;
+    private readonly ICacheProvider _cdnCache;
+
+    public FileStorageService(Rest rest)
+    {
+        _documentsStorage = rest.GetProvider<IStorageProvider>("documents");
+        _mediaStorage = rest.GetProvider<IStorageProvider>("media");
+        _archiveStorage = rest.GetProvider<IStorageProvider>("archive");
+        _cdnCache = rest.GetProvider<ICacheProvider>("cdn");
+    }
+
+    public async Task<string> StoreDocumentAsync(string fileName, byte[] content, string category = "general")
+    {
+        var key = $"{category}/{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid()}/{fileName}";
+        await _documentsStorage.SetAsync(key, content);
+        return key;
+    }
+
+    public async Task<string> StoreMediaFileAsync(string fileName, Stream content, string mediaType)
+    {
+        var key = $"{mediaType}/{DateTime.UtcNow:yyyy/MM}/{Guid.NewGuid()}/{fileName}";
+        await _mediaStorage.SetStreamAsync(key, content);
+
+        // Also cache in CDN for quick access
+        content.Position = 0;
+        await _cdnCache.SetStreamAsync($"cdn:{mediaType}:{Path.GetFileNameWithoutExtension(fileName)}", content);
+
+        return key;
+    }
+
+    public async Task ArchiveOldDataAsync(string sourceKey, DateTime archiveDate)
+    {
+        // Move from active storage to archive storage
+        var data = await _documentsStorage.GetAsync<byte[]>(sourceKey);
+        if (data != null)
+        {
+            var archiveKey = $"archive/{archiveDate:yyyy/MM}/{sourceKey}";
+            await _archiveStorage.SetAsync(archiveKey, data);
+            await _documentsStorage.RemoveAsync(sourceKey);
+        }
+    }
+}
+
+// Multi-bucket storage with named providers
+public class MultiBucketStorageService
+{
+    private readonly IStorageProvider _productionStorage;
+    private readonly IStorageProvider _stagingStorage;
+    private readonly IStorageProvider _backupStorage;
+    private readonly ICacheProvider _globalCache;
+
+    public MultiBucketStorageService()
+    {
+        var productionRest = new Rest("https://s3.amazonaws.com", new RestConfig
+        {
+            OperationMode = RestMode.S3,
+            BucketName = "production-data",
+            Region = "us-west-2"
+        });
+
+        var stagingRest = new Rest("https://s3.amazonaws.com", new RestConfig
+        {
+            OperationMode = RestMode.S3,
+            BucketName = "staging-data",
+            Region = "us-east-1"
+        });
+
+        var backupRest = new Rest("https://s3.amazonaws.com", new RestConfig
+        {
+            OperationMode = RestMode.S3,
+            BucketName = "backup-storage",
+            Region = "eu-west-1"
+        });
+
+        _productionStorage = productionRest.GetProvider<IStorageProvider>("production");
+        _stagingStorage = stagingRest.GetProvider<IStorageProvider>("staging");
+        _backupStorage = backupRest.GetProvider<IStorageProvider>("backup");
+        _globalCache = productionRest.GetProvider<ICacheProvider>("global-cache");
+    }
+
+    public async Task<T> GetDataWithFallbackAsync<T>(string key) where T : class
+    {
+        // Try cache first
+        var cached = await _globalCache.GetAsync<T>($"cache:{key}");
+        if (cached != null) return cached;
+
+        // Try production storage
+        var productionData = await _productionStorage.GetAsync<T>(key);
+        if (productionData != null)
+        {
+            // Cache for future requests
+            await _globalCache.SetAsync($"cache:{key}", productionData);
+            return productionData;
+        }
+
+        // Fallback to staging storage
+        var stagingData = await _stagingStorage.GetAsync<T>(key);
+        return stagingData;
+    }
+
+    public async Task StoreWithBackupAsync<T>(string key, T data) where T : class
+    {
+        // Store in production and backup simultaneously
+        var storeTasks = new[]
+        {
+            _productionStorage.SetAsync(key, data),
+            _backupStorage.SetAsync($"backup/{DateTime.UtcNow:yyyy/MM/dd}/{key}", data)
+        };
+
+        await Task.WhenAll(storeTasks);
+
+        // Cache for immediate access
+        await _globalCache.SetAsync($"cache:{key}", data);
+    }
+}
 ```
 
 ### Error Handling

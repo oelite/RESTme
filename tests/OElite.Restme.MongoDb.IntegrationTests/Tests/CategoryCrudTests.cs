@@ -201,7 +201,7 @@ public class CategoryCrudTests : TestBase
 
         // Assert
         totalCount.Should().Be(5); // Including the parent category
-        rootCount.Should().Be(2);
+        rootCount.Should().Be(3); // Parent Category, Root 1, and Root 2 (all have parentCategoryId = null)
         childCount.Should().Be(2);
         activeCount.Should().Be(4); // Parent + Root 1 + Child 1 + Child 2
     }

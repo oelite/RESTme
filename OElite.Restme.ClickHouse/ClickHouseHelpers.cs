@@ -1,236 +1,199 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 using ClickHouse.Client.ADO;
-using ClickHouse.Client.ADO.Parameters;
-using OElite.Abstractions;
+using ClickHouse.Client.Utility;
 
 namespace OElite.Restme.ClickHouse
 {
     /// <summary>
-    /// Builds ClickHouse SQL statements
+    /// ClickHouse connection wrapper using ClickHouse.Client library
     /// </summary>
-    public static class ClickHouseSqlBuilder
+    public class ClickHouseConnectionWrapper : IDisposable
     {
-        public static string BuildInsertSql<T>(T data, string tableName)
-        {
-            var properties = GetProperties<T>();
-            var columns = string.Join(", ", properties.Select(p => ToSnakeCase(p.Name)));
-            var values = string.Join(", ", properties.Select((p, i) => $"@p{i}"));
-
-            return $"INSERT INTO {tableName} ({columns}) VALUES ({values})";
-        }
-
-        public static string BuildBulkInsertSql<T>(string tableName)
-        {
-            var properties = GetProperties<T>();
-            var columns = string.Join(", ", properties.Select(p => ToSnakeCase(p.Name)));
-
-            return $"INSERT INTO {tableName} ({columns}) VALUES ";
-        }
-
-        private static PropertyInfo[] GetProperties<T>()
-        {
-            return typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead && p.CanWrite)
-                .ToArray();
-        }
-
-        private static string ToSnakeCase(string pascalCase)
-        {
-            if (string.IsNullOrEmpty(pascalCase))
-                return pascalCase;
-
-            var result = new StringBuilder();
-            for (int i = 0; i < pascalCase.Length; i++)
-            {
-                char currentChar = pascalCase[i];
-                if (char.IsUpper(currentChar) && i > 0)
-                {
-                    result.Append('_');
-                }
-                result.Append(char.ToLowerInvariant(currentChar));
-            }
-            return result.ToString();
-        }
-    }
-
-    /// <summary>
-    /// Builds parameters for ClickHouse queries
-    /// </summary>
-    public static class ClickHouseParameterBuilder
-    {
-        public static Dictionary<string, object> BuildParameters<T>(T data)
-        {
-            var parameters = new Dictionary<string, object>();
-            var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead && p.CanWrite)
-                .ToArray();
-
-            for (int i = 0; i < properties.Length; i++)
-            {
-                var value = properties[i].GetValue(data);
-                parameters[$"@p{i}"] = value ?? DBNull.Value;
-            }
-
-            return parameters;
-        }
-
-        public static Dictionary<string, object> BuildBulkParameters<T>(IEnumerable<T> data)
-        {
-            var parameters = new Dictionary<string, object>();
-            var list = data.ToList();
-
-            if (!list.Any()) return parameters;
-
-            var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead && p.CanWrite)
-                .ToArray();
-
-            for (int rowIndex = 0; rowIndex < list.Count; rowIndex++)
-            {
-                for (int colIndex = 0; colIndex < properties.Length; colIndex++)
-                {
-                    var value = properties[colIndex].GetValue(list[rowIndex]);
-                    parameters[$"@p{rowIndex}_{colIndex}"] = value ?? DBNull.Value;
-                }
-            }
-
-            return parameters;
-        }
-    }
-
-    /// <summary>
-    /// Builds ClickHouse table creation SQL
-    /// </summary>
-    public static class ClickHouseTableBuilder
-    {
-        public static string BuildCreateTableSql<T>(string tableName, ClickHouseEngine engine)
-        {
-            var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead && p.CanWrite)
-                .ToArray();
-
-            var columns = new List<string>();
-            foreach (var property in properties)
-            {
-                var columnName = ToSnakeCase(property.Name);
-                var columnType = MapClrTypeToClickHouseType(property.PropertyType);
-                columns.Add($"{columnName} {columnType}");
-            }
-
-            var engineClause = GetEngineClause(engine);
-            var columnsSql = string.Join(",\n    ", columns);
-
-            return $@"
-CREATE TABLE IF NOT EXISTS {tableName} (
-    {columnsSql}
-) ENGINE = {engineClause}
-ORDER BY tuple()";
-        }
-
-        private static string MapClrTypeToClickHouseType(Type clrType)
-        {
-            if (clrType == typeof(string))
-                return "String";
-            if (clrType == typeof(int) || clrType == typeof(int?))
-                return "Int32";
-            if (clrType == typeof(long) || clrType == typeof(long?))
-                return "Int64";
-            if (clrType == typeof(decimal) || clrType == typeof(decimal?))
-                return "Decimal(18,2)";
-            if (clrType == typeof(double) || clrType == typeof(double?))
-                return "Float64";
-            if (clrType == typeof(float) || clrType == typeof(float?))
-                return "Float32";
-            if (clrType == typeof(bool) || clrType == typeof(bool?))
-                return "UInt8";
-            if (clrType == typeof(DateTime) || clrType == typeof(DateTime?))
-                return "DateTime";
-            if (clrType == typeof(Guid))
-                return "String";
-
-            // Default to String for unknown types
-            return "String";
-        }
-
-        private static string GetEngineClause(ClickHouseEngine engine)
-        {
-            return engine switch
-            {
-                ClickHouseEngine.MergeTree => "MergeTree()",
-                ClickHouseEngine.ReplacingMergeTree => "ReplacingMergeTree()",
-                ClickHouseEngine.SummingMergeTree => "SummingMergeTree()",
-                ClickHouseEngine.AggregatingMergeTree => "AggregatingMergeTree()",
-                ClickHouseEngine.CollapsingMergeTree => "CollapsingMergeTree(sign)",
-                ClickHouseEngine.VersionedCollapsingMergeTree => "VersionedCollapsingMergeTree(sign, version)",
-                ClickHouseEngine.GraphiteMergeTree => "GraphiteMergeTree('config')",
-                _ => "MergeTree()"
-            };
-        }
-
-        private static string ToSnakeCase(string pascalCase)
-        {
-            if (string.IsNullOrEmpty(pascalCase))
-                return pascalCase;
-
-            var result = new StringBuilder();
-            for (int i = 0; i < pascalCase.Length; i++)
-            {
-                char currentChar = pascalCase[i];
-                if (char.IsUpper(currentChar) && i > 0)
-                {
-                    result.Append('_');
-                }
-                result.Append(char.ToLowerInvariant(currentChar));
-            }
-            return result.ToString();
-        }
-    }
-
-    /// <summary>
-    /// Simplified ClickHouse connection (would use actual ClickHouse client in real implementation)
-    /// </summary>
-    public class ClickHouseConnection : IDisposable
-    {
-        private readonly string _connectionString;
+        private readonly ClickHouseConnection _connection;
         private bool _disposed = false;
 
-        public ClickHouseConnection(string connectionString)
+        public ClickHouseConnectionWrapper(string connectionString)
         {
-            _connectionString = connectionString;
+            if (string.IsNullOrEmpty(connectionString))
+                throw new ArgumentNullException(nameof(connectionString));
+
+            // Parse Restme connection string format: clickhouse://host:port/database
+            var parsedConnection = ParseConnectionString(connectionString);
+
+            Console.WriteLine($"[DEBUG] Input connection string: {connectionString}");
+            Console.WriteLine($"[DEBUG] Parsed connection string: {parsedConnection}");
+
+            // ClickHouse.Client expects standard ADO.NET format
+            _connection = new ClickHouseConnection(parsedConnection);
         }
 
-        public async Task ExecuteNonQueryAsync(string sql, Dictionary<string, object> parameters, CancellationToken cancellationToken = default)
+        private static string ParseConnectionString(string connectionString)
         {
-            // Simplified implementation - in production this would use ClickHouse.Client properly
-            // For now, we'll simulate successful execution
-            await Task.Delay(10, cancellationToken); // Simulate network delay
+            // Convert from clickhouse://host:port/database to ClickHouse.Client format
+            var uri = connectionString.Replace("clickhouse://", "");
+            
+            // Default values
+            var host = "localhost";
+            var port = "8123";
+            var database = "default";
+            var username = "";
+            var password = "";
+
+            // Parse authentication if present: username:password@host
+            if (uri.Contains("@"))
+            {
+                var authParts = uri.Split('@');
+                var credentials = authParts[0].Split(':');
+                username = credentials[0];
+                password = credentials.Length > 1 ? credentials[1] : "";
+                uri = authParts[1];
+            }
+
+            // Parse host, port, database
+            var parts = uri.Split('/');
+            if (parts.Length > 0 && !string.IsNullOrEmpty(parts[0]))
+            {
+                var hostPort = parts[0].Split(':');
+                host = hostPort[0];
+                port = hostPort.Length > 1 ? hostPort[1] : "8123";
+            }
+
+            if (parts.Length > 1 && !string.IsNullOrEmpty(parts[1]))
+            {
+                database = parts[1].Split('?')[0];
+            }
+
+            // Build ClickHouse.Client connection string
+            var builder = new System.Text.StringBuilder();
+            builder.Append($"Host={host};Port={port};Database={database}");
+            
+            if (!string.IsNullOrEmpty(username))
+                builder.Append($";Username={username}");
+            
+            if (!string.IsNullOrEmpty(password))
+                builder.Append($";Password={password}");
+
+            builder.Append(";Compress=false");
+
+            return builder.ToString();
         }
 
-        public async Task<List<T>> ExecuteQueryAsync<T>(string sql, Dictionary<string, object> parameters, CancellationToken cancellationToken = default)
+        public async Task ExecuteNonQueryAsync(string query, CancellationToken cancellationToken = default)
         {
-            // Simplified implementation - return empty list for now
-            // In production, this would execute the query and map results to T
-            await Task.Delay(10, cancellationToken); // Simulate network delay
-            return new List<T>();
+            await EnsureConnectionOpenAsync(cancellationToken);
+            using var command = _connection.CreateCommand();
+            command.CommandText = query;
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        public async Task<T> ExecuteScalarAsync<T>(string sql, Dictionary<string, object> parameters, CancellationToken cancellationToken = default)
+        public async Task<List<T>> ExecuteQueryAsync<T>(string query, CancellationToken cancellationToken = default)
         {
-            // Simplified implementation - return default value
-            // In production, this would execute scalar query and return result
-            await Task.Delay(10, cancellationToken); // Simulate network delay
-            return default!;
+            await EnsureConnectionOpenAsync(cancellationToken);
+            using var command = _connection.CreateCommand();
+            command.CommandText = query;
+
+            var results = new List<T>();
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                // Simple object mapping - for complex types, you'd use reflection
+                if (typeof(T).IsPrimitive || typeof(T) == typeof(string) || typeof(T) == typeof(long))
+                {
+                    var value = reader.GetValue(0);
+
+                    // Handle type conversions for ClickHouse-specific types
+                    if (typeof(T) == typeof(long) && value is ulong ulongValue)
+                    {
+                        results.Add((T)(object)(long)ulongValue);
+                    }
+                    else if (typeof(T) == typeof(int) && value is ulong ulongValueInt)
+                    {
+                        results.Add((T)(object)(int)ulongValueInt);
+                    }
+                    else
+                    {
+                        results.Add((T)value);
+                    }
+                }
+                else
+                {
+                    // For complex types, create instance and map properties
+                    var instance = Activator.CreateInstance<T>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        var property = typeof(T).GetProperty(reader.GetName(i));
+                        if (property != null && !reader.IsDBNull(i))
+                        {
+                            property.SetValue(instance, reader.GetValue(i));
+                        }
+                    }
+                    results.Add(instance);
+                }
+            }
+
+            return results;
+        }
+
+        private async Task EnsureConnectionOpenAsync(CancellationToken cancellationToken = default)
+        {
+            if (_connection.State != System.Data.ConnectionState.Open)
+            {
+                await _connection.OpenAsync(cancellationToken);
+            }
+        }
+
+        public async Task BulkInsertAsync<T>(IEnumerable<T> data, string tableName, CancellationToken cancellationToken = default)
+        {
+            await EnsureConnectionOpenAsync(cancellationToken);
+            
+            // Use ClickHouse bulk insert with VALUES format
+            var dataList = data.ToList();
+            if (!dataList.Any()) return;
+
+            // Get properties from first item
+            var properties = typeof(T).GetProperties();
+            var columnNames = string.Join(", ", properties.Select(p => p.Name));
+            
+            // Build bulk insert values
+            var valuesBuilder = new System.Text.StringBuilder();
+            valuesBuilder.Append($"INSERT INTO {tableName} ({columnNames}) VALUES ");
+            
+            var valueRows = new List<string>();
+            foreach (var item in dataList)
+            {
+                var values = properties.Select(p => FormatValue(p.GetValue(item)));
+                valueRows.Add($"({string.Join(", ", values)})");
+            }
+            
+            valuesBuilder.Append(string.Join(", ", valueRows));
+            
+            using var command = _connection.CreateCommand();
+            command.CommandText = valuesBuilder.ToString();
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        private static string FormatValue(object? value)
+        {
+            if (value == null) return "NULL";
+
+            return value switch
+            {
+                string s => $"'{s.Replace("'", "''")}'",
+                DateTime dt => $"'{dt:yyyy-MM-dd HH:mm:ss}'",
+                bool b => b ? "1" : "0",
+                Guid g => $"'{g}'",
+                decimal d => d.ToString("0.################", System.Globalization.CultureInfo.InvariantCulture),
+                double d => d.ToString("0.################", System.Globalization.CultureInfo.InvariantCulture),
+                float f => f.ToString("0.################", System.Globalization.CultureInfo.InvariantCulture),
+                _ => value.ToString() ?? "NULL"
+            };
         }
 
         public void Dispose()
         {
             if (!_disposed)
             {
-                // Dispose connection resources
+                _connection?.Dispose();
                 _disposed = true;
             }
         }

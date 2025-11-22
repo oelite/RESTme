@@ -244,7 +244,7 @@ public class OrderCrudTests : TestBase
         // Assert
         totalCount.Should().Be(6);
         pendingCount.Should().Be(2);
-        activeCount.Should().Be(3); // Pending (2) + Confirmed (1)
+        activeCount.Should().Be(4); // Pending (2) + Confirmed (1) + Shipped (1)
         completedCount.Should().Be(1);
     }
 
@@ -288,12 +288,8 @@ public class OrderCrudTests : TestBase
             await collection.InsertOneAsync(order);
         }
 
-        // Act - Find orders containing specific product
-        var filter = new Dictionary<string, object>
-        {
-            { "items.product_id", product1Id.ToString() }
-        };
-        var ordersWithProduct1 = await collection.FindAsync(filter);
+        // Act - Find orders containing specific product using lambda expression
+        var ordersWithProduct1 = await collection.FindAsync(o => o.Items.Any(item => item.ProductId == product1Id));
 
         // Assert
         ordersWithProduct1.Should().HaveCount(2);

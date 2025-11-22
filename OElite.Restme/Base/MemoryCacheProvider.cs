@@ -3,9 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Base
+namespace OElite.Restme.Base
 {
     /// <summary>
     /// In-memory cache provider for fast temporary value access
@@ -16,6 +16,21 @@ namespace OElite.Base
         private readonly ConcurrentDictionary<string, CacheItem> _cache;
         private readonly Timer _cleanupTimer;
         private bool _disposed = false;
+
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "MemoryCache";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new RestConfig();
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Cache;
 
         public MemoryCacheProvider()
         {

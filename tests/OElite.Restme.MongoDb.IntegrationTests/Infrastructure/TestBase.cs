@@ -34,7 +34,6 @@ public abstract class TestBase : IAsyncLifetime
         _mongoContainer = new MongoDbBuilder()
             .WithImage("mongo:8.0.15")
             .WithPortBinding(27017, true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(27017))
             .Build();
 
         Logger.LogInformation("MongoDB test container initialized");
@@ -54,9 +53,20 @@ public abstract class TestBase : IAsyncLifetime
         TestDatabaseName = $"integration_tests_{Guid.NewGuid():N}";
         Database = _mongoClient.GetDatabase(TestDatabaseName);
 
-        // Initialize TestMongoDbCentre
-        var testConnectionString = $"{connectionString}/{TestDatabaseName}";
-        DbCentre = new TestMongoDbCentre(testConnectionString);
+        // Initialize TestMongoDbCentre with the full connection string including database
+        // But we need to construct it properly to avoid URI parsing issues
+        var baseUri = new Uri(connectionString);
+
+        var fullConnectionString =
+            $"{baseUri.Scheme}://{baseUri.UserInfo}@{baseUri.Host}:{baseUri.Port}/{TestDatabaseName}";
+        if (!string.IsNullOrEmpty(baseUri.Query))
+        {
+            fullConnectionString += baseUri.Query;
+        }
+
+        Logger.LogInformation("Full connection string for TestMongoDbCentre: {FullConnectionString}",
+            fullConnectionString);
+        DbCentre = new TestMongoDbCentre(fullConnectionString);
 
         Logger.LogInformation("Test database created: {DatabaseName}", TestDatabaseName);
     }
@@ -125,7 +135,8 @@ public abstract class TestBase : IAsyncLifetime
     /// <summary>
     /// Gets a raw MongoDB collection for direct operations (for complex test scenarios)
     /// </summary>
-    protected MongoDB.Driver.IMongoCollection<T> GetRawMongoCollection<T>(string collectionName = null) where T : OElite.BaseEntity
+    protected MongoDB.Driver.IMongoCollection<T> GetRawMongoCollection<T>(string collectionName = null)
+        where T : OElite.BaseEntity
     {
         return DbCentre.GetCollection<T>(collectionName);
     }

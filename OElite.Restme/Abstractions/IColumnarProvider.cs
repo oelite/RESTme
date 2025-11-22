@@ -4,13 +4,13 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Interface for ClickHouse columnar database operations
     /// Provides simplified access to ClickHouse analytics and time-series capabilities
     /// </summary>
-    public interface IColumnarProvider : IDisposable
+    public interface IColumnarProvider : IRestmeProvider
     {
         /// <summary>
         /// Insert a single data record into ClickHouse table
@@ -65,125 +65,6 @@ namespace OElite.Abstractions
     }
 
     /// <summary>
-    /// Interface for Kafka streaming operations
-    /// Provides simplified access to Kafka topics, partitions, and consumer groups
-    /// </summary>
-    public interface IStreamingProvider : IDisposable
-    {
-        /// <summary>
-        /// Publish a single message to a Kafka topic
-        /// </summary>
-        Task PublishAsync<T>(T message, string topicName, string key = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Publish multiple messages to a Kafka topic in batch
-        /// </summary>
-        Task PublishBatchAsync<T>(IEnumerable<T> messages, string topicName, Func<T, string> keySelector = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Subscribe to a Kafka topic with a message handler
-        /// </summary>
-        Task SubscribeAsync<T>(string topicName, string consumerGroup, Func<T, Task> messageHandler, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Subscribe to topics matching a pattern with a message handler
-        /// </summary>
-        Task SubscribePatternAsync<T>(string topicPattern, string consumerGroup, Func<string, T, Task> messageHandler, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Process messages from a topic and return a stream result
-        /// </summary>
-        Task<StreamResult<T>> ProcessAsync<T>(string topicName, string consumerGroup, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Create a Kafka topic with specified configuration
-        /// </summary>
-        Task CreateTopicAsync(string topicName, int partitions = 1, short replicationFactor = 1, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// List all available Kafka topics
-        /// </summary>
-        Task<List<string>> ListTopicsAsync(CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Set retention policy for a Kafka topic (message expiry)
-        /// </summary>
-        Task SetTopicRetentionAsync(string topicName, TimeSpan retentionPeriod, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Configure message timestamp-based expiry for a topic
-        /// </summary>
-        Task SetMessageExpiryAsync(string topicName, TimeSpan maxAge, CancellationToken cancellationToken = default);
-    }
-
-    /// <summary>
-    /// Interface for OpenSearch operations
-    /// Provides simplified access to search, indexing, and analytics capabilities
-    /// </summary>
-    public interface ISearchProvider : IDisposable
-    {
-        /// <summary>
-        /// Index a single document in OpenSearch
-        /// </summary>
-        Task IndexAsync<T>(T document, string indexName = null, string documentId = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Bulk index multiple documents in OpenSearch
-        /// </summary>
-        Task BulkIndexAsync<T>(IEnumerable<T> documents, string indexName = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Get a document by ID from OpenSearch
-        /// </summary>
-        Task<T> GetAsync<T>(string documentId, string indexName = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Search documents using a search query
-        /// </summary>
-        Task<SearchResult<T>> SearchAsync<T>(SearchQuery query, string indexName = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Perform full-text search across specified fields
-        /// </summary>
-        Task<SearchResult<T>> TextSearchAsync<T>(string searchText, string[] fields = null, string indexName = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Delete a document by ID
-        /// </summary>
-        Task<bool> DeleteAsync(string documentId, string indexName = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Delete documents matching a query
-        /// </summary>
-        Task<bool> DeleteByQueryAsync<T>(Expression<Func<T, bool>> query, string indexName = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Execute aggregation queries for analytics
-        /// </summary>
-        Task<AggregationResult> AggregateAsync<T>(AggregationQuery query, string indexName = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Create an OpenSearch index with automatic mapping
-        /// </summary>
-        Task CreateIndexAsync<T>(string indexName = null, OpenSearchMapping mapping = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// List all available indices
-        /// </summary>
-        Task<List<string>> ListIndicesAsync(CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Set TTL (Time To Live) for documents in an index
-        /// </summary>
-        Task SetIndexTTLAsync(string indexName, string ttlField, TimeSpan ttl, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Configure index lifecycle policy for automatic cleanup
-        /// </summary>
-        Task SetIndexLifecyclePolicyAsync(string indexName, TimeSpan deleteAfter, CancellationToken cancellationToken = default);
-    }
-
-    /// <summary>
     /// ClickHouse table engines
     /// </summary>
     public enum ClickHouseEngine
@@ -223,7 +104,7 @@ namespace OElite.Abstractions
     /// </summary>
     public class StreamResult<T>
     {
-        public IAsyncEnumerable<T> Messages { get; set; }
+        public IEnumerable<T> Messages { get; set; }
         public string ConsumerGroup { get; set; }
         public string TopicName { get; set; }
         public long MessagesProcessed { get; set; }

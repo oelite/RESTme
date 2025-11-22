@@ -1,7 +1,6 @@
 using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Logging;
-using OElite;
-using Testcontainers.Elasticsearch;
+using Testcontainers.OpenSearch;
 using Xunit;
 
 namespace OElite.Restme.OpenSearch.IntegrationTests.Infrastructure;
@@ -14,7 +13,7 @@ public abstract class OpenSearchTestBase : IAsyncLifetime
     protected Rest Rest = null!;
     protected readonly ILogger Logger;
 
-    private ElasticsearchContainer _openSearchContainer = null!;
+    private OpenSearchContainer _openSearchContainer = null!;
     private readonly ILoggerFactory _loggerFactory;
 
     protected OpenSearchTestBase()
@@ -24,13 +23,18 @@ public abstract class OpenSearchTestBase : IAsyncLifetime
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         Logger = _loggerFactory.CreateLogger(GetType());
 
-        // Setup OpenSearch test container
-        _openSearchContainer = new ElasticsearchBuilder()
-            .WithImage("opensearchproject/opensearch:3.3.2")
-            .WithPortBinding(9200, true)
-            .WithEnvironment("discovery.type", "single-node")
-            .WithEnvironment("OPENSEARCH_JAVA_OPTS", "-Xms512m -Xmx512m")
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(9200))
+        // Setup OpenSearch test container with security plugin properly configured
+        _openSearchContainer = new OpenSearchBuilder()
+            .WithImage("opensearchproject/opensearch:2.8.0")
+            .WithPassword("admin")
+            // .WithPortBinding(9200, true)
+            // .WithEnvironment("discovery.type", "single-node")
+            // .WithEnvironment("bootstrap.memory_lock", "true")
+            // .WithEnvironment("OPENSEARCH_JAVA_OPTS", "-Xms256m -Xmx256m")
+            // .WithWaitStrategy(Wait.ForUnixContainer()
+            //     .UntilInternalTcpPortIsAvailable(9200)
+            //     .UntilHttpRequestIsSucceeded(request =>
+            //         request.ForPort(9200).ForPath("/_cluster/health")))
             .Build();
 
         Logger.LogInformation("OpenSearch test container initialized");
@@ -41,12 +45,13 @@ public abstract class OpenSearchTestBase : IAsyncLifetime
         await _openSearchContainer.StartAsync();
         var connectionString = _openSearchContainer.GetConnectionString();
 
-        Logger.LogInformation("OpenSearch container started: {ConnectionString}", connectionString);
-
-        // Configure Rest with OpenSearch
-        Rest = new Rest($"{connectionString}", new RestConfig
+        // Configure Rest with OpenSearch with authentication and explicit mode
+        Logger.LogInformation("Container connection string: {ConnectionString}", connectionString);
+        Rest = new Rest(connectionString, new RestConfig
         {
-            OperationMode = RestMode.OpenSearch
+            OperationMode = RestMode.OpenSearch,
+            AuthKey = "admin",
+            AuthSecret = "admin"
         });
     }
 

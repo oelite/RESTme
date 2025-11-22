@@ -1,5 +1,4 @@
-using System;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Restme.ClickHouse
 {
@@ -8,44 +7,75 @@ namespace OElite.Restme.ClickHouse
     /// </summary>
     public class ClickHouseServiceFactory : IServiceFactory
     {
-        public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
+        static ClickHouseServiceFactory()
         {
-            throw new NotImplementedException("ClickHouse does not provide caching services");
+            ServiceLocator.RegisterFactory("clickhouse", new ClickHouseServiceFactory());
         }
 
-        public IQueueProvider CreateQueueProvider(string connectionString, RestConfig config)
+        /// <summary>
+        /// ClickHouse supports Columnar capability only
+        /// </summary>
+        public ProviderCapabilities SupportedCapabilities => ProviderCapabilities.Columnar;
+
+        /// <summary>
+        /// Checks if this factory can create the requested provider type
+        /// </summary>
+        public bool CanCreateProvider<T>() where T : class, IRestmeProvider
         {
-            throw new NotImplementedException("ClickHouse does not provide queuing services");
+            return typeof(T) == typeof(IColumnarProvider);
         }
 
-        public IStorageProvider CreateStorageProvider(string connectionString, RestConfig config)
+        /// <summary>
+        /// Generic provider creation with capability detection
+        /// </summary>
+        public T? CreateProvider<T>(RestConfig config) where T : class, IRestmeProvider
         {
-            throw new NotImplementedException("ClickHouse does not provide storage services");
+            if (typeof(T) == typeof(IColumnarProvider))
+            {
+                return new ClickHouseProvider(config) as T;
+            }
+
+            return null;
         }
 
-        public IHttpProvider CreateHttpProvider(RestConfig config)
+        public ICacheProvider? CreateCacheProvider(RestConfig config)
         {
-            throw new NotImplementedException("ClickHouse does not provide HTTP services");
+            return null;
         }
 
-        public ILogProvider CreateLogProvider(RestConfig config)
+        public IQueueProvider? CreateQueueProvider(RestConfig config)
         {
-            throw new NotImplementedException("ClickHouse does not provide logging services");
+            return null;
         }
 
-        public IColumnarProvider CreateColumnarProvider(string connectionString, RestConfig config)
+        public IStorageProvider? CreateStorageProvider(RestConfig config)
         {
-            return new ClickHouseProvider(connectionString, config);
+            return null;
         }
 
-        public IStreamingProvider CreateStreamingProvider(string connectionString, RestConfig config)
+        public IHttpProvider? CreateHttpProvider(RestConfig config)
         {
-            throw new NotImplementedException("ClickHouse does not provide streaming services");
+            return null;
         }
 
-        public ISearchProvider CreateSearchProvider(string connectionString, RestConfig config)
+        public ILogProvider? CreateLogProvider(RestConfig config)
         {
-            throw new NotImplementedException("ClickHouse does not provide search services");
+            return null;
+        }
+
+        public IColumnarProvider? CreateColumnarProvider(RestConfig config)
+        {
+            return new ClickHouseProvider(config);
+        }
+
+        public IStreamingProvider? CreateStreamingProvider(RestConfig config)
+        {
+            return null;
+        }
+
+        public ISearchProvider? CreateSearchProvider(RestConfig config)
+        {
+            return null;
         }
     }
 }

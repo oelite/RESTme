@@ -2,9 +2,9 @@ using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Base
+namespace OElite.Restme.Base
 {
     /// <summary>
     /// Default HttpClient-based provider using existing Restme HTTP extension behavior.
@@ -14,6 +14,21 @@ namespace OElite.Base
         private readonly RestConfig _config;
         private readonly ILogger? _logger;
         private bool _disposed;
+
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "HttpClient";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => _config;
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.None;
 
         public HttpClientProvider(RestConfig config, ILogger? logger = null)
         {

@@ -1,10 +1,12 @@
 using System;
-using OElite.Abstractions;
+using OElite.Providers;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Providers
+namespace OElite.Restme.Azure
 {
     /// <summary>
     /// Service factory for Azure providers
+    /// Supports Cache and Storage capabilities via Azure Blob Storage
     /// </summary>
     public class AzureServiceFactory : IServiceFactory
     {
@@ -13,44 +15,77 @@ namespace OElite.Providers
             // Auto-register this factory when the assembly is loaded
             ServiceLocator.RegisterFactory("azure", new AzureServiceFactory());
         }
-        public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
+
+        /// <summary>
+        /// Azure provider supports Cache and Storage capabilities
+        /// </summary>
+        public ProviderCapabilities SupportedCapabilities => ProviderCapabilities.Cache | ProviderCapabilities.Storage;
+
+        /// <summary>
+        /// Check if this factory can create a specific provider type
+        /// </summary>
+        public bool CanCreateProvider<T>() where T : class, IRestmeProvider
         {
-            return new AzureCacheProvider(connectionString, config);
+            var type = typeof(T);
+            return type == typeof(ICacheProvider) || type == typeof(IStorageProvider);
         }
 
-        public IQueueProvider CreateQueueProvider(string connectionString, RestConfig config)
+        /// <summary>
+        /// Create a provider of the specified type if supported
+        /// </summary>
+        public T? CreateProvider<T>(RestConfig config) where T : class, IRestmeProvider
         {
-            throw new NotImplementedException("Queue operations not supported by Azure provider. Use RabbitMQ provider instead.");
+            var type = typeof(T);
+
+            if (type == typeof(ICacheProvider))
+                return new AzureCacheProvider(config) as T;
+
+            if (type == typeof(IStorageProvider))
+                return new AzureStorageProvider(config) as T;
+
+            return null;
         }
 
-        public IStorageProvider CreateStorageProvider(string connectionString, RestConfig config)
+        // Legacy methods - return null for unsupported providers
+
+        public ICacheProvider? CreateCacheProvider(RestConfig config)
         {
-            return new AzureStorageProvider(connectionString, config);
+            return new AzureCacheProvider(config);
         }
 
-        public IHttpProvider CreateHttpProvider(RestConfig config)
+        public IQueueProvider? CreateQueueProvider(RestConfig config)
         {
-            throw new NotImplementedException("HTTP operations not supported by Azure provider. Use HTTP provider instead.");
+            return null;
         }
 
-        public ILogProvider CreateLogProvider(RestConfig config)
+        public IStorageProvider? CreateStorageProvider(RestConfig config)
         {
-            return new DefaultLogProvider();
+            return new AzureStorageProvider(config);
         }
 
-        public IColumnarProvider CreateColumnarProvider(string connectionString, RestConfig config)
+        public IHttpProvider? CreateHttpProvider(RestConfig config)
         {
-            throw new NotImplementedException("Columnar operations not supported by Azure provider. Use ClickHouse provider instead.");
+            return null;
         }
 
-        public IStreamingProvider CreateStreamingProvider(string connectionString, RestConfig config)
+        public ILogProvider? CreateLogProvider(RestConfig config)
         {
-            throw new NotImplementedException("Streaming operations not supported by Azure provider. Use Kafka provider instead.");
+            return null;
         }
 
-        public ISearchProvider CreateSearchProvider(string connectionString, RestConfig config)
+        public IColumnarProvider? CreateColumnarProvider(RestConfig config)
         {
-            throw new NotImplementedException("Search operations not supported by Azure provider. Use OpenSearch provider instead.");
+            return null;
+        }
+
+        public IStreamingProvider? CreateStreamingProvider(RestConfig config)
+        {
+            return null;
+        }
+
+        public ISearchProvider? CreateSearchProvider(RestConfig config)
+        {
+            return null;
         }
     }
 }

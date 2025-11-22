@@ -3,8 +3,8 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using OElite.Abstractions;
-using OElite.Base;
+using OElite.Restme.Abstractions;
+using OElite.Restme.Base;
 
 namespace OElite.Restme.Hosting.Memory
 {

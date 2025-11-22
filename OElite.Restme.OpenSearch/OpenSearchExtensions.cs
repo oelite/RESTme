@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite
 {
@@ -17,14 +18,15 @@ namespace OElite
         /// </summary>
         public static async Task IndexAsync<T>(this IRestme rest, T document,
             string indexName = null, string documentId = null, CancellationToken cancellationToken = default)
+            where T : class
         {
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            await rest.SearchProvider.IndexAsync(document, indexName, documentId, cancellationToken);
+            await provider.IndexAsync(document, indexName, documentId, cancellationToken);
         }
 
         /// <summary>
@@ -32,14 +34,15 @@ namespace OElite
         /// </summary>
         public static async Task IndexAsync<T>(this IRestme rest, IEnumerable<T> documents,
             string indexName = null, CancellationToken cancellationToken = default)
+            where T : class
         {
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            await rest.SearchProvider.BulkIndexAsync(documents, indexName, cancellationToken);
+            await provider.BulkIndexAsync(documents, indexName, cancellationToken);
         }
 
         /// <summary>
@@ -47,14 +50,15 @@ namespace OElite
         /// </summary>
         public static async Task<SearchResult<T>> SearchAsync<T>(this IRestme rest,
             SearchQuery query, string indexName = null, CancellationToken cancellationToken = default)
+            where T : class
         {
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            return await rest.SearchProvider.SearchAsync<T>(query, indexName, cancellationToken);
+            return await provider.SearchAsync<T>(query, indexName, cancellationToken);
         }
 
         /// <summary>
@@ -63,29 +67,31 @@ namespace OElite
         public static async Task<SearchResult<T>> SearchAsync<T>(this IRestme rest,
             string searchText, string[] fields = null, string indexName = null,
             CancellationToken cancellationToken = default)
+            where T : class
         {
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            return await rest.SearchProvider.TextSearchAsync<T>(searchText, fields, indexName, cancellationToken);
+            return await provider.TextSearchAsync<T>(searchText, fields, indexName, cancellationToken);
         }
 
         /// <summary>
         /// Get a document by ID from OpenSearch
         /// </summary>
-        public static async Task<T> GetAsync<T>(this IRestme rest, string documentId,
+        public static async Task<T> GetDocumentAsync<T>(this IRestme rest, string documentId,
             string indexName = null, CancellationToken cancellationToken = default)
+            where T : class
         {
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            return await rest.SearchProvider.GetAsync<T>(documentId, indexName, cancellationToken);
+            return await provider.GetAsync<T>(documentId, indexName, cancellationToken);
         }
 
         /// <summary>
@@ -93,14 +99,15 @@ namespace OElite
         /// </summary>
         public static async Task<AggregationResult> AggregateAsync<T>(this IRestme rest,
             AggregationQuery query, string indexName = null, CancellationToken cancellationToken = default)
+            where T : class
         {
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            return await rest.SearchProvider.AggregateAsync<T>(query, indexName, cancellationToken);
+            return await provider.AggregateAsync<T>(query, indexName, cancellationToken);
         }
 
         /// <summary>
@@ -109,14 +116,15 @@ namespace OElite
         public static async Task CreateIndexAsync<T>(this IRestme rest,
             string indexName = null, OpenSearchMapping mapping = null,
             CancellationToken cancellationToken = default)
+            where T : class
         {
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            await rest.SearchProvider.CreateIndexAsync<T>(indexName, mapping, cancellationToken);
+            await provider.CreateIndexAsync<T>(indexName, mapping, cancellationToken);
         }
 
         /// <summary>
@@ -128,10 +136,10 @@ namespace OElite
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            return await rest.SearchProvider.ListIndicesAsync(cancellationToken);
+            return await provider.ListIndicesAsync(cancellationToken);
         }
 
         /// <summary>
@@ -143,10 +151,10 @@ namespace OElite
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            await rest.SearchProvider.SetIndexTTLAsync(indexName, ttlField, ttl, cancellationToken);
+            await provider.SetIndexTTLAsync(indexName, ttlField, ttl, cancellationToken);
         }
 
         /// <summary>
@@ -158,10 +166,10 @@ namespace OElite
             if (rest.CurrentMode != RestMode.OpenSearch)
                 throw new OEliteException("OpenSearch mode required");
 
-            if (rest.SearchProvider == null)
+            var provider = rest.GetProvider<ISearchProvider>();            if (provider == null)
                 throw new OEliteException("OpenSearch provider not initialized");
 
-            await rest.SearchProvider.SetIndexLifecyclePolicyAsync(indexName, deleteAfter, cancellationToken);
+            await provider.SetIndexLifecyclePolicyAsync(indexName, deleteAfter, cancellationToken);
         }
     }
 }

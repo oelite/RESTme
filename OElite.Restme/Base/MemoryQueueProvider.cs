@@ -3,9 +3,9 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Base
+namespace OElite.Restme.Base
 {
     /// <summary>
     /// In-memory queue provider using Channels. Suitable for single-process scenarios.
@@ -15,6 +15,21 @@ namespace OElite.Base
         private readonly ConcurrentDictionary<string, Channel<object>> _queues = new();
         private CancellationTokenSource? _cts;
         private bool _disposed;
+
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "MemoryQueue";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new RestConfig();
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Queue;
 
         public Task<bool> PublishAsync<T>(T message, string? queueName = null, string? routingKey = null, string? exchangeName = null, bool isDurable = true, bool isExclusive = false, bool autoDelete = true, string exchangeType = "direct", bool isMessagePersistent = true, CancellationToken cancellationToken = default) where T : class
         {

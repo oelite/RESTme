@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using OElite;
 
 namespace OElite.Restme.ClickHouse.IntegrationTests.Models;
@@ -5,7 +6,7 @@ namespace OElite.Restme.ClickHouse.IntegrationTests.Models;
 /// <summary>
 /// Test entity for ClickHouse integration tests
 /// </summary>
-[ClickHouseTable("user_events")]
+[Table("user_events")]
 public class UserEvent
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -19,7 +20,7 @@ public class UserEvent
 /// <summary>
 /// Test entity for TTL functionality
 /// </summary>
-[ClickHouseTable("logs")]
+[Table("logs")]
 public class LogEntry
 {
     public Guid Id { get; set; } = Guid.NewGuid();

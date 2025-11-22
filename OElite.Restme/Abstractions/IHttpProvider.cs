@@ -2,12 +2,12 @@ using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Interface for HTTP operations
     /// </summary>
-    public interface IHttpProvider : IDisposable
+    public interface IHttpProvider : IRestmeProvider
     {
         /// <summary>
         /// Perform HTTP request

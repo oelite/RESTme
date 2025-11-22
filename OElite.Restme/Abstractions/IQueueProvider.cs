@@ -2,12 +2,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Interface for message queue operations (RabbitMQ, etc.)
     /// </summary>
-    public interface IQueueProvider : IDisposable
+    public interface IQueueProvider : IRestmeProvider
     {
         /// <summary>
         /// Publish a message to a queue

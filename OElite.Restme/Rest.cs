@@ -9,61 +9,146 @@ using System.Reflection;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.Extensions.Logging;
-using OElite.Abstractions;
-using OElite.Base;
+using OElite.Restme.Abstractions;
+using OElite.Restme.Base;
 
-namespace OElite
+namespace OElite.Restme
 {
-    public partial class Rest : IRestme, IDisposable
+    public partial class Rest : IRestme
     {
         internal Dictionary<string, string> Params;
         internal Dictionary<string, List<string>> Headers;
         internal object? ObjAsParam;
+        internal Dictionary<string, IRestmeProvider> InstantiatedProviders = new();
         public RestConfig Configuration { get; private set; }
 
         public Uri? BaseUri { get; set; }
-        public string? ConnectionString { get; }
         public string? RequestUrlPath { get; set; }
         public bool Initialized { get; private set; }
 
-        // Provider properties for dynamic loading
-        public ICacheProvider? CacheProvider { get; private set; }
-        public IQueueProvider? QueueProvider { get; private set; }
-        public IStorageProvider? StorageProvider { get; private set; }
-        public IHttpProvider? HttpProvider { get; private set; }
-        public ILogProvider? LogProvider { get; private set; }
-        public IColumnarProvider? ColumnarProvider { get; private set; }
-        public IStreamingProvider? StreamingProvider { get; private set; }
-        public ISearchProvider? SearchProvider { get; private set; }
+
+        /// <summary>
+        /// Get a provider instance based on the current RestMode configuration using factory pattern.
+        /// </summary>
+        /// <typeparam name="T">The provider interface type to retrieve.</typeparam>
+        /// <param name="name">Optional provider name for managing multiple instances of the same type. Defaults to "default".</param>
+        /// <returns>A provider instance if available for the current mode, null otherwise.</returns>
+        public T? GetProvider<T>(string name = "default") where T : class, IRestmeProvider
+        {
+            try
+            {
+                // Generate provider key using type name and custom name
+                string providerKey = string.IsNullOrEmpty(name)
+                    ? $"{typeof(T).Name}:default"
+                    : $"{typeof(T).Name}:{name}";
+
+                // Check if provider is already cached
+                if (InstantiatedProviders.TryGetValue(providerKey, out var cachedProvider))
+                {
+                    return cachedProvider as T;
+                }
+
+                // Special handling for LogProvider - always available
+                if (typeof(T) == typeof(ILogProvider))
+                {
+                    var logProvider = new ConsoleLogProvider();
+                    InstantiatedProviders[providerKey] = logProvider;
+                    return logProvider as T;
+                }
+
+                // Special handling for HttpProvider - fallback implementation always available
+                if (typeof(T) == typeof(IHttpProvider))
+                {
+                    var httpProvider = new HttpClientProvider(Configuration, Logger);
+                    InstantiatedProviders[providerKey] = httpProvider;
+                    return httpProvider as T;
+                }
+
+                // Get factory based on current mode
+                string factoryName = Configuration.OperationMode switch
+                {
+                    RestMode.Redis => "redis",
+                    RestMode.RabbitMq => "rabbitmq",
+                    RestMode.Azure => "azure",
+                    RestMode.S3 => "s3",
+                    RestMode.ClickHouse => "clickhouse",
+                    RestMode.Kafka => "kafka",
+                    RestMode.OpenSearch => "opensearch",
+                    _ => ""
+                };
+
+                if (string.IsNullOrEmpty(factoryName))
+                {
+                    Logger?.LogWarning("No factory name determined for mode {Mode}", Configuration.OperationMode);
+                    return null;
+                }
+
+                var factory = ServiceLocator.GetFactory(factoryName);
+                if (factory == null)
+                {
+                    Logger?.LogWarning("Factory not found for {FactoryName}", factoryName);
+                    return null;
+                }
+
+                // Check if factory can create the requested provider type
+                if (!factory.CanCreateProvider<T>())
+                {
+                    Logger?.LogDebug("Factory {FactoryName} cannot create provider {ProviderType}", factoryName,
+                        typeof(T).Name);
+                    return null;
+                }
+
+                // Create provider using factory
+                var provider = factory.CreateProvider<T>(Configuration);
+                if (provider != null)
+                {
+                    Logger?.LogDebug("Successfully created {ProviderType} from {FactoryName}", typeof(T).Name,
+                        factoryName);
+                    // Cache the provider for future use
+                    InstantiatedProviders[providerKey] = provider;
+                }
+
+                return provider;
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "Failed to get provider {ProviderType}", typeof(T).Name);
+                return null;
+            }
+        }
 
 
         public Rest(Uri? baseUri = null,
             string? urlPath = null, RestConfig? config = null, ILogger? logger = null,
             Dictionary<string, string>? @params = null, Dictionary<string, List<string>>? headers = null)
         {
+            Configuration = config ?? new RestConfig();
             Params = @params ?? new Dictionary<string, string>();
             Headers = headers ?? new Dictionary<string, List<string>>();
             BaseUri = baseUri!;
-            ConnectionString = baseUri?.Host?.IsNotNullOrEmpty() == true
-                ? $"{baseUri.Scheme}://{baseUri.Host}{(baseUri.Port > 0 ? ":" + baseUri : null)}"
-                : null;
             RequestUrlPath = urlPath;
             Logger = logger;
-            Configuration = config!;
+
             this.PrepareRestMode();
+            Configuration.ConnectionString = baseUri?.Host?.IsNotNullOrEmpty() == true
+                ? $"{baseUri.Scheme}://{baseUri.Host}{(baseUri.Port > 0 ? ":" + baseUri : null)}"
+                : null;
         }
 
         public Rest(string? endPointOrConnectionString, RestConfig? configuration = null, ILogger? logger = null,
             Dictionary<string, string>? @params = null, Dictionary<string, List<string>>? headers = null)
         {
+            Configuration = configuration ?? new RestConfig();
             Params = @params ?? new Dictionary<string, string>();
             Headers = headers ?? new Dictionary<string, List<string>>();
+
+            // Set connection string for all provider types, not just HTTP
+            Configuration.ConnectionString = endPointOrConnectionString;
+
             if (endPointOrConnectionString != null && endPointOrConnectionString.StartsWith("http"))
                 BaseUri = new Uri(endPointOrConnectionString);
-            else
-                ConnectionString = endPointOrConnectionString;
+
             Logger = logger;
-            Configuration = configuration!;
             this.PrepareRestMode();
         }
 
@@ -79,63 +164,14 @@ namespace OElite
         }
 
         /// <summary>
-        /// Initialize providers based on current mode and available assemblies
+        /// Initialize provider assemblies for the current mode
         /// </summary>
-        private void InitializeProviders()
+        public void InitializeProviders()
         {
             try
             {
-                // Initialize log provider first (always available)
-                LogProvider = new OElite.Base.ConsoleLogProvider();
-
-                // Load appropriate assemblies to trigger static constructors
+                // Load appropriate assemblies to trigger static constructors and register factories
                 LoadProviderAssemblies();
-
-                // Try to load providers dynamically based on mode
-                switch (Configuration.OperationMode)
-                {
-                    case RestMode.MemoryAsCache:
-                        CacheProvider = new OElite.Base.MemoryCacheProvider();
-                        break;
-                    case RestMode.LocalFileSystemAsStorage:
-                        StorageProvider = new OElite.Base.LocalFileSystemStorageProvider(ConnectionString);
-                        break;
-                    case RestMode.InMemoryQueue:
-                        QueueProvider = new OElite.Base.MemoryQueueProvider();
-                        break;
-                    case RestMode.RedisAsCache:
-                        InitializeCacheProvider();
-                        break;
-                    case RestMode.RabbitMq:
-                        InitializeQueueProvider();
-                        break;
-                    case RestMode.AzureAsStorage:
-                        InitializeStorageProvider();
-                        break;
-                    case RestMode.AzureAsCache:
-                        InitializeCacheProvider();
-                        break;
-                    case RestMode.S3AsStorage:
-                        InitializeStorageProvider();
-                        break;
-                    case RestMode.S3AsCache:
-                        InitializeCacheProvider();
-                        break;
-                    case RestMode.ClickHouse:
-                        InitializeColumnarProvider();
-                        break;
-                    case RestMode.Kafka:
-                        InitializeStreamingProvider();
-                        break;
-                    case RestMode.OpenSearch:
-                        InitializeSearchProvider();
-                        break;
-                    case RestMode.Http:
-                    case RestMode.HttpRest:
-                    default:
-                        InitializeHttpProvider();
-                        break;
-                }
 
                 Initialized = true;
             }
@@ -156,10 +192,10 @@ namespace OElite
             {
                 string? assemblyName = Configuration.OperationMode switch
                 {
-                    RestMode.RedisAsCache => "OElite.Restme.Redis",
+                    RestMode.Redis => "OElite.Restme.Redis",
                     RestMode.RabbitMq => "OElite.Restme.RabbitMQ",
-                    RestMode.AzureAsStorage or RestMode.AzureAsCache => "OElite.Restme.Azure",
-                    RestMode.S3AsStorage or RestMode.S3AsCache => "OElite.Restme.S3",
+                    RestMode.Azure => "OElite.Restme.Azure",
+                    RestMode.S3 => "OElite.Restme.S3",
                     RestMode.ClickHouse => "OElite.Restme.ClickHouse",
                     RestMode.Kafka => "OElite.Restme.Kafka",
                     RestMode.OpenSearch => "OElite.Restme.OpenSearch",
@@ -183,10 +219,10 @@ namespace OElite
                         ServiceLocator.Clear(); // Clear cache to force discovery
                         var factory = ServiceLocator.GetFactory(Configuration.OperationMode switch
                         {
-                            RestMode.RedisAsCache => "redis",
+                            RestMode.Redis => "redis",
                             RestMode.RabbitMq => "rabbitmq",
-                            RestMode.AzureAsStorage or RestMode.AzureAsCache => "azure",
-                            RestMode.S3AsStorage or RestMode.S3AsCache => "s3",
+                            RestMode.Azure => "azure",
+                            RestMode.S3 => "s3",
                             _ => ""
                         });
 
@@ -334,7 +370,8 @@ namespace OElite
                     searchPaths.Add(path);
             }
 
-            Logger?.LogDebug("Searching for assembly {AssemblyName} in {PathCount} paths", assemblyName, searchPaths.Count);
+            Logger?.LogDebug("Searching for assembly {AssemblyName} in {PathCount} paths", assemblyName,
+                searchPaths.Count);
 
             foreach (var searchPath in searchPaths)
             {
@@ -352,7 +389,8 @@ namespace OElite
                     // Also try recursive search in subdirectories for NuGet packages
                     if (searchPath.Contains(".nuget") || searchPath.Contains("packages"))
                     {
-                        var foundFiles = Directory.GetFiles(searchPath, $"{assemblyName}.dll", SearchOption.AllDirectories);
+                        var foundFiles = Directory.GetFiles(searchPath, $"{assemblyName}.dll",
+                            SearchOption.AllDirectories);
 
                         if (foundFiles.Length > 0)
                         {
@@ -371,232 +409,6 @@ namespace OElite
 
             Logger?.LogDebug("Assembly {AssemblyName} not found in any search paths", assemblyName);
             return null;
-        }
-
-        /// <summary>
-        /// Initialize cache provider (Redis, Azure, or S3)
-        /// </summary>
-        private void InitializeCacheProvider()
-        {
-            try
-            {
-                string factoryName = Configuration.OperationMode switch
-                {
-                    RestMode.RedisAsCache => "redis",
-                    RestMode.AzureAsCache => "azure",
-                    RestMode.S3AsCache => "s3",
-                    _ => "redis" // Default fallback
-                };
-
-                var factory = ServiceLocator.GetFactory(factoryName);
-                if (factory != null)
-                {
-                    CacheProvider = factory.CreateCacheProvider(ConnectionString ?? "", Configuration);
-                }
-                else
-                {
-                    // Fallback to default implementation that throws helpful error
-                    CacheProvider = new DefaultCacheProvider();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "Failed to initialize cache provider");
-                var packageName = Configuration.OperationMode switch
-                {
-                    RestMode.RedisAsCache => "OElite.Restme.Redis",
-                    RestMode.AzureAsCache => "OElite.Restme.Azure",
-                    RestMode.S3AsCache => "OElite.Restme.S3",
-                    _ => "OElite.Restme.Redis"
-                };
-                throw new OEliteException(
-                    $"{Configuration.OperationMode} cache provider not loaded. Please reference {packageName} package.",
-                    ex);
-            }
-        }
-
-        /// <summary>
-        /// Initialize queue provider (RabbitMQ)
-        /// </summary>
-        private void InitializeQueueProvider()
-        {
-            // For RabbitMQ, include VHost in connection string if provided
-            var connectionStringWithVHost = ConnectionString ?? "";
-            if (!string.IsNullOrEmpty(RequestUrlPath))
-            {
-                // Append VHost info to connection string for RabbitMQ
-                connectionStringWithVHost += $"|vhost={RequestUrlPath}";
-            }
-
-            try
-            {
-                // Try to load RabbitMQ provider dynamically
-                var factory = ServiceLocator.GetFactory("rabbitmq");
-
-                // If factory not found, try more aggressive loading
-                if (factory == null)
-                {
-                    Logger?.LogDebug("RabbitMQ factory not found, attempting aggressive assembly loading");
-
-                    // Force assembly loading specifically for RabbitMQ
-                    LoadAssembly("OElite.Restme.RabbitMQ");
-
-                    // Force discovery after assembly load
-                    ServiceLocator.Clear();
-                    factory = ServiceLocator.GetFactory("rabbitmq");
-                }
-
-                if (factory != null)
-                {
-                    Logger?.LogDebug("Creating RabbitMQ queue provider with connection: {Connection}", connectionStringWithVHost);
-                    QueueProvider = factory.CreateQueueProvider(connectionStringWithVHost, Configuration);
-                    Logger?.LogInformation("Successfully initialized RabbitMQ queue provider");
-                }
-                else
-                {
-                    Logger?.LogError("RabbitMQ factory not found after assembly loading attempts");
-                    // Fallback to default implementation that throws helpful error
-                    QueueProvider = new DefaultQueueProvider();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "Failed to initialize queue provider with connection string of: {ConnectionString}", connectionStringWithVHost);
-                throw new OEliteException(
-                    "RabbitMQ provider not loaded. Please reference OElite.Restme.RabbitMQ package.", ex);
-            }
-        }
-
-        /// <summary>
-        /// Initialize storage provider (Azure or S3)
-        /// </summary>
-        private void InitializeStorageProvider()
-        {
-            try
-            {
-                // Try to load storage provider dynamically based on mode
-                string factoryName = Configuration.OperationMode switch
-                {
-                    RestMode.AzureAsStorage => "azure",
-                    RestMode.S3AsStorage => "s3",
-                    _ => "azure"
-                };
-                var factory = ServiceLocator.GetFactory(factoryName);
-                if (factory != null)
-                {
-                    StorageProvider = factory.CreateStorageProvider(ConnectionString ?? "", Configuration);
-                }
-                else
-                {
-                    // Fallback to default implementation that throws helpful error
-                    StorageProvider = new DefaultStorageProvider();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "Failed to initialize storage provider");
-                var packageName = Configuration.OperationMode switch
-                {
-                    RestMode.AzureAsStorage => "OElite.Restme.Azure",
-                    RestMode.S3AsStorage => "OElite.Restme.S3",
-                    _ => "OElite.Restme.Azure"
-                };
-                throw new OEliteException(
-                    $"{Configuration.OperationMode} provider not loaded. Please reference {packageName} package.", ex);
-            }
-        }
-
-        /// <summary>
-        /// Initialize HTTP provider
-        /// </summary>
-        private void InitializeHttpProvider()
-        {
-            try
-            {
-                // Try to load HTTP provider dynamically
-                var factory = ServiceLocator.GetFactory<IHttpProvider>();
-                if (factory != null)
-                {
-                    HttpProvider = factory.CreateHttpProvider(Configuration);
-                }
-                else
-                {
-                    // Fallback to base implementation without external deps
-                    HttpProvider = new OElite.Base.HttpClientProvider(Configuration, Logger);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "Failed to initialize HTTP provider");
-                // HTTP provider should always be available as fallback
-                HttpProvider = new OElite.Base.HttpClientProvider(Configuration, Logger);
-            }
-        }
-
-        private void InitializeColumnarProvider()
-        {
-            try
-            {
-                var factory = ServiceLocator.GetFactory("clickhouse");
-                if (factory != null)
-                {
-                    ColumnarProvider = factory.CreateColumnarProvider(ConnectionString ?? "", Configuration);
-                }
-                else
-                {
-                    // Fallback to default implementation that throws helpful error
-                    ColumnarProvider = new DefaultColumnarProvider();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "Failed to initialize columnar provider");
-                throw new OEliteException($"Failed to initialize ClickHouse provider: {ex.Message}", ex);
-            }
-        }
-
-        private void InitializeStreamingProvider()
-        {
-            try
-            {
-                var factory = ServiceLocator.GetFactory("kafka");
-                if (factory != null)
-                {
-                    StreamingProvider = factory.CreateStreamingProvider(ConnectionString ?? "", Configuration);
-                }
-                else
-                {
-                    // Fallback to default implementation that throws helpful error
-                    StreamingProvider = new DefaultStreamingProvider();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "Failed to initialize streaming provider");
-                throw new OEliteException($"Failed to initialize Kafka provider: {ex.Message}", ex);
-            }
-        }
-
-        private void InitializeSearchProvider()
-        {
-            try
-            {
-                var factory = ServiceLocator.GetFactory("opensearch");
-                if (factory != null)
-                {
-                    SearchProvider = factory.CreateSearchProvider(ConnectionString ?? "", Configuration);
-                }
-                else
-                {
-                    // Fallback to default implementation that throws helpful error
-                    SearchProvider = new DefaultSearchProvider();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "Failed to initialize search provider");
-                throw new OEliteException($"Failed to initialize OpenSearch provider: {ex.Message}", ex);
-            }
         }
 
 
@@ -657,9 +469,8 @@ namespace OElite
                     return Task.Run(() =>
                         RestmeHttpExtensions.HttpRequestAsync<T>(this, method, relativePath)
                             .WaitAndGetResult(Configuration.DefaultTimeout));
-                case RestMode.AzureAsStorage:
-                case RestMode.AzureAsCache:
-                case RestMode.RedisAsCache:
+                case RestMode.Azure:
+                case RestMode.Redis:
                 default:
                     throw new NotSupportedException(
                         "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
@@ -684,35 +495,44 @@ namespace OElite
             {
                 if (!keyOrRelativeUrlPath.IsNotNullOrEmpty())
                     throw new SyntaxErrorException("No key or relative url path provided.");
+
                 switch (CurrentMode)
                 {
                     case RestMode.Http:
                     case RestMode.HttpRest:
                         return this.HttpGetAsync<T>(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureAsStorage:
-                    case RestMode.S3AsStorage:
-                        if (StorageProvider != null)
+
+                    case RestMode.Azure:
+                    case RestMode.S3:
+                    case RestMode.LocalFileSystem:
+                        var storageProvider = GetProvider<IStorageProvider>();
+                        if (storageProvider != null)
                         {
-                            return StorageProvider.GetAsync<T>(keyOrRelativeUrlPath)
+                            return storageProvider.GetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         }
 
                         throw new InvalidOperationException(
-                            "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
-                    case RestMode.RedisAsCache:
-                        if (CacheProvider != null)
+                            $"Storage provider not available for mode {CurrentMode}. Please reference appropriate provider package.");
+
+                    case RestMode.Redis:
+                    case RestMode.Memory:
+                        var cacheProvider = GetProvider<ICacheProvider>();
+                        if (cacheProvider != null)
                         {
-                            return CacheProvider.GetAsync<T>(keyOrRelativeUrlPath)
+                            return cacheProvider.GetAsync<T>(keyOrRelativeUrlPath)
                                 .WaitAndGetResult(Configuration.DefaultTimeout);
                         }
 
                         throw new InvalidOperationException(
-                            "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+                            $"Cache provider not available for mode {CurrentMode}. Please reference appropriate provider package.");
+
                     case RestMode.RabbitMq:
+                    case RestMode.Kafka:
                     default:
                         throw new NotSupportedException(
-                            "Generic request async method only supports HTTP requests, please use other extension methods or switch operation RestMode to HTTPClient");
+                            $"Get operation not supported for mode {CurrentMode}. Use appropriate extension methods for this provider type.");
                 }
             });
             return task;
@@ -744,92 +564,53 @@ namespace OElite
         {
             if (dataObject != null)
                 ObjAsParam = dataObject;
+
             var task = Task.Run(() =>
             {
+                // Resolve data object from parameters
+                var resolvedData = ResolveDataObject<T>(dataObject);
+
                 switch (CurrentMode)
                 {
                     case RestMode.Http:
                     case RestMode.HttpRest:
                         return HttpRequestAsync<T>(HttpMethod.Put, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureAsStorage:
-                    case RestMode.S3AsStorage:
-                        if (StorageProvider == null)
+
+                    case RestMode.Azure:
+                    case RestMode.S3:
+                    case RestMode.LocalFileSystem:
+                        var storageProvider = GetProvider<IStorageProvider>();
+                        if (storageProvider == null)
                             throw new InvalidOperationException(
-                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+                                $"Storage provider not available for mode {CurrentMode}. Please reference appropriate provider package.");
 
-                        if (dataObject != null)
-                        {
-                            if (dataObject is T typedData)
-                                return StorageProvider.PutAsync<T>(keyOrRelativeUrlPath, typedData)
-                                    .WaitAndGetResult(Configuration.DefaultTimeout);
-                            throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                        }
-
-                        if (ObjAsParam == null)
-                        {
+                        if (resolvedData == null)
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
-                        }
 
-                        if (ObjAsParam is T)
-                        {
-                            dataObject = (T)Convert.ChangeType(ObjAsParam, typeof(T));
-                        }
-                        else
-                        {
-                            throw new NotSupportedException(
-                                "A object parameter is detected, however it is not same generic type as the return type for the current call.");
-                        }
+                        return storageProvider.PutAsync<T>(keyOrRelativeUrlPath, resolvedData)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
 
-                        if (dataObject is T typedData4)
-                            return StorageProvider.PutAsync<T>(keyOrRelativeUrlPath, typedData4)
-                                .WaitAndGetResult(Configuration.DefaultTimeout);
-                        throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                    case RestMode.RedisAsCache:
-                        if (CacheProvider == null)
+                    case RestMode.Redis:
+                    case RestMode.Memory:
+                        var cacheProvider = GetProvider<ICacheProvider>();
+                        if (cacheProvider == null)
                             throw new InvalidOperationException(
-                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+                                $"Cache provider not available for mode {CurrentMode}. Please reference appropriate provider package.");
 
-                        if (dataObject != null)
-                        {
-                            var expiry = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
-                            if (dataObject is T typedData)
-                            {
-                                var success = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData, expiry)
-                                    .WaitAndGetResult(Configuration.DefaultTimeout);
-                                return success ? typedData : null;
-                            }
-
-                            throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                        }
-
-                        if (ObjAsParam == null)
-                        {
+                        if (resolvedData == null)
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
-                        }
 
-                        if (ObjAsParam is T)
-                        {
-                            dataObject = (T)Convert.ChangeType(ObjAsParam, typeof(T));
-                        }
-                        else
-                        {
-                            throw new NotSupportedException(
-                                "A object parameter is detected, however it is not same generic type as the return type for the current call.");
-                        }
+                        var expiry = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
+                        var success = cacheProvider.SetAsync(keyOrRelativeUrlPath, resolvedData, expiry)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                        return success ? resolvedData : null;
 
-                        var expiry2 = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
-                        if (dataObject is T typedData5)
-                        {
-                            var success2 = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData5, expiry2)
-                                .WaitAndGetResult(Configuration.DefaultTimeout);
-                            return success2 ? typedData5 : null;
-                        }
-
-                        throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RabbitMq:
+                    case RestMode.Kafka:
                     default:
-                        throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
+                        throw new NotSupportedException(
+                            $"Put operation not supported for mode {CurrentMode}. Use appropriate extension methods for this provider type.");
                 }
             });
 
@@ -862,6 +643,7 @@ namespace OElite
         {
             if (dataObject != null)
                 ObjAsParam = dataObject;
+
             var task = Task.Run(() =>
             {
                 switch (CurrentMode)
@@ -870,23 +652,35 @@ namespace OElite
                     case RestMode.HttpRest:
                         return HttpRequestAsync<T>(HttpMethod.Delete, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureAsStorage:
-                    case RestMode.S3AsStorage:
-                        if (StorageProvider == null)
+
+                    case RestMode.Azure:
+                    case RestMode.S3:
+                    case RestMode.LocalFileSystem:
+                        var storageProvider = GetProvider<IStorageProvider>();
+                        if (storageProvider == null)
                             throw new InvalidOperationException(
-                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
-                        var deleteSuccess = StorageProvider.DeleteAsync(keyOrRelativeUrlPath)
+                                $"Storage provider not available for mode {CurrentMode}. Please reference appropriate provider package.");
+
+                        var deleteSuccess = storageProvider.DeleteAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                         return deleteSuccess ? null : null;
-                    case RestMode.RedisAsCache:
-                        if (CacheProvider == null)
+
+                    case RestMode.Redis:
+                    case RestMode.Memory:
+                        var cacheProvider = GetProvider<ICacheProvider>();
+                        if (cacheProvider == null)
                             throw new InvalidOperationException(
-                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
-                        var cacheDeleteSuccess = CacheProvider.RemoveAsync(keyOrRelativeUrlPath)
+                                $"Cache provider not available for mode {CurrentMode}. Please reference appropriate provider package.");
+
+                        var cacheDeleteSuccess = cacheProvider.RemoveAsync(keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
                         return cacheDeleteSuccess ? null : null;
+
+                    case RestMode.RabbitMq:
+                    case RestMode.Kafka:
                     default:
-                        throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
+                        throw new NotSupportedException(
+                            $"Delete operation not supported for mode {CurrentMode}. Use appropriate extension methods for this provider type.");
                 }
             });
             return task;
@@ -927,6 +721,9 @@ namespace OElite
         {
             var task = Task.Run(() =>
             {
+                // Resolve data object from parameters
+                var resolvedData = ResolveDataObject<T>(dataObject);
+
                 switch (CurrentMode)
                 {
                     case RestMode.Http:
@@ -935,82 +732,41 @@ namespace OElite
                             ObjAsParam = dataObject;
                         return HttpRequestAsync<T>(HttpMethod.Post, keyOrRelativeUrlPath)
                             .WaitAndGetResult(Configuration.DefaultTimeout);
-                    case RestMode.AzureAsStorage:
-                    case RestMode.S3AsStorage:
-                        if (StorageProvider == null)
+
+                    case RestMode.Azure:
+                    case RestMode.S3:
+                    case RestMode.LocalFileSystem:
+                        var storageProvider = GetProvider<IStorageProvider>();
+                        if (storageProvider == null)
                             throw new InvalidOperationException(
-                                "Storage provider not initialized. Please reference OElite.Restme.Azure or OElite.Restme.S3 package.");
+                                $"Storage provider not available for mode {CurrentMode}. Please reference appropriate provider package.");
 
-                        if (dataObject != null)
-                        {
-                            if (dataObject is T typedData)
-                                return StorageProvider.PutAsync<T>(keyOrRelativeUrlPath, typedData)
-                                    .WaitAndGetResult(Configuration.DefaultTimeout);
-                            throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                        }
-
-                        if (ObjAsParam == null)
-                        {
+                        if (resolvedData == null)
                             return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
-                        }
 
-                        if (ObjAsParam is T)
-                        {
-                            dataObject = (T)Convert.ChangeType(ObjAsParam, typeof(T));
-                        }
-                        else
-                        {
-                            throw new NotSupportedException(
-                                "A object parameter is detected, however it is not same generic type as the return type for the current call.");
-                        }
+                        return storageProvider.PutAsync<T>(keyOrRelativeUrlPath, resolvedData)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
 
-                        if (dataObject is T typedData4)
-                            return StorageProvider.PutAsync<T>(keyOrRelativeUrlPath, typedData4)
-                                .WaitAndGetResult(Configuration.DefaultTimeout);
-                        throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                    case RestMode.RedisAsCache:
-                        if (CacheProvider == null)
+                    case RestMode.Redis:
+                    case RestMode.Memory:
+                        var cacheProvider = GetProvider<ICacheProvider>();
+                        if (cacheProvider == null)
                             throw new InvalidOperationException(
-                                "Cache provider not initialized. Please reference OElite.Restme.Redis package.");
+                                $"Cache provider not available for mode {CurrentMode}. Please reference appropriate provider package.");
 
-                        if (dataObject != null)
-                        {
-                            var expiry = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
-                            if (dataObject is T typedData)
-                            {
-                                var success = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData, expiry)
-                                    .WaitAndGetResult(Configuration.DefaultTimeout);
-                                return success ? typedData : null;
-                            }
+                        if (resolvedData == null)
+                            return DeleteAsync<T>(keyOrRelativeUrlPath).WaitAndGetResult(Configuration.DefaultTimeout);
 
-                            throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
-                        }
+                        var expiry = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
+                        var success = cacheProvider.SetAsync(keyOrRelativeUrlPath, resolvedData, expiry)
+                            .WaitAndGetResult(Configuration.DefaultTimeout);
+                        return success ? resolvedData : null;
 
-                        switch (ObjAsParam)
-                        {
-                            case null:
-                                return DeleteAsync<T>(keyOrRelativeUrlPath)
-                                    .WaitAndGetResult(Configuration.DefaultTimeout);
-                            case T:
-                                dataObject = (T)Convert.ChangeType(ObjAsParam, typeof(T));
-                                break;
-                            default:
-                                throw new NotSupportedException(
-                                    "A object parameter is detected, however it is not same generic type as the return type for the current call.");
-                        }
-
-                        var expiry2 = expiryInMinutes?.TotalMinutes > 0 ? expiryInMinutes : null;
-                        if (dataObject is T typedData6)
-                        {
-                            var success2 = CacheProvider.SetAsync(keyOrRelativeUrlPath, typedData6, expiry2)
-                                .WaitAndGetResult(Configuration.DefaultTimeout);
-                            return success2 ? typedData6 : null;
-                        }
-
-                        throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
                     case RestMode.RabbitMq:
+                    case RestMode.Kafka:
                     default:
-                        throw new NotSupportedException("Unexpected RestMode, let me call it a break!");
+                        throw new NotSupportedException(
+                            $"Post operation not supported for mode {CurrentMode}. Use appropriate extension methods for this provider type.");
                 }
             });
 
@@ -1092,24 +848,42 @@ namespace OElite
             return urlPath + nvc.ParseIntoQueryString();
         }
 
+        /// <summary>
+        /// Helper method to resolve data object from various parameter sources
+        /// </summary>
+        private T? ResolveDataObject<T>(object? dataObject) where T : class
+        {
+            // Priority: dataObject parameter > ObjAsParam > null
+            if (dataObject != null)
+            {
+                if (dataObject is T typedData)
+                    return typedData;
+                throw new InvalidOperationException($"Data object is not of type {typeof(T).Name}");
+            }
+
+            if (ObjAsParam != null)
+            {
+                if (ObjAsParam is T typedObjParam)
+                    return typedObjParam;
+                throw new NotSupportedException(
+                    "A object parameter is detected, however it is not same generic type as the return type for the current call.");
+            }
+
+            return null;
+        }
+
         #endregion
 
 
         public void Dispose()
         {
-            try
+            // Dispose all cached providers
+            foreach (var provider in InstantiatedProviders.Values)
             {
-                // Dispose providers
-                CacheProvider?.Dispose();
-                QueueProvider?.Dispose();
-                StorageProvider?.Dispose();
-                HttpProvider?.Dispose();
-                LogProvider?.Dispose();
+                provider?.Dispose();
             }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "Error disposing providers");
-            }
+
+            InstantiatedProviders.Clear();
         }
     }
 }

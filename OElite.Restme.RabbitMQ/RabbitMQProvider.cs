@@ -2,7 +2,8 @@ using System;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -13,24 +14,38 @@ namespace OElite.Providers
     /// </summary>
     public class RabbitMQProvider : IQueueProvider
     {
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "RabbitMQ";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration { get; }
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Queue;
+
         private readonly IConnection _connection;
         private readonly IChannel _channel;
-        private readonly RestConfig _config;
         private bool _disposed = false;
 
-        public RabbitMQProvider(string connectionString, RestConfig config)
+        public RabbitMQProvider(RestConfig config)
         {
-            _config = config;
-            
+            Configuration = config;
+
             var factory = new ConnectionFactory();
-            
+
             // Check if connection string includes VHost info (format: uri|vhost=name)
-            string actualConnectionString = connectionString;
+            string actualConnectionString = config.ConnectionString ?? "amqp://localhost";
             string? vhost = null;
-            
-            if (connectionString.Contains("|vhost="))
+
+            if (actualConnectionString.Contains("|vhost="))
             {
-                var parts = connectionString.Split(new[] { "|vhost=" }, StringSplitOptions.None);
+                var parts = actualConnectionString.Split(new[] { "|vhost=" }, StringSplitOptions.None);
                 actualConnectionString = parts[0];
                 vhost = parts.Length > 1 ? parts[1] : null;
             }
@@ -52,14 +67,17 @@ namespace OElite.Providers
             }
             
             // Override with authentication from RestConfig if provided
-            if (!string.IsNullOrEmpty(config.RestKey))
+            var username = config.AuthKey;
+            var password = config.AuthSecret;
+
+            if (!string.IsNullOrEmpty(username))
             {
-                factory.UserName = config.RestKey;
+                factory.UserName = username;
             }
-            
-            if (!string.IsNullOrEmpty(config.RestSecret))
+
+            if (!string.IsNullOrEmpty(password))
             {
-                factory.Password = config.RestSecret;
+                factory.Password = password;
             }
             
             // Set VHost if provided
@@ -118,7 +136,7 @@ namespace OElite.Providers
                     await BindQueueAsync(queueName, exchangeName, routingKey, cancellationToken);
                 }
 
-                var jsonMessage = message.JsonSerialize(_config.UseRestConvertForCollectionSerialization, _config.SerializerSettings);
+                var jsonMessage = message.JsonSerialize(Configuration.UseRestConvertForCollectionSerialization, Configuration.SerializerSettings);
                 var body = Encoding.UTF8.GetBytes(jsonMessage);
 
                 var properties = new BasicProperties

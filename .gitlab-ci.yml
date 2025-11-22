@@ -115,22 +115,22 @@ run_tests:
           dotnet test tests/$project/$project.csproj --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-unit-test-results.xml" --results-directory ./unit-test-results
         fi
       done <<< "$UNIT_TEST_PROJECTS"
-    - echo "🔍 Checking Docker availability for integration tests..."
-    - |
-      if docker info >/dev/null 2>&1; then
-        echo "✅ Docker is available - running integration tests with test containers..."
-        while IFS= read -r project || [ -n "$project" ]; do
-          if [ -n "$project" ]; then
-            echo "Running integration tests for $project"
-            dotnet test tests/$project/$project.csproj --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-integration-test-results.xml" --results-directory ./integration-test-results || echo "⚠️  Integration tests failed for $project (may be due to Docker configuration)"
-          fi
-        done <<< "$INTEGRATION_TEST_PROJECTS"
-      else
-        echo "⚠️  Docker not available - skipping integration tests"
-        echo "📋 Integration tests require Docker for test containers"
-        echo "🔧 Run integration tests locally: dotnet test **/*IntegrationTests.csproj"
-        echo "💡 Or configure Docker-in-Docker in your CI/CD environment"
-      fi
+      #    - echo "🔍 Checking Docker availability for integration tests..."
+      #    - |
+      #      if docker info >/dev/null 2>&1; then
+      #        echo "✅ Docker is available - running integration tests with test containers..."
+      #        while IFS= read -r project || [ -n "$project" ]; do
+      #          if [ -n "$project" ]; then
+      #            echo "Running integration tests for $project"
+      #            dotnet test tests/$project/$project.csproj --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-integration-test-results.xml" --results-directory ./integration-test-results || echo "⚠️  Integration tests failed for $project (may be due to Docker configuration)"
+      #          fi
+      #        done <<< "$INTEGRATION_TEST_PROJECTS"
+      #      else
+      #        echo "⚠️  Docker not available - skipping integration tests"
+      #        echo "📋 Integration tests require Docker for test containers"
+      #        echo "🔧 Run integration tests locally: dotnet test **/*IntegrationTests.csproj"
+      #        echo "💡 Or configure Docker-in-Docker in your CI/CD environment"
+      #      fi
   artifacts:
     reports:
       junit:

@@ -3,15 +3,30 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Base
+namespace OElite.Restme.Base
 {
     /// <summary>
     /// Default ClickHouse provider that throws helpful error messages
     /// </summary>
     public class DefaultColumnarProvider : IColumnarProvider
     {
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "DefaultColumnar";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new RestConfig();
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Columnar;
+
         public Task InsertAsync<T>(T data, string tableName = null, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException("ClickHouse provider not available. Please install OElite.Restme.ClickHouse package and configure ClickHouse connection.");
@@ -73,6 +88,21 @@ namespace OElite.Base
     /// </summary>
     public class DefaultStreamingProvider : IStreamingProvider
     {
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "DefaultStreaming";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new RestConfig();
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Streaming;
+
         public Task PublishAsync<T>(T message, string topicName, string key = null, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException("Kafka provider not available. Please install OElite.Restme.Kafka package and configure Kafka connection.");
@@ -129,27 +159,42 @@ namespace OElite.Base
     /// </summary>
     public class DefaultSearchProvider : ISearchProvider
     {
-        public Task IndexAsync<T>(T document, string indexName = null, string documentId = null, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "DefaultSearch";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new RestConfig();
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Search;
+
+        public Task IndexAsync<T>(T document, string indexName = null, string documentId = null, CancellationToken cancellationToken = default) where T : class
         {
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }
 
-        public Task BulkIndexAsync<T>(IEnumerable<T> documents, string indexName = null, CancellationToken cancellationToken = default)
+        public Task BulkIndexAsync<T>(IEnumerable<T> documents, string indexName = null, CancellationToken cancellationToken = default) where T : class
         {
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }
 
-        public Task<T> GetAsync<T>(string documentId, string indexName = null, CancellationToken cancellationToken = default)
+        public Task<T> GetAsync<T>(string documentId, string indexName = null, CancellationToken cancellationToken = default) where T : class
         {
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }
 
-        public Task<SearchResult<T>> SearchAsync<T>(SearchQuery query, string indexName = null, CancellationToken cancellationToken = default)
+        public Task<SearchResult<T>> SearchAsync<T>(SearchQuery query, string indexName = null, CancellationToken cancellationToken = default) where T : class
         {
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }
 
-        public Task<SearchResult<T>> TextSearchAsync<T>(string searchText, string[] fields = null, string indexName = null, CancellationToken cancellationToken = default)
+        public Task<SearchResult<T>> TextSearchAsync<T>(string searchText, string[] fields = null, string indexName = null, CancellationToken cancellationToken = default) where T : class
         {
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }
@@ -159,17 +204,17 @@ namespace OElite.Base
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }
 
-        public Task<bool> DeleteByQueryAsync<T>(Expression<Func<T, bool>> query, string indexName = null, CancellationToken cancellationToken = default)
+        public Task<bool> DeleteByQueryAsync<T>(Expression<Func<T, bool>> query, string indexName = null, CancellationToken cancellationToken = default) where T : class
         {
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }
 
-        public Task<AggregationResult> AggregateAsync<T>(AggregationQuery query, string indexName = null, CancellationToken cancellationToken = default)
+        public Task<AggregationResult> AggregateAsync<T>(AggregationQuery query, string indexName = null, CancellationToken cancellationToken = default) where T : class
         {
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }
 
-        public Task CreateIndexAsync<T>(string indexName = null, OpenSearchMapping mapping = null, CancellationToken cancellationToken = default)
+        public Task CreateIndexAsync<T>(string indexName = null, OpenSearchMapping mapping = null, CancellationToken cancellationToken = default) where T : class
         {
             throw new NotImplementedException("OpenSearch provider not available. Please install OElite.Restme.OpenSearch package and configure OpenSearch connection.");
         }

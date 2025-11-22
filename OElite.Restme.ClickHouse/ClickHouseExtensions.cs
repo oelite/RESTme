@@ -1,9 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite
 {
@@ -21,10 +18,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            await rest.ColumnarProvider.InsertAsync(data, tableName, cancellationToken);
+            await provider.InsertAsync(data, tableName, cancellationToken);
         }
 
         /// <summary>
@@ -36,10 +34,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            await rest.ColumnarProvider.BulkInsertAsync(data, tableName, cancellationToken);
+            await provider.BulkInsertAsync(data, tableName, cancellationToken);
         }
 
         /// <summary>
@@ -52,10 +51,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            return await rest.ColumnarProvider.QueryAsync(predicate, tableName, cancellationToken);
+            return await provider.QueryAsync(predicate, tableName, cancellationToken);
         }
 
         /// <summary>
@@ -67,10 +67,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            return await rest.ColumnarProvider.QueryAsync<T>(sql, parameters, cancellationToken);
+            return await provider.QueryAsync<T>(sql, parameters, cancellationToken);
         }
 
         /// <summary>
@@ -82,10 +83,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            return await rest.ColumnarProvider.CountAsync(tableName, whereClause, cancellationToken);
+            return await provider.CountAsync(tableName, whereClause, cancellationToken);
         }
 
         /// <summary>
@@ -98,10 +100,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            return await rest.ColumnarProvider.TimeSeriesAsync<T>(
+            return await provider.TimeSeriesAsync<T>(
                 tableName, start, end, groupBy, cancellationToken);
         }
 
@@ -114,10 +117,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            return await rest.ColumnarProvider.AggregateAsync(tableName, aggregationQuery, cancellationToken);
+            return await provider.AggregateAsync(tableName, aggregationQuery, cancellationToken);
         }
 
         /// <summary>
@@ -130,10 +134,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            await rest.ColumnarProvider.CreateTableAsync<T>(tableName, engine, cancellationToken);
+            await provider.CreateTableAsync<T>(tableName, engine, cancellationToken);
         }
 
         /// <summary>
@@ -145,10 +150,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            await rest.ColumnarProvider.SetTableTTLAsync(tableName, ttlExpression, cancellationToken);
+            await provider.SetTableTTLAsync(tableName, ttlExpression, cancellationToken);
         }
 
         /// <summary>
@@ -160,10 +166,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.ClickHouse)
                 throw new OEliteException("ClickHouse mode required");
 
-            if (rest.ColumnarProvider == null)
+            var provider = rest.GetProvider<IColumnarProvider>();
+            if (provider == null)
                 throw new OEliteException("ClickHouse provider not initialized");
 
-            await rest.ColumnarProvider.CreateTTLIndexAsync(tableName, columnName, ttl, cancellationToken);
+            await provider.CreateTTLIndexAsync(tableName, columnName, ttl, cancellationToken);
         }
     }
 }

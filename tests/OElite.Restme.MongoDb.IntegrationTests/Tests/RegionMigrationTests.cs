@@ -118,6 +118,7 @@ public class RegionMigrationTests : TestBase
         {
             new MigrationTestUser
             {
+                Id = DbObjectId.NewId(),
                 UserId = "user001",
                 Email = "john.doe@example.com",
                 FirstName = "John",
@@ -128,6 +129,7 @@ public class RegionMigrationTests : TestBase
             },
             new MigrationTestUser
             {
+                Id = DbObjectId.NewId(),
                 UserId = "user002",
                 Email = "jane.smith@example.com",
                 FirstName = "Jane",
@@ -161,6 +163,7 @@ public class RegionMigrationTests : TestBase
 
         var testUser = new MigrationTestUser
         {
+            Id = DbObjectId.NewId(),
             UserId = "migration_user001",
             Email = "migrate.me@example.com",
             FirstName = "Migration",
@@ -183,6 +186,7 @@ public class RegionMigrationTests : TestBase
         // Create audit trail
         var auditRecord = new MigrationAuditTrail
         {
+            Id = DbObjectId.NewId(),
             MigrationId = Guid.NewGuid().ToString(),
             UserId = testUser.UserId,
             SourceRegion = "us",
@@ -219,9 +223,9 @@ public class RegionMigrationTests : TestBase
 
         var bulkUsers = new[]
         {
-            new MigrationTestUser { UserId = "bulk001", Region = "legacy_region", Email = "bulk1@example.com", MigrationStatus = "pending_migration" },
-            new MigrationTestUser { UserId = "bulk002", Region = "legacy_region", Email = "bulk2@example.com", MigrationStatus = "pending_migration" },
-            new MigrationTestUser { UserId = "bulk003", Region = "legacy_region", Email = "bulk3@example.com", MigrationStatus = "pending_migration" }
+            new MigrationTestUser { Id = DbObjectId.NewId(), UserId = "bulk001", Region = "legacy_region", Email = "bulk1@example.com", MigrationStatus = "pending_migration" },
+            new MigrationTestUser { Id = DbObjectId.NewId(), UserId = "bulk002", Region = "legacy_region", Email = "bulk2@example.com", MigrationStatus = "pending_migration" },
+            new MigrationTestUser { Id = DbObjectId.NewId(), UserId = "bulk003", Region = "legacy_region", Email = "bulk3@example.com", MigrationStatus = "pending_migration" }
         };
 
         foreach (var user in bulkUsers)
@@ -297,9 +301,9 @@ public class RegionMigrationTests : TestBase
 
         var crossRegionUsers = new[]
         {
-            new MigrationTestUser { UserId = "cross001", Region = "us", Email = "us@example.com" },
-            new MigrationTestUser { UserId = "cross002", Region = "eu", Email = "eu@example.com" },
-            new MigrationTestUser { UserId = "cross003", Region = "ap", Email = "ap@example.com" }
+            new MigrationTestUser { Id = DbObjectId.NewId(), UserId = "cross001", Region = "us", Email = "us@example.com" },
+            new MigrationTestUser { Id = DbObjectId.NewId(), UserId = "cross002", Region = "eu", Email = "eu@example.com" },
+            new MigrationTestUser { Id = DbObjectId.NewId(), UserId = "cross003", Region = "ap", Email = "ap@example.com" }
         };
 
         foreach (var user in crossRegionUsers)

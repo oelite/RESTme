@@ -3,7 +3,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
-using OElite.Abstractions;
+using OElite.Providers;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Restme.Hosting.Redis
 {
@@ -16,7 +17,7 @@ namespace OElite.Restme.Hosting.Redis
         private readonly ICacheProvider _cacheProvider;
         private readonly string? _instancePrefix;
 
-        public RedisDistributedCache(ICacheProvider cacheProvider, string? instancePrefix = null)
+        public RedisDistributedCache(RedisCacheProvider cacheProvider, string? instancePrefix = null)
         {
             _cacheProvider = cacheProvider ?? throw new ArgumentNullException(nameof(cacheProvider));
             _instancePrefix = instancePrefix;

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
-using OElite.Abstractions;
-using OElite.Base;
+using OElite.Restme.Abstractions;
+using OElite.Restme.Base;
 using OElite.Restme.RateLimiting.Interfaces;
 using OElite.Restme.RateLimiting.Models;
 

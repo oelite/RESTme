@@ -1,5 +1,6 @@
 using System;
-using OElite.Abstractions;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Providers
 {
@@ -13,24 +14,59 @@ namespace OElite.Providers
             // Auto-register this factory when the assembly is loaded
             ServiceLocator.RegisterFactory("s3", new S3ServiceFactory());
         }
-        public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
+
+        /// <summary>
+        /// S3 supports Cache and Storage capabilities
+        /// </summary>
+        public ProviderCapabilities SupportedCapabilities => ProviderCapabilities.Cache | ProviderCapabilities.Storage;
+
+        /// <summary>
+        /// Checks if this factory can create the requested provider type
+        /// </summary>
+        public bool CanCreateProvider<T>() where T : class, IRestmeProvider
         {
-            return new S3CacheProvider(connectionString, config);
+            var requestedType = typeof(T);
+            return requestedType == typeof(ICacheProvider) || requestedType == typeof(IStorageProvider);
         }
 
-        public IQueueProvider CreateQueueProvider(string connectionString, RestConfig config)
+        /// <summary>
+        /// Generic provider creation with capability detection
+        /// </summary>
+        public T? CreateProvider<T>(RestConfig config) where T : class, IRestmeProvider
         {
-            throw new NotImplementedException("Queue operations not supported by S3 provider. Use RabbitMQ provider instead.");
+            var requestedType = typeof(T);
+
+            if (requestedType == typeof(ICacheProvider))
+            {
+                return new S3CacheProvider(config) as T;
+            }
+
+            if (requestedType == typeof(IStorageProvider))
+            {
+                return new S3StorageProvider(config) as T;
+            }
+
+            return null;
         }
 
-        public IStorageProvider CreateStorageProvider(string connectionString, RestConfig config)
+        public ICacheProvider? CreateCacheProvider(RestConfig config)
         {
-            return new S3StorageProvider(connectionString, config);
+            return new S3CacheProvider(config);
         }
 
-        public IHttpProvider CreateHttpProvider(RestConfig config)
+        public IQueueProvider? CreateQueueProvider(RestConfig config)
         {
-            throw new NotImplementedException("HTTP operations not supported by S3 provider. Use HTTP provider instead.");
+            return null;
+        }
+
+        public IStorageProvider? CreateStorageProvider(RestConfig config)
+        {
+            return new S3StorageProvider(config);
+        }
+
+        public IHttpProvider? CreateHttpProvider(RestConfig config)
+        {
+            return null;
         }
 
         public ILogProvider CreateLogProvider(RestConfig config)
@@ -38,19 +74,19 @@ namespace OElite.Providers
             return new DefaultLogProvider();
         }
 
-        public IColumnarProvider CreateColumnarProvider(string connectionString, RestConfig config)
+        public IColumnarProvider? CreateColumnarProvider(RestConfig config)
         {
-            throw new NotImplementedException("Columnar operations not supported by S3 provider. Use ClickHouse provider instead.");
+            return null;
         }
 
-        public IStreamingProvider CreateStreamingProvider(string connectionString, RestConfig config)
+        public IStreamingProvider? CreateStreamingProvider(RestConfig config)
         {
-            throw new NotImplementedException("Streaming operations not supported by S3 provider. Use Kafka provider instead.");
+            return null;
         }
 
-        public ISearchProvider CreateSearchProvider(string connectionString, RestConfig config)
+        public ISearchProvider? CreateSearchProvider(RestConfig config)
         {
-            throw new NotImplementedException("Search operations not supported by S3 provider. Use OpenSearch provider instead.");
+            return null;
         }
     }
 }

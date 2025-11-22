@@ -11,6 +11,8 @@ OElite.Restme.Redis provides a robust Redis integration for the OElite platform,
 
 ## Features
 
+- **Generic Provider Factory**: Auto-registered via `ServiceLocator` with capability detection
+- **Provider Capability**: `ProviderCapabilities.Cache` - Redis exclusively provides caching
 - **High-Performance Caching**: Lightning-fast Redis-based caching with connection multiplexing
 - **Automatic Serialization**: JSON serialization/deserialization with support for complex objects
 - **Connection Management**: Robust connection handling with automatic retry and failover
@@ -28,15 +30,52 @@ dotnet add package OElite.Restme.Redis
 
 ## Quick Start
 
+### Provider Factory Auto-Registration
+
+OElite.Restme.Redis automatically registers itself with the service locator when loaded:
+
+```csharp
+// Automatic registration happens when assembly is loaded
+// The RedisServiceFactory registers itself as "redis" provider
+
+// Check provider capabilities
+var factory = ServiceLocator.GetFactory("redis");
+var capabilities = factory?.SupportedCapabilities;
+// capabilities == ProviderCapabilities.Cache
+
+// Check if cache provider can be created
+bool canCreateCache = factory?.CanCreateProvider<ICacheProvider>() ?? false;
+// canCreateCache == true
+
+bool canCreateStorage = factory?.CanCreateProvider<IStorageProvider>() ?? false;
+// canCreateStorage == false (Redis only supports caching)
+```
+
 ### Basic Configuration
 
 ```csharp
-using OElite.Providers;
+using OElite;
+using OElite.Abstractions;
 
-// Configure Redis cache provider
-var connectionString = "localhost:6379";
-var config = new RestConfig();
-var cacheProvider = new RedisCacheProvider(connectionString, config);
+// Option 1: Using Rest with generic provider pattern (recommended)
+var rest = new Rest("redis://localhost:6379",
+    configuration: new RestConfig
+    {
+        OperationMode = RestMode.Redis,
+        AuthSecret = "your-password" // Optional
+    });
+
+// Get cache provider using generic factory pattern
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+
+// NEW: Named providers for multiple cache instances
+var primaryCache = rest.GetProvider<ICacheProvider>("primary");
+var sessionCache = rest.GetProvider<ICacheProvider>("sessions");
+var tempCache = rest.GetProvider<ICacheProvider>("temporary");
+
+// Option 2: Direct provider instantiation (still supported)
+var config = new RestConfig { AuthSecret = "your-redis-password" };
+var directProvider = new RedisCacheProvider("localhost:6379", config);
 ```
 
 ### Basic Cache Operations
@@ -163,6 +202,77 @@ public async Task<User> GetUserAsync(string userId)
 }
 ```
 
+### Named Cache Providers
+
+**NEW in v2.1.0**: Support for multiple cache provider instances using named providers:
+
+```csharp
+// Create Rest instance
+var rest = new Rest("redis://localhost:6379", new RestConfig { OperationMode = RestMode.Redis });
+
+// Get named cache providers for different use cases
+var userCache = rest.GetProvider<ICacheProvider>("users");
+var sessionCache = rest.GetProvider<ICacheProvider>("sessions");
+var apiCache = rest.GetProvider<ICacheProvider>("api-responses");
+var tempCache = rest.GetProvider<ICacheProvider>("temporary");
+
+// Use different cache providers for logical separation
+await userCache.SetAsync("user:123", userData, TimeSpan.FromMinutes(30));
+await sessionCache.SetAsync("session:abc123", sessionData, TimeSpan.FromHours(24));
+await apiCache.SetAsync("api:external-service:users", apiResponse, TimeSpan.FromMinutes(10));
+await tempCache.SetAsync("temp:processing:456", processingData, TimeSpan.FromMinutes(5));
+
+// Default provider (backward compatible)
+var defaultCache = rest.GetProvider<ICacheProvider>(); // Same as GetProvider<ICacheProvider>("default")
+
+// Named providers enable organized caching strategies
+public class UserService
+{
+    private readonly ICacheProvider _userProfileCache;
+    private readonly ICacheProvider _userPermissionsCache;
+    private readonly ICacheProvider _userPreferencesCache;
+
+    public UserService(Rest rest)
+    {
+        _userProfileCache = rest.GetProvider<ICacheProvider>("user-profiles");
+        _userPermissionsCache = rest.GetProvider<ICacheProvider>("user-permissions");
+        _userPreferencesCache = rest.GetProvider<ICacheProvider>("user-preferences");
+    }
+
+    public async Task<UserProfile> GetUserProfileAsync(string userId)
+    {
+        var cacheKey = $"profile:{userId}";
+
+        // Check cache first
+        var cached = await _userProfileCache.GetAsync<UserProfile>(cacheKey);
+        if (cached != null) return cached;
+
+        // Fetch from database and cache
+        var profile = await _userRepository.GetProfileAsync(userId);
+        if (profile != null)
+        {
+            await _userProfileCache.SetAsync(cacheKey, profile, TimeSpan.FromMinutes(15));
+        }
+
+        return profile;
+    }
+
+    public async Task<List<Permission>> GetUserPermissionsAsync(string userId)
+    {
+        var cacheKey = $"permissions:{userId}";
+
+        // Use dedicated permissions cache with longer TTL
+        var cached = await _userPermissionsCache.GetAsync<List<Permission>>(cacheKey);
+        if (cached != null) return cached;
+
+        var permissions = await _permissionService.GetUserPermissionsAsync(userId);
+        await _userPermissionsCache.SetAsync(cacheKey, permissions, TimeSpan.FromHours(1));
+
+        return permissions;
+    }
+}
+```
+
 ### Error Handling
 
 ```csharp
@@ -257,8 +367,18 @@ public class SessionManager
 
 ## Configuration
 
-### Connection String Options
+### Authentication Configuration
 
+#### Using RestConfig (Recommended)
+```csharp
+var config = new RestConfig
+{
+    AuthSecret = "your-redis-password" // Redis password
+};
+var cacheProvider = new RedisCacheProvider("localhost:6379", config);
+```
+
+#### Legacy Connection String Options (Still Supported)
 ```csharp
 // Basic connection
 "localhost:6379"

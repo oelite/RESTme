@@ -1,12 +1,12 @@
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 using OElite.Restme.Utils;
 
-namespace OElite
+namespace OElite.Restme
 {
-    public interface IRestme
+    public interface IRestme : IDisposable
     {
         Uri? BaseUri { get; set; }
         string? RequestUrlPath { get; set; }
@@ -74,13 +74,12 @@ namespace OElite
 
         RestMode CurrentMode { get; }
 
-        ICacheProvider? CacheProvider { get; }
-        IQueueProvider? QueueProvider { get; }
-        IStorageProvider? StorageProvider { get; }
-        IHttpProvider? HttpProvider { get; }
-        ILogProvider? LogProvider { get; }
-        IColumnarProvider? ColumnarProvider { get; }
-        IStreamingProvider? StreamingProvider { get; }
-        ISearchProvider? SearchProvider { get; }
+        /// <summary>
+        /// Get a provider instance based on the current RestMode configuration.
+        /// </summary>
+        /// <typeparam name="T">The provider interface type to retrieve.</typeparam>
+        /// <param name="name">Optional provider name for managing multiple instances of the same type. Defaults to "default".</param>
+        /// <returns>A provider instance if available for the current mode, null otherwise.</returns>
+        T? GetProvider<T>(string name = "default") where T : class, IRestmeProvider;
     }
 }

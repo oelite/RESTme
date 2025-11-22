@@ -11,6 +11,8 @@ OElite.Restme.RabbitMQ provides robust RabbitMQ integration for the OElite platf
 
 ## Features
 
+- **Generic Provider Factory**: Auto-registered via `ServiceLocator` with Queue capability
+- **Provider Capability**: `ProviderCapabilities.Queue` - RabbitMQ exclusively provides message queuing
 - **Reliable Message Queuing**: Enterprise-grade message queuing with delivery guarantees
 - **Publish-Subscribe Pattern**: Support for topic-based messaging and event broadcasting
 - **Automatic Serialization**: JSON serialization/deserialization for complex message types
@@ -32,20 +34,26 @@ dotnet add package OElite.Restme.RabbitMQ
 ### Basic Configuration
 
 ```csharp
-using OElite.Providers;
+using OElite;
+using OElite.Abstractions;
 
-// Basic RabbitMQ connection
-var connectionString = "localhost:5672";
-var config = new RestConfig();
-var queueProvider = new RabbitMQProvider(connectionString, config);
+// Option 1: Using Rest with generic provider pattern (recommended)
+var rest = new Rest("amqp://localhost:5672",
+    configuration: new RestConfig
+    {
+        OperationMode = RestMode.RabbitMq
+    });
 
-// With authentication
-var authConnection = "amqp://username:password@localhost:5672";
-var authProvider = new RabbitMQProvider(authConnection, config);
+// Get queue provider using generic factory pattern
+var queueProvider = rest.GetProvider<IQueueProvider>();
 
-// With virtual host
-var vhostConnection = "amqp://user:pass@host:5672|vhost=production";
-var vhostProvider = new RabbitMQProvider(vhostConnection, config);
+// Option 2: Direct provider instantiation (still supported)
+var directProvider = new RabbitMQProvider("localhost:5672", new RestConfig());
+
+// With authentication and virtual host
+var authRest = new Rest("amqp://user:pass@host:5672|vhost=production",
+    new RestConfig { OperationMode = RestMode.RabbitMq });
+var authQueue = authRest.GetProvider<IQueueProvider>();
 ```
 
 ### Basic Queue Operations

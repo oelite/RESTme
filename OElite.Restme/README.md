@@ -13,16 +13,21 @@ OElite.Restme is the foundational toolkit that provides unified access to extern
 
 ### 🌐 Universal REST Client
 - **RestMode Support**: HTTP, Redis, S3, RabbitMQ operations through unified interface
+- **Generic Provider Pattern**: Type-safe provider access with `GetProvider<T>()`
+- **Capability Detection**: Automatic provider capability checking before instantiation
 - **Async/Await Patterns**: Modern async programming support
 - **Connection Pooling**: Efficient resource management
 - **Timeout Management**: Configurable timeout handling
 - **Error Resilience**: Built-in retry mechanisms and failure handling
 
-### 🔧 Multi-protocol Support
+### 🔧 Multi-Protocol Support
 - **RestMode.Http**: Standard RESTful API calls
-- **RestMode.RedisAsCache**: Redis operations for caching
-- **RestMode.S3AsStorage**: S3-compatible storage operations
+- **RestMode.Redis**: Redis operations for caching
+- **RestMode.S3**: S3-compatible storage operations
 - **RestMode.RabbitMq**: Message queue operations
+- **RestMode.ClickHouse**: Columnar database operations
+- **RestMode.Kafka**: Streaming data operations
+- **RestMode.OpenSearch**: Full-text search operations
 - **RestMode.MongoDb**: MongoDB operations (when used with OElite.Restme.MongoDb)
 
 ### ⚡ Performance Optimized
@@ -39,7 +44,33 @@ OElite.Restme is the foundational toolkit that provides unified access to extern
 dotnet add package OElite.Restme
 ```
 
-### 2. Basic HTTP Client Usage
+### 2. Generic Provider Pattern (Recommended)
+
+```csharp
+using OElite;
+using OElite.Abstractions;
+
+// Create Rest instance with automatic provider factory
+var rest = new Rest("https://api.example.com",
+    configuration: new RestConfig
+    {
+        OperationMode = RestMode.Http,
+        DefaultTimeout = 30000
+    });
+
+// Get provider using generic pattern
+var httpProvider = rest.GetProvider<IHttpProvider>();
+var cacheProvider = rest.GetProvider<ICacheProvider>(); // Returns null if not available
+
+// Check provider capabilities before use
+if (httpProvider != null)
+{
+    // Use HTTP provider
+    var response = await rest.GetAsync<ApiResponse>("/users/123");
+}
+```
+
+### 3. Basic HTTP Client Usage
 
 ```csharp
 using OElite.Restme;
@@ -68,47 +99,219 @@ var headers = new Dictionary<string, string>
 var updatedUser = await apiClient.PutAsync<User>("/users/123", updateData, headers);
 ```
 
-### 3. Redis Cache Operations
+### 4. Redis Cache Operations
 
 ```csharp
-// Create Redis client
-var redisClient = new Rest("redis://localhost:6379",
+// Create Redis client with new provider pattern
+var redisRest = new Rest("redis://localhost:6379",
     configuration: new RestConfig
     {
-        OperationMode = RestMode.RedisAsCache,
+        OperationMode = RestMode.Redis,
         DefaultTimeout = 5000
     });
 
-// Cache operations
-await redisClient.SetAsync("user:123", userObject, TimeSpan.FromMinutes(30));
-var cachedUser = await redisClient.GetAsync<User>("user:123");
+// Access cache provider using generic pattern
+var cacheProvider = redisRest.GetProvider<ICacheProvider>();
 
-// Redis-specific operations
-await redisClient.DeleteAsync("user:123");
-var exists = await redisClient.ExistsAsync("user:123");
+if (cacheProvider != null)
+{
+    // Cache operations via provider
+    await cacheProvider.SetAsync("user:123", userObject, TimeSpan.FromMinutes(30));
+    var cachedUser = await cacheProvider.GetAsync<User>("user:123");
+    await cacheProvider.RemoveAsync("user:123");
+}
+
+// Or use convenience methods (backward compatible)
+await redisRest.Put("user:123", userObject, TimeSpan.FromMinutes(30));
+var cachedUser = await redisRest.Get<User>("user:123");
 ```
 
-### 4. S3 Storage Operations
+### 5. S3 Storage Operations
 
 ```csharp
-// Create S3 client
-var s3Client = new Rest("https://s3.amazonaws.com/my-bucket",
+// Create S3 client with new provider pattern
+var s3Rest = new Rest("https://s3.amazonaws.com",
     configuration: new RestConfig
     {
-        OperationMode = RestMode.S3AsStorage,
-        RestKey = "your-access-key",
-        RestSecret = "your-secret-key"
+        OperationMode = RestMode.S3,
+        AuthKey = "your-access-key",
+        AuthSecret = "your-secret-key"
     });
 
-// Upload file
-using var fileStream = File.OpenRead("document.pdf");
-await s3Client.UploadAsync("documents/document.pdf", fileStream, "application/pdf");
+// Access storage provider using generic pattern
+var storageProvider = s3Rest.GetProvider<IStorageProvider>();
 
-// Download file
-using var downloadStream = await s3Client.DownloadAsync("documents/document.pdf");
+if (storageProvider != null)
+{
+    // Storage operations via provider
+    await storageProvider.PutAsync("documents/document.pdf", pdfBytes);
+    var file = await storageProvider.GetAsync<byte[]>("documents/document.pdf");
+    await storageProvider.DeleteAsync("documents/document.pdf");
+}
 
-// List objects
-var objects = await s3Client.ListObjectsAsync("documents/");
+// Or use cache provider (S3 supports both!)
+var cacheProvider = s3Rest.GetProvider<ICacheProvider>();
+if (cacheProvider != null)
+{
+    await cacheProvider.SetAsync("cache:key", data, TimeSpan.FromHours(1));
+}
+```
+
+## Provider Factory System
+
+### Generic Provider Pattern
+
+OElite.Restme uses a modern factory pattern with automatic capability detection and supports **named providers** for advanced use cases:
+
+```csharp
+// Create Rest instance
+var rest = new Rest(connectionString, new RestConfig
+{
+    OperationMode = RestMode.Redis
+});
+
+// Get provider using type-safe generic pattern
+var cacheProvider = rest.GetProvider<ICacheProvider>();
+var storageProvider = rest.GetProvider<IStorageProvider>();
+var queueProvider = rest.GetProvider<IQueueProvider>();
+var columnarProvider = rest.GetProvider<IColumnarProvider>();
+var streamingProvider = rest.GetProvider<IStreamingProvider>();
+var searchProvider = rest.GetProvider<ISearchProvider>();
+
+// NEW: Named providers for multiple instances of the same type
+var primaryCache = rest.GetProvider<ICacheProvider>("primary");
+var secondaryCache = rest.GetProvider<ICacheProvider>("secondary");
+var analyticsCache = rest.GetProvider<ICacheProvider>("analytics");
+
+// Providers return null if not supported by current mode
+if (cacheProvider != null)
+{
+    await cacheProvider.SetAsync("key", value);
+}
+
+// Named providers enable complex architectures
+if (primaryCache != null && secondaryCache != null)
+{
+    // Use different cache instances for different purposes
+    await primaryCache.SetAsync("user:123", userData);
+    await secondaryCache.SetAsync("session:456", sessionData);
+}
+```
+
+### Provider Capabilities
+
+Each provider mode supports specific capabilities:
+
+| RestMode | Cache | Storage | Queue | Columnar | Streaming | Search |
+|----------|-------|---------|-------|----------|-----------|--------|
+| **Redis** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **S3** | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Azure** | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **RabbitMQ** | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **ClickHouse** | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| **Kafka** | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| **OpenSearch** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+### Capability Detection
+
+```csharp
+// Check capabilities before requesting provider
+var factory = ServiceLocator.GetFactory("redis");
+
+if (factory != null)
+{
+    // Check supported capabilities
+    var capabilities = factory.SupportedCapabilities;
+    Console.WriteLine($"Supports Cache: {capabilities.HasFlag(ProviderCapabilities.Cache)}");
+    Console.WriteLine($"Supports Storage: {capabilities.HasFlag(ProviderCapabilities.Storage)}");
+    
+    // Check if specific provider type can be created
+    if (factory.CanCreateProvider<ICacheProvider>())
+    {
+        var provider = factory.CreateProvider<ICacheProvider>(connectionString, config);
+    }
+}
+```
+
+### Multi-Provider Usage
+
+Use multiple providers simultaneously for different capabilities:
+
+```csharp
+// Redis for caching
+var redisRest = new Rest("redis://localhost:6379",
+    new RestConfig { OperationMode = RestMode.Redis });
+var cache = redisRest.GetProvider<ICacheProvider>();
+
+// S3 for storage
+var s3Rest = new Rest("https://s3.amazonaws.com",
+    new RestConfig { OperationMode = RestMode.S3, AuthKey = "key", AuthSecret = "secret" });
+var storage = s3Rest.GetProvider<IStorageProvider>();
+
+// RabbitMQ for queuing
+var rabbitRest = new Rest("amqp://localhost:5672",
+    new RestConfig { OperationMode = RestMode.RabbitMq });
+var queue = rabbitRest.GetProvider<IQueueProvider>();
+
+// Use together
+await cache.SetAsync("data:123", data, TimeSpan.FromMinutes(15));
+await storage.PutAsync("backups/data-123.json", data);
+await queue.PublishAsync("data.events", new DataCreatedEvent { Id = "123" });
+```
+
+### Named Providers
+
+**NEW in v2.1.0**: Support for multiple provider instances of the same type using named providers:
+
+```csharp
+// Create multiple Rest instances for different purposes
+var mainRest = new Rest("redis://main.cache:6379", new RestConfig { OperationMode = RestMode.Redis });
+var sessionRest = new Rest("redis://session.cache:6379", new RestConfig { OperationMode = RestMode.Redis });
+var analyticsRest = new Rest("redis://analytics.cache:6379", new RestConfig { OperationMode = RestMode.Redis });
+
+// Get named providers for different use cases
+var mainCache = mainRest.GetProvider<ICacheProvider>("primary");
+var sessionCache = sessionRest.GetProvider<ICacheProvider>("sessions");
+var analyticsCache = analyticsRest.GetProvider<ICacheProvider>("analytics");
+
+// Use different cache instances for different purposes
+await mainCache.SetAsync("user:123", userData, TimeSpan.FromMinutes(30));
+await sessionCache.SetAsync("session:abc", sessionData, TimeSpan.FromHours(24));
+await analyticsCache.SetAsync("metrics:daily", metricsData, TimeSpan.FromDays(1));
+
+// Default provider (backward compatible)
+var defaultCache = mainRest.GetProvider<ICacheProvider>(); // Same as GetProvider<ICacheProvider>("default")
+
+// Named providers enable clean separation of concerns
+public class CacheService
+{
+    private readonly ICacheProvider _userCache;
+    private readonly ICacheProvider _sessionCache;
+    private readonly ICacheProvider _tempCache;
+
+    public CacheService()
+    {
+        var rest = new Rest(connectionString, config);
+        _userCache = rest.GetProvider<ICacheProvider>("users");
+        _sessionCache = rest.GetProvider<ICacheProvider>("sessions");
+        _tempCache = rest.GetProvider<ICacheProvider>("temp");
+    }
+
+    public async Task CacheUserDataAsync(string userId, object userData)
+    {
+        await _userCache.SetAsync($"user:{userId}", userData, TimeSpan.FromMinutes(30));
+    }
+
+    public async Task CacheSessionAsync(string sessionId, object sessionData)
+    {
+        await _sessionCache.SetAsync($"session:{sessionId}", sessionData, TimeSpan.FromHours(24));
+    }
+
+    public async Task CacheTempDataAsync(string key, object data)
+    {
+        await _tempCache.SetAsync(key, data, TimeSpan.FromMinutes(5));
+    }
+}
 ```
 
 ## Advanced Usage
@@ -372,7 +575,7 @@ services.AddSingleton<Rest>(provider =>
         configuration: new RestConfig
         {
             OperationMode = RestMode.Http,
-            RestKey = config.GetApiKey("external-service"),
+            AuthKey = config.GetApiKey("external-service"),
             DefaultTimeout = 30000
         });
 });
@@ -382,7 +585,7 @@ services.AddSingleton<Rest>("PaymentApi", provider =>
     new Rest("https://payments.example.com", new RestConfig
     {
         OperationMode = RestMode.Http,
-        RestKey = provider.GetRequiredService<IConfiguration>()["PaymentApi:ApiKey"]
+        AuthKey = provider.GetRequiredService<IConfiguration>()["PaymentApi:ApiKey"]
     }));
 
 services.AddSingleton<Rest>("NotificationApi", provider =>
@@ -501,19 +704,30 @@ catch (RestmeException ex)
 
 ## Version History
 
-- **2.1.0**: Current version with .NET 10.0 support
-- Enhanced async/await patterns
-- Improved connection pooling and resource management
-- Extended S3-compatible storage support
-- Better error handling and resilience
-- Performance optimizations for high-throughput scenarios
+- **2.1.0**: Current version with major refactoring and .NET 10.0 support
+  - **Generic Provider Factory Pattern**: Type-safe `GetProvider<T>()` with capability detection
+  - **Capability-Based Architecture**: Factories declare supported provider types via `ProviderCapabilities` flags
+  - **Removed 350+ lines** of duplicate initialization code
+  - **Backward Compatible**: Existing code continues to work seamlessly
+  - Enhanced async/await patterns
+  - Improved connection pooling and resource management
+  - Extended provider ecosystem (ClickHouse, Kafka, OpenSearch)
+  - Better error handling and resilience
+  - Performance optimizations for high-throughput scenarios
 
 ## Related Packages
 
+### Provider Packages (Auto-Registered via Factory Pattern)
+- **OElite.Restme.Redis**: Redis caching provider (Cache capability)
+- **OElite.Restme.S3**: S3-compatible storage provider (Cache + Storage capabilities)
+- **OElite.Restme.Azure**: Azure storage provider (Cache + Storage capabilities)
+- **OElite.Restme.RabbitMQ**: RabbitMQ messaging provider (Queue capability)
+- **OElite.Restme.ClickHouse**: ClickHouse analytics provider (Columnar capability)
+- **OElite.Restme.Kafka**: Apache Kafka streaming provider (Streaming capability)
+- **OElite.Restme.OpenSearch**: OpenSearch/Elasticsearch provider (Search capability)
+
+### Core Packages
 - **OElite.Restme.MongoDb**: MongoDB integration and operations
-- **OElite.Restme.Redis**: Enhanced Redis operations and caching
-- **OElite.Restme.S3**: Extended S3-compatible storage features
-- **OElite.Restme.RabbitMQ**: RabbitMQ message queue operations
 - **OElite.Restme.Hosting**: Hosting integration and service registration
 - **OElite.Restme.Utils**: Utility functions and extensions
 - **OElite.Common**: Configuration integration and app config patterns

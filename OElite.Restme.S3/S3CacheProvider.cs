@@ -4,10 +4,11 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Providers
 {
@@ -21,32 +22,76 @@ namespace OElite.Providers
         private readonly S3Configuration _s3Config;
         protected bool Disposed = false;
 
-        public S3CacheProvider(string connectionString, RestConfig config) : base(config)
-        {
-            // Parse connection string to extract S3 configuration
-            _s3Config = S3ConnectionStringParser.ParseConnectionString(connectionString);
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public override string ProviderName => "S3Cache";
 
-            // Use credentials from config or parsed connection string
-            var accessKey = !string.IsNullOrEmpty(_s3Config.AccessKeyId) ? _s3Config.AccessKeyId : config.RestKey;
-            var secretKey = !string.IsNullOrEmpty(_s3Config.SecretAccessKey)
-                ? _s3Config.SecretAccessKey
-                : config.RestSecret;
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public override ProviderCapabilities Capabilities => ProviderCapabilities.Cache;
+
+        public S3CacheProvider(RestConfig config) : base(config)
+        {
+
+            // Use pre-parsed config values directly
+            var accessKey = config.AuthKey;
+            var secretKey = config.AuthSecret;
+
+            // Parse connection string for additional configuration if needed
+            S3Configuration? parsedConfig = null;
+            if (string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
+            {
+                if (!string.IsNullOrEmpty(config.ConnectionString))
+                {
+                    parsedConfig = S3ConnectionStringParser.ParseConnectionString(config.ConnectionString);
+                    accessKey = accessKey ?? parsedConfig.AccessKeyId;
+                    secretKey = secretKey ?? parsedConfig.SecretAccessKey;
+                }
+                else
+                {
+                    throw new InvalidOperationException("S3 credentials not provided. Set AuthKey and AuthSecret in RestConfig, or provide a connection string.");
+                }
+            }
 
             // Create AWS S3 client configuration
-            var s3Config = new AmazonS3Config
-            {
-                ServiceURL = _s3Config.ServiceUrl,
-                ForcePathStyle = _s3Config.ForcePathStyle,
-                UseHttp = _s3Config.UseHttp
-            };
+            var s3Config = new AmazonS3Config();
 
-            if (_s3Config.Region != null)
+            // Use config values with fallbacks to parsed connection string
+            if (!string.IsNullOrEmpty(config.Endpoint))
             {
-                s3Config.RegionEndpoint = _s3Config.Region;
+                s3Config.ServiceURL = config.Endpoint;
+            }
+            else if (parsedConfig?.ServiceUrl != null)
+            {
+                s3Config.ServiceURL = parsedConfig.ServiceUrl;
+            }
+
+            // Set region from config or parsed connection string
+            if (!string.IsNullOrEmpty(config.Region))
+            {
+                s3Config.RegionEndpoint = RegionEndpoint.GetBySystemName(config.Region);
+            }
+            else if (parsedConfig?.Region != null)
+            {
+                s3Config.RegionEndpoint = parsedConfig.Region;
+            }
+            else
+            {
+                s3Config.RegionEndpoint = RegionEndpoint.USEast1; // Default
+            }
+
+            // Set additional S3 config from parsed connection string if available
+            if (parsedConfig != null)
+            {
+                s3Config.ForcePathStyle = parsedConfig.ForcePathStyle;
+                s3Config.UseHttp = parsedConfig.UseHttp;
             }
 
             _s3Client = new AmazonS3Client(accessKey, secretKey, s3Config);
-            _bucketName = _s3Config.BucketName ?? "restme-cache";
+            _bucketName = config.InstanceName ?? parsedConfig?.BucketName ?? "restme-cache";
+            _s3Config = parsedConfig ?? new S3Configuration { RootPath = config.RootPath };
 
             // Ensure bucket exists
             _ = Task.Run(async () => await EnsureBucketExistsAsync());

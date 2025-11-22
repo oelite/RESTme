@@ -11,6 +11,8 @@ OElite.Restme.ClickHouse provides powerful ClickHouse integration for the OElite
 
 ## Features
 
+- **Generic Provider Factory**: Auto-registered via `ServiceLocator` with Columnar capability
+- **Provider Capability**: `ProviderCapabilities.Columnar` - ClickHouse provides columnar database operations
 - **LINQ Expression Support**: Write C# queries that automatically translate to ClickHouse SQL
 - **Time-Series Analytics**: Built-in time-series query helpers with automatic date filtering
 - **High-Performance Operations**: Optimized for ClickHouse's columnar architecture
@@ -32,12 +34,33 @@ dotnet add package OElite.Restme.ClickHouse
 
 ```csharp
 using OElite;
+using OElite.Abstractions;
 
-// Configure ClickHouse connection
-var rest = new Rest("clickhouse://localhost:8123", new RestConfig
+// Option 1: Using Rest with generic provider pattern (recommended)
+var rest = new Rest("clickhouse://localhost:8123",
+    configuration: new RestConfig
+    {
+        OperationMode = RestMode.ClickHouse,
+        AuthKey = "default",
+        AuthSecret = ""
+    });
+
+// Get columnar provider using generic factory pattern
+var columnarProvider = rest.GetProvider<IColumnarProvider>();
+
+// NEW: Named providers for multiple ClickHouse clusters/databases
+var analyticsProvider = rest.GetProvider<IColumnarProvider>("analytics");
+var loggingProvider = rest.GetProvider<IColumnarProvider>("logging");
+var metricsProvider = rest.GetProvider<IColumnarProvider>("metrics");
+
+// Option 2: Direct provider instantiation (still supported)
+var config = new RestConfig
 {
+    AuthKey = "default",
+    AuthSecret = "",
     OperationMode = RestMode.ClickHouse
-});
+};
+var rest = new Rest("clickhouse://localhost:8123", config);
 ```
 
 ### Define Data Models
@@ -230,6 +253,119 @@ var usersWithTags = await rest.QueryAsync<UserProfile>(u =>
     u.Tags.Contains("premium") && u.Tags.Length > 2);
 ```
 
+### Named Columnar Providers
+
+**NEW in v2.1.0**: Support for multiple columnar provider instances using named providers:
+
+```csharp
+// Create Rest instance
+var rest = new Rest("clickhouse://localhost:8123", new RestConfig { OperationMode = RestMode.ClickHouse });
+
+// Get named columnar providers for different purposes
+var analyticsProvider = rest.GetProvider<IColumnarProvider>("analytics");
+var loggingProvider = rest.GetProvider<IColumnarProvider>("logging");
+var metricsProvider = rest.GetProvider<IColumnarProvider>("metrics");
+var auditProvider = rest.GetProvider<IColumnarProvider>("audit");
+
+// Use different providers for logical separation
+await analyticsProvider.InsertAsync(userAnalyticsEvent, "user_analytics");
+await loggingProvider.InsertAsync(logEvent, "application_logs");
+await metricsProvider.InsertAsync(metricsEvent, "system_metrics");
+await auditProvider.InsertAsync(auditEvent, "security_audit");
+
+// Default provider (backward compatible)
+var defaultProvider = rest.GetProvider<IColumnarProvider>(); // Same as GetProvider<IColumnarProvider>("default")
+
+// Named providers enable organized analytics architecture
+public class AnalyticsService
+{
+    private readonly IColumnarProvider _userAnalytics;
+    private readonly IColumnarProvider _productAnalytics;
+    private readonly IColumnarProvider _systemAnalytics;
+
+    public AnalyticsService(Rest rest)
+    {
+        _userAnalytics = rest.GetProvider<IColumnarProvider>("user-analytics");
+        _productAnalytics = rest.GetProvider<IColumnarProvider>("product-analytics");
+        _systemAnalytics = rest.GetProvider<IColumnarProvider>("system-analytics");
+    }
+
+    public async Task<List<UserBehaviorSummary>> GetUserBehaviorAnalyticsAsync(DateTime fromDate, DateTime toDate)
+    {
+        return await _userAnalytics.QueryAsync<UserBehaviorSummary>(
+            e => e.Timestamp >= fromDate && e.Timestamp <= toDate &&
+                 e.EventType == "page_view");
+    }
+
+    public async Task<List<ProductPerformance>> GetProductAnalyticsAsync(string productCategory)
+    {
+        return await _productAnalytics.QueryAsync<ProductPerformance>(
+            p => p.Category == productCategory &&
+                 p.Timestamp >= DateTime.UtcNow.AddDays(-30));
+    }
+
+    public async Task<SystemMetricsSummary> GetSystemHealthAsync()
+    {
+        var hourlyStats = await _systemAnalytics.TimeSeriesAsync<SystemMetrics>(
+            "system_health",
+            DateTime.UtcNow.AddHours(-24),
+            DateTime.UtcNow,
+            "hour"
+        );
+
+        return new SystemMetricsSummary
+        {
+            AverageResponseTime = hourlyStats.Series.Average(s => s.Value.ResponseTime),
+            TotalRequests = hourlyStats.Series.Sum(s => s.Value.RequestCount),
+            ErrorRate = hourlyStats.Series.Average(s => s.Value.ErrorRate)
+        };
+    }
+}
+
+// Multi-cluster analytics with named providers
+public class MultiClusterAnalyticsService
+{
+    private readonly IColumnarProvider _onlineCluster;
+    private readonly IColumnarProvider _archivalCluster;
+    private readonly IColumnarProvider _realtimeCluster;
+
+    public MultiClusterAnalyticsService()
+    {
+        var onlineRest = new Rest("clickhouse://online.cluster:8123", new RestConfig { OperationMode = RestMode.ClickHouse });
+        var archivalRest = new Rest("clickhouse://archival.cluster:8123", new RestConfig { OperationMode = RestMode.ClickHouse });
+        var realtimeRest = new Rest("clickhouse://realtime.cluster:8123", new RestConfig { OperationMode = RestMode.ClickHouse });
+
+        _onlineCluster = onlineRest.GetProvider<IColumnarProvider>("online");
+        _archivalCluster = archivalRest.GetProvider<IColumnarProvider>("archival");
+        _realtimeCluster = realtimeRest.GetProvider<IColumnarProvider>("realtime");
+    }
+
+    public async Task<List<T>> GetRecentDataAsync<T>(string tableName, int lastHours = 24) where T : class
+    {
+        // Query recent data from real-time cluster
+        return await _realtimeCluster.QueryAsync<T>(
+            $"SELECT * FROM {tableName} WHERE timestamp >= now() - INTERVAL {lastHours} HOUR ORDER BY timestamp DESC");
+    }
+
+    public async Task<List<T>> GetHistoricalDataAsync<T>(string tableName, DateTime fromDate, DateTime toDate) where T : class
+    {
+        // Query historical data from archival cluster for better performance on large datasets
+        return await _archivalCluster.QueryAsync<T>(
+            $"SELECT * FROM {tableName} WHERE date >= @fromDate AND date <= @toDate",
+            new { fromDate, toDate });
+    }
+
+    public async Task StoreRealtimeEventAsync<T>(T eventData, string tableName) where T : class
+    {
+        // Store in real-time cluster for immediate querying
+        await _realtimeCluster.InsertAsync(eventData, tableName);
+
+        // Also store in online cluster for balanced queries
+        await _onlineCluster.InsertAsync(eventData, tableName);
+    }
+}
+```
+
 ### Performance Optimization
 
 ```csharp
@@ -294,8 +430,20 @@ e => e.CreatedAt.Month == 1
 
 ## Configuration Options
 
-### Connection Strings
+### Authentication Configuration
 
+#### Using RestConfig (Recommended)
+```csharp
+var config = new RestConfig
+{
+    AuthKey = "default",        // ClickHouse username
+    AuthSecret = "password",    // ClickHouse password
+    OperationMode = RestMode.ClickHouse
+};
+var rest = new Rest("clickhouse://localhost:8123", config);
+```
+
+#### Legacy Connection Strings (Still Supported)
 ```csharp
 // Basic connection
 "clickhouse://localhost:8123"

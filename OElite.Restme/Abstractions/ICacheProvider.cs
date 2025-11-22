@@ -2,12 +2,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Interface for cache operations (Redis, etc.)
     /// </summary>
-    public interface ICacheProvider : IDisposable
+    public interface ICacheProvider : IRestmeProvider
     {
         /// <summary>
         /// Get cached data by key

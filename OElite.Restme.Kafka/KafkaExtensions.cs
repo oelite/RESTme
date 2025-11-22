@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite
 {
@@ -20,10 +21,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            if (rest.StreamingProvider == null)
+            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
-            await rest.StreamingProvider.PublishAsync(message, topicName, key, cancellationToken);
+            await streamingProvider.PublishAsync(message, topicName, key, cancellationToken);
         }
 
         /// <summary>
@@ -35,10 +37,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            if (rest.StreamingProvider == null)
+            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
-            await rest.StreamingProvider.PublishBatchAsync(messages, topicName, keySelector, cancellationToken);
+            await streamingProvider.PublishBatchAsync(messages, topicName, keySelector, cancellationToken);
         }
 
         /// <summary>
@@ -50,10 +53,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            if (rest.StreamingProvider == null)
+            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
-            await rest.StreamingProvider.SubscribeAsync(topicName, consumerGroup, messageHandler, cancellationToken);
+            await streamingProvider.SubscribeAsync(topicName, consumerGroup, messageHandler, cancellationToken);
         }
 
         /// <summary>
@@ -65,10 +69,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            if (rest.StreamingProvider == null)
+            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
-            await rest.StreamingProvider.SubscribePatternAsync(topicPattern, consumerGroup, messageHandler, cancellationToken);
+            await streamingProvider.SubscribePatternAsync(topicPattern, consumerGroup, messageHandler, cancellationToken);
         }
 
         /// <summary>
@@ -80,10 +85,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            if (rest.StreamingProvider == null)
+            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
-            return await rest.StreamingProvider.ListTopicsAsync(cancellationToken);
+            return await streamingProvider.ListTopicsAsync(cancellationToken);
         }
 
         /// <summary>
@@ -95,10 +101,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            if (rest.StreamingProvider == null)
+            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
-            await rest.StreamingProvider.SetTopicRetentionAsync(topicName, retentionPeriod, cancellationToken);
+            await streamingProvider.SetTopicRetentionAsync(topicName, retentionPeriod, cancellationToken);
         }
 
         /// <summary>
@@ -110,10 +117,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            if (rest.StreamingProvider == null)
+            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
-            await rest.StreamingProvider.SetMessageExpiryAsync(topicName, maxAge, cancellationToken);
+            await streamingProvider.SetMessageExpiryAsync(topicName, maxAge, cancellationToken);
         }
 
         /// <summary>
@@ -125,10 +133,11 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            if (rest.StreamingProvider == null)
+            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
-            await rest.StreamingProvider.CreateTopicAsync(topicName, partitions, replicationFactor, cancellationToken);
+            await streamingProvider.CreateTopicAsync(topicName, partitions, replicationFactor, cancellationToken);
         }
 
 

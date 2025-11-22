@@ -11,6 +11,8 @@ OElite.Restme.OpenSearch provides powerful OpenSearch integration for the OElite
 
 ## Features
 
+- **Generic Provider Factory**: Auto-registered via `ServiceLocator` with Search capability
+- **Provider Capability**: `ProviderCapabilities.Search` - OpenSearch provides search operations
 - **Document Operations**: Index, search, update, and delete documents
 - **Full-Text Search**: Powerful text search with field-specific queries
 - **Bulk Operations**: High-throughput bulk indexing and operations
@@ -31,8 +33,21 @@ dotnet add package OElite.Restme.OpenSearch
 
 ```csharp
 using OElite;
+using OElite.Abstractions;
 
-// Configure OpenSearch connection
+// Option 1: Using Rest with generic provider pattern (recommended)
+var rest = new Rest("opensearch://localhost:9200",
+    configuration: new RestConfig
+    {
+        OperationMode = RestMode.OpenSearch,
+        AuthKey = "admin",
+        AuthSecret = "password"
+    });
+
+// Get search provider using generic factory pattern
+var searchProvider = rest.GetProvider<ISearchProvider>();
+
+// Option 2: Legacy connection string (still supported)
 var rest = new Rest("opensearch://localhost:9200", new RestConfig
 {
     OperationMode = RestMode.OpenSearch
@@ -168,8 +183,20 @@ await rest.DeleteByQueryAsync<Product>(
 
 ## Configuration Options
 
-### Connection Strings
+### Authentication Configuration
 
+#### Using RestConfig (Recommended)
+```csharp
+var config = new RestConfig
+{
+    AuthKey = "admin",        // OpenSearch username
+    AuthSecret = "password",  // OpenSearch password
+    OperationMode = RestMode.OpenSearch
+};
+var rest = new Rest("opensearch://localhost:9200", config);
+```
+
+#### Legacy Connection Strings (Still Supported)
 ```csharp
 // Basic connection
 "opensearch://localhost:9200"

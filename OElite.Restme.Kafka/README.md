@@ -11,6 +11,8 @@ OElite.Restme.Kafka provides powerful Kafka integration for the OElite platform,
 
 ## Features
 
+- **Generic Provider Factory**: Auto-registered via `ServiceLocator` with Streaming capability
+- **Provider Capability**: `ProviderCapabilities.Streaming` - Kafka provides streaming operations
 - **Simple Publishing**: Stream messages to topics with automatic serialization
 - **Batch Operations**: High-throughput batch publishing with custom partitioning
 - **Consumer Groups**: Simplified consumer group management and load balancing
@@ -32,8 +34,26 @@ dotnet add package OElite.Restme.Kafka
 
 ```csharp
 using OElite;
+using OElite.Abstractions;
 
-// Configure Kafka connection
+// Option 1: Using Rest with generic provider pattern (recommended)
+var rest = new Rest("kafka://localhost:9092",
+    configuration: new RestConfig
+    {
+        OperationMode = RestMode.Kafka,
+        AuthKey = "kafka-user",        // Optional
+        AuthSecret = "kafka-password"  // Optional
+    });
+
+// Get streaming provider using generic factory pattern
+var streamingProvider = rest.GetProvider<IStreamingProvider>();
+
+// NEW: Named providers for multiple Kafka clusters
+var orderStreamProvider = rest.GetProvider<IStreamingProvider>("orders");
+var analyticsStreamProvider = rest.GetProvider<IStreamingProvider>("analytics");
+var loggingStreamProvider = rest.GetProvider<IStreamingProvider>("logging");
+
+// Option 2: Legacy connection string (still supported)
 var rest = new Rest("kafka://localhost:9092", new RestConfig
 {
     OperationMode = RestMode.Kafka
@@ -119,6 +139,94 @@ await rest.SubscribeAsync<OrderEvent>("orders", "notification-service", SendNoti
 await rest.SubscribeAsync<OrderEvent>("orders", "analytics-service", UpdateAnalytics);
 ```
 
+### Named Streaming Providers
+
+**NEW in v2.1.0**: Support for multiple streaming provider instances using named providers:
+
+```csharp
+// Create Rest instance
+var rest = new Rest("kafka://localhost:9092", new RestConfig { OperationMode = RestMode.Kafka });
+
+// Get named streaming providers for different purposes
+var orderStreaming = rest.GetProvider<IStreamingProvider>("orders");
+var eventStreaming = rest.GetProvider<IStreamingProvider>("events");
+var analyticsStreaming = rest.GetProvider<IStreamingProvider>("analytics");
+var loggingStreaming = rest.GetProvider<IStreamingProvider>("logging");
+
+// Use different streaming providers for logical separation
+await orderStreaming.PublishAsync(orderEvent, "order-events", orderEvent.UserId);
+await eventStreaming.PublishAsync(userEvent, "user-events", userEvent.UserId);
+await analyticsStreaming.PublishAsync(analyticsEvent, "analytics-events");
+await loggingStreaming.PublishAsync(logEvent, "application-logs");
+
+// Default provider (backward compatible)
+var defaultStreaming = rest.GetProvider<IStreamingProvider>(); // Same as GetProvider<IStreamingProvider>("default")
+
+// Named providers enable clean streaming architecture
+public class EventPublishingService
+{
+    private readonly IStreamingProvider _orderStreaming;
+    private readonly IStreamingProvider _userStreaming;
+    private readonly IStreamingProvider _systemStreaming;
+
+    public EventPublishingService(Rest rest)
+    {
+        _orderStreaming = rest.GetProvider<IStreamingProvider>("orders");
+        _userStreaming = rest.GetProvider<IStreamingProvider>("users");
+        _systemStreaming = rest.GetProvider<IStreamingProvider>("system");
+    }
+
+    public async Task PublishOrderEventAsync(OrderEvent orderEvent)
+    {
+        await _orderStreaming.PublishAsync(orderEvent, "order-processing", orderEvent.OrderId);
+    }
+
+    public async Task PublishUserEventAsync(UserEvent userEvent)
+    {
+        await _userStreaming.PublishAsync(userEvent, "user-activity", userEvent.UserId);
+    }
+
+    public async Task PublishSystemEventAsync(SystemEvent systemEvent)
+    {
+        await _systemStreaming.PublishAsync(systemEvent, "system-monitoring", systemEvent.Source);
+    }
+}
+
+// Multi-cluster streaming with named providers
+public class MultiClusterEventService
+{
+    private readonly IStreamingProvider _primaryCluster;
+    private readonly IStreamingProvider _analyticsCluster;
+    private readonly IStreamingProvider _backupCluster;
+
+    public MultiClusterEventService()
+    {
+        var primaryRest = new Rest("kafka://primary.cluster:9092", new RestConfig { OperationMode = RestMode.Kafka });
+        var analyticsRest = new Rest("kafka://analytics.cluster:9092", new RestConfig { OperationMode = RestMode.Kafka });
+        var backupRest = new Rest("kafka://backup.cluster:9092", new RestConfig { OperationMode = RestMode.Kafka });
+
+        _primaryCluster = primaryRest.GetProvider<IStreamingProvider>("primary");
+        _analyticsCluster = analyticsRest.GetProvider<IStreamingProvider>("analytics");
+        _backupCluster = backupRest.GetProvider<IStreamingProvider>("backup");
+    }
+
+    public async Task PublishCriticalEventAsync<T>(T eventData, string topic) where T : class
+    {
+        // Publish to both primary and backup clusters
+        var publishTasks = new[]
+        {
+            _primaryCluster.PublishAsync(eventData, topic),
+            _backupCluster.PublishAsync(eventData, $"backup-{topic}")
+        };
+
+        await Task.WhenAll(publishTasks);
+
+        // Also send to analytics cluster for processing
+        await _analyticsCluster.PublishAsync(eventData, $"analytics-{topic}");
+    }
+}
+```
+
 ### Error Handling and Resilience
 
 ```csharp
@@ -136,8 +244,20 @@ catch (KafkaException ex)
 
 ## Configuration Options
 
-### Connection Strings
+### Authentication Configuration
 
+#### Using RestConfig (Recommended)
+```csharp
+var config = new RestConfig
+{
+    AuthKey = "kafka-user",        // SASL username (optional)
+    AuthSecret = "kafka-password", // SASL password (optional)
+    OperationMode = RestMode.Kafka
+};
+var rest = new Rest("kafka://localhost:9092", config);
+```
+
+#### Legacy Connection Strings (Still Supported)
 ```csharp
 // Basic connection
 "kafka://localhost:9092"

@@ -5,6 +5,7 @@ A powerful, modular .NET library that provides a unified interface for HTTP requ
 ## 🚀 Features
 
 - **Unified API**: Single `Rest` class for all operations
+- **Named Provider Support**: Multiple provider instances of the same type with `GetProvider<T>(string name)`
 - **Modular Architecture**: Load only the backends you need
 - **Multiple Backend Support**: Redis, RabbitMQ, Azure Blob Storage, S3-compatible providers, ClickHouse, Kafka, OpenSearch
 - **Cache Providers**: Redis, Azure Blob Storage, S3 (perfect for CDN scenarios)
@@ -93,7 +94,14 @@ await rest.DeleteAsync("/users/123");
 
 ```csharp
 // Add OElite.Restme.Redis package
-var rest = new Rest("localhost:6379", RestMode.RedisCacheClient);
+var rest = new Rest("localhost:6379", RestMode.Redis);
+
+// Or use RestConfig for authentication
+var config = new RestConfig
+{
+    AuthSecret = "your-redis-password" // For password-protected Redis
+};
+var rest = new Rest("localhost:6379", config, RestMode.Redis);
 
 // Cache data with expiry
 await rest.CachemeAsync("user:123", userData, 60); // 60 minutes
@@ -109,8 +117,19 @@ await rest.RemovemeAsync("user:123");
 
 ```csharp
 // Add OElite.Restme.Azure package
-var connectionString = "DefaultEndpointsProtocol=https;AccountName=...;RootPath=my-app/uploads";
-var rest = new Rest(connectionString, RestMode.AzureStorageClient);
+
+// Option 1: Using RestConfig (recommended)
+var config = new RestConfig
+{
+    AuthKey = "your-account-name",      // Azure Storage Account Name
+    AuthSecret = "your-account-key",    // Azure Storage Account Key
+    Endpoint = "core.windows.net",      // Optional: Azure endpoint
+    RootPath = "my-app/uploads"         // Optional: Logical path prefix
+};
+var rest = new Rest("DefaultEndpointsProtocol=https", config, RestMode.Azure);
+
+// Option 2: Legacy connection string (still supported)
+var rest = new Rest("DefaultEndpointsProtocol=https;AccountName=...;RootPath=my-app/uploads", RestMode.Azure);
 
 // Store data (rootPath is automatically prefixed)
 await rest.StoremAsync("documents/report.pdf", fileData); // Stored as "my-app/uploads/documents/report.pdf"
@@ -127,14 +146,42 @@ await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(1));
 ```csharp
 // Add OElite.Restme.S3 package
 
-// Amazon S3
-var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;Region=us-west-2", RestMode.S3Client);
+// Option 1: Using RestConfig (recommended)
+var config = new RestConfig
+{
+    AuthKey = "your-access-key-id",     // S3 Access Key ID
+    AuthSecret = "your-secret-access-key", // S3 Secret Access Key
+    Endpoint = "https://s3.amazonaws.com", // S3 endpoint
+    Region = "us-west-2",               // AWS region
+    BucketName = "my-bucket",           // S3 bucket name
+    RootPath = "my-app/uploads"         // Optional: Logical path prefix
+};
+var rest = new Rest("s3://", config, RestMode.S3);
 
-// Backblaze B2 with root path
-var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;ServiceUrl=https://s3.us-west-004.backblazeb2.com;ForcePathStyle=true;RootPath=my-app/uploads", RestMode.S3Client);
+// Option 2: Legacy connection string (still supported)
+var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;Region=us-west-2", RestMode.S3);
 
-// MinIO (local development) with root path
-var rest = new Rest("AccessKeyId=minioadmin;SecretAccessKey=minioadmin;ServiceUrl=http://localhost:9000;ForcePathStyle=true;UseHttp=true;RootPath=dev/cache", RestMode.S3Client);
+// Backblaze B2 with RestConfig
+var b2Config = new RestConfig
+{
+    AuthKey = "your-b2-key-id",
+    AuthSecret = "your-b2-secret",
+    Endpoint = "https://s3.us-west-004.backblazeb2.com",
+    BucketName = "my-bucket",
+    RootPath = "my-app/uploads"
+};
+var rest = new Rest("s3://", b2Config, RestMode.S3);
+
+// MinIO (local development) with RestConfig
+var minioConfig = new RestConfig
+{
+    AuthKey = "minioadmin",
+    AuthSecret = "minioadmin",
+    Endpoint = "http://localhost:9000",
+    BucketName = "my-bucket",
+    RootPath = "dev/cache"
+};
+var rest = new Rest("s3://", minioConfig, RestMode.S3);
 
 // Store and cache operations (rootPath is automatically prefixed)
 await rest.StoremAsync("files/document.pdf", fileData); // Stored as "my-app/uploads/files/document.pdf"
@@ -145,7 +192,17 @@ await rest.CachemeAsync("cache:key", data, TimeSpan.FromHours(2)); // Cached as 
 
 ```csharp
 // Add OElite.Restme.RabbitMQ package
-var rest = new Rest("amqp://localhost", RestMode.RabbitMq);
+
+// Option 1: Using RestConfig (recommended)
+var config = new RestConfig
+{
+    AuthKey = "guest",        // RabbitMQ username
+    AuthSecret = "guest"      // RabbitMQ password
+};
+var rest = new Rest("amqp://localhost", config, RestMode.RabbitMq);
+
+// Option 2: Legacy connection string (still supported)
+var rest = new Rest("amqp://guest:guest@localhost", RestMode.RabbitMq);
 
 // Publish message
 await rest.QueuemeAsync("user.created", userData);
@@ -161,22 +218,34 @@ await rest.DomeAsync<User>("user.created", async (user) => {
 
 ```csharp
 // Add OElite.Restme.ClickHouse package
-var rest = new Rest("clickhouse://localhost:8123", new RestConfig
+
+// Option 1: Using RestConfig (recommended)
+var config = new RestConfig
+{
+    AuthKey = "default",        // ClickHouse username
+    AuthSecret = "",            // ClickHouse password (empty for default)
+    OperationMode = RestMode.ClickHouse
+};
+var rest = new Rest("clickhouse://localhost:8123", config);
+
+// Option 2: Legacy connection string (still supported)
+var rest = new Rest("clickhouse://default:password@localhost:8123", new RestConfig
 {
     OperationMode = RestMode.ClickHouse
 });
 
-// LINQ-style queries (automatically translated to SQL)
-var activeUsers = await rest.QueryAsync<UserEvent>(
+// LINQ expressions automatically translate to ClickHouse SQL
+var recentEvents = await rest.QueryAsync<UserEvent>(
     e => e.Timestamp > DateTime.UtcNow.AddHours(-1) &&
-         e.EventType == "login");
+         e.EventType == "page_view");
 
 // Time-series analytics
 var hourlyStats = await rest.TimeSeriesAsync<UserEvent>(
     "user_events",
-    DateTime.UtcNow.AddDays(-7),
-    DateTime.UtcNow,
-    "hour");
+    DateTime.UtcNow.AddDays(-7),  // Start date
+    DateTime.UtcNow,              // End date
+    "hour"                        // Group by hour
+);
 
 // Aggregation queries
 var userAnalytics = await rest.AggregateAsync(
@@ -194,6 +263,17 @@ var results = await rest.QueryAsync<UserAnalytics>(
 
 ```csharp
 // Add OElite.Restme.Kafka package
+
+// Option 1: Using RestConfig (recommended)
+var config = new RestConfig
+{
+    AuthKey = "kafka-user",        // SASL username (optional)
+    AuthSecret = "kafka-password", // SASL password (optional)
+    OperationMode = RestMode.Kafka
+};
+var rest = new Rest("kafka://localhost:9092", config);
+
+// Option 2: Legacy connection string (still supported)
 var rest = new Rest("kafka://localhost:9092", new RestConfig
 {
     OperationMode = RestMode.Kafka
@@ -213,10 +293,10 @@ await rest.SubscribeAsync<OrderEvent>("orders", "order-processor",
     });
 
 // Stream processing
-var orderStream = await rest.ProcessAsync<OrderEvent>("orders", "analytics");
+var orderStream = await rest.ProcessAsync<OrderEvent>("orders", "realtime-analytics");
 await foreach (var order in orderStream.Messages)
 {
-    await UpdateAnalyticsAsync(order);
+    await UpdateRealTimeMetricsAsync(order);
 }
 ```
 
@@ -224,6 +304,17 @@ await foreach (var order in orderStream.Messages)
 
 ```csharp
 // Add OElite.Restme.OpenSearch package
+
+// Option 1: Using RestConfig (recommended)
+var config = new RestConfig
+{
+    AuthKey = "admin",        // OpenSearch username
+    AuthSecret = "password",  // OpenSearch password
+    OperationMode = RestMode.OpenSearch
+};
+var rest = new Rest("opensearch://localhost:9200", config);
+
+// Option 2: Legacy connection string (still supported)
 var rest = new Rest("opensearch://localhost:9200", new RestConfig
 {
     OperationMode = RestMode.OpenSearch
@@ -250,7 +341,94 @@ var expensiveProducts = await rest.SearchAsync<Product>(
 var product = await rest.GetAsync<Product>("123", "products");
 ```
 
-### 9. Base Providers (No additional packages required)
+### 9. Named Providers (NEW in v2.1.0)
+
+**NEW Feature**: Support for multiple provider instances of the same type using named providers:
+
+```csharp
+using OElite;
+
+// Create Rest instance
+var rest = new Rest("redis://localhost:6379", new RestConfig { OperationMode = RestMode.Redis });
+
+// Get named providers for different purposes
+var userCache = rest.GetProvider<ICacheProvider>("users");
+var sessionCache = rest.GetProvider<ICacheProvider>("sessions");
+var apiCache = rest.GetProvider<ICacheProvider>("api-responses");
+var tempCache = rest.GetProvider<ICacheProvider>("temporary");
+
+// Use different cache providers for logical separation
+await userCache.SetAsync("user:123", userData, TimeSpan.FromMinutes(30));
+await sessionCache.SetAsync("session:abc123", sessionData, TimeSpan.FromHours(24));
+await apiCache.SetAsync("api:external-service:users", apiResponse, TimeSpan.FromMinutes(10));
+await tempCache.SetAsync("temp:processing:456", processingData, TimeSpan.FromMinutes(5));
+
+// Default provider (backward compatible)
+var defaultCache = rest.GetProvider<ICacheProvider>(); // Same as GetProvider<ICacheProvider>("default")
+
+// Named providers work with all provider types
+var orderStreaming = rest.GetProvider<IStreamingProvider>("orders");
+var analyticsStreaming = rest.GetProvider<IStreamingProvider>("analytics");
+var primaryStorage = rest.GetProvider<IStorageProvider>("primary");
+var backupStorage = rest.GetProvider<IStorageProvider>("backup");
+
+// Example: Multi-tier architecture with named providers
+public class MultiTierDataService
+{
+    private readonly ICacheProvider _l1Cache;    // Fast cache
+    private readonly ICacheProvider _l2Cache;    // Slower but larger cache
+    private readonly IStorageProvider _hotStorage;   // Frequently accessed data
+    private readonly IStorageProvider _coldStorage;  // Archival data
+
+    public MultiTierDataService(Rest rest)
+    {
+        _l1Cache = rest.GetProvider<ICacheProvider>("l1-cache");
+        _l2Cache = rest.GetProvider<ICacheProvider>("l2-cache");
+        _hotStorage = rest.GetProvider<IStorageProvider>("hot-storage");
+        _coldStorage = rest.GetProvider<IStorageProvider>("cold-storage");
+    }
+
+    public async Task<T> GetDataAsync<T>(string key) where T : class
+    {
+        // Try L1 cache first (fastest)
+        var l1Data = await _l1Cache.GetAsync<T>(key);
+        if (l1Data != null) return l1Data;
+
+        // Try L2 cache
+        var l2Data = await _l2Cache.GetAsync<T>(key);
+        if (l2Data != null)
+        {
+            // Store in L1 for next time
+            await _l1Cache.SetAsync(key, l2Data, TimeSpan.FromMinutes(5));
+            return l2Data;
+        }
+
+        // Try hot storage
+        var hotData = await _hotStorage.GetAsync<T>(key);
+        if (hotData != null)
+        {
+            // Cache in both levels
+            await _l1Cache.SetAsync(key, hotData, TimeSpan.FromMinutes(5));
+            await _l2Cache.SetAsync(key, hotData, TimeSpan.FromHours(1));
+            return hotData;
+        }
+
+        // Fallback to cold storage
+        var coldData = await _coldStorage.GetAsync<T>(key);
+        if (coldData != null)
+        {
+            // Cache in all levels
+            await _l1Cache.SetAsync(key, coldData, TimeSpan.FromMinutes(5));
+            await _l2Cache.SetAsync(key, coldData, TimeSpan.FromHours(1));
+            await _hotStorage.SetAsync(key, coldData); // Promote to hot storage
+        }
+
+        return coldData;
+    }
+}
+```
+
+### 10. Base Providers (No additional packages required)
 
 Use built-in base providers for simple scenarios without external infrastructure.
 
@@ -259,7 +437,20 @@ using OElite;
 
 // Memory cache
 var restMemoryCache = new Rest(
-    configuration: new RestConfig { OperationMode = RestMode.MemoryAsCache }
+    configuration: new RestConfig { OperationMode = RestMode.Memory }
+);
+await restMemoryCache.CachemeAsync("user:123", userData, TimeSpan.FromMinutes(30));
+
+// Local file system storage (uses default AppContext.BaseDirectory/restme_storage)
+var restLocalFs = new Rest(
+    endPointOrConnectionString: "/var/data/myapp", // optional base directory; omit to use default
+    configuration: new RestConfig { OperationMode = RestMode.LocalFileSystem }
+);
+await restLocalFs.StoremAsync("docs/report.pdf", fileBytes);
+
+// In-memory queue (single-process)
+var restInMemoryQueue = new Rest(
+    configuration: new RestConfig { OperationMode = RestMode.Memory }
 );
 await restMemoryCache.CachemeAsync("user:123", userData, TimeSpan.FromMinutes(30));
 var cached = await restMemoryCache.FindmeAsync<User>("user:123");
@@ -288,38 +479,120 @@ await restInMemoryQueue.DomeAsync<User>("events.user.created", async user => {
 ### RestMode Options
 
 - `RestMode.Http` - HTTP REST client
-- `RestMode.RedisCacheClient` - Redis caching
-- `RestMode.AzureStorageClient` - Azure Blob Storage
-- `RestMode.S3Client` - S3-compatible storage
+- `RestMode.HttpRest` - HTTP REST client (alternative)
+- `RestMode.Redis` - Redis caching and queuing
+- `RestMode.Azure` - Azure Blob Storage and caching
+- `RestMode.S3` - S3-compatible storage and caching
 - `RestMode.RabbitMq` - RabbitMQ message queuing
 - `RestMode.ClickHouse` - ClickHouse columnar analytics
 - `RestMode.Kafka` - Kafka streaming
 - `RestMode.OpenSearch` - OpenSearch full-text search
-- `RestMode.RabbitMq` - RabbitMQ message queuing
-- `RestMode.MemoryAsCache` - In-memory cache (base provider)
-- `RestMode.LocalFileSystemAsStorage` - Local filesystem storage (base provider)
-- `RestMode.InMemoryQueue` - In-process queue (base provider)
+- `RestMode.Memory` - In-memory cache and queuing (base provider)
+- `RestMode.LocalFileSystem` - Local filesystem storage (base provider)
 
-### Connection Strings
+### Authentication Configuration
 
-#### Redis
+#### Using RestConfig (Recommended)
+```csharp
+var config = new RestConfig
+{
+    AuthKey = "username/account/id",        // Provider-specific username/account
+    AuthSecret = "password/secret/key",     // Provider-specific password/secret
+    Endpoint = "https://service.endpoint",  // Service endpoint (optional)
+    Region = "us-east-1",                   // Region for cloud services (optional)
+    BucketName = "my-bucket",               // Bucket/container name (optional)
+    RootPath = "my-app/data"                // Logical path prefix (optional)
+};
+```
+
+#### Provider-Specific Authentication
+
+**Redis:**
+```csharp
+var config = new RestConfig { AuthSecret = "redis-password" };
+var rest = new Rest("localhost:6379", config, RestMode.Redis);
+```
+
+**Azure Blob Storage:**
+```csharp
+var config = new RestConfig {
+    AuthKey = "account-name",
+    AuthSecret = "account-key",
+    Endpoint = "core.windows.net"
+};
+var rest = new Rest("DefaultEndpointsProtocol=https", config, RestMode.Azure);
+```
+
+**S3-Compatible:**
+```csharp
+var config = new RestConfig {
+    AuthKey = "access-key-id",
+    AuthSecret = "secret-access-key",
+    Endpoint = "https://s3.amazonaws.com",
+    Region = "us-west-2",
+    BucketName = "my-bucket"
+};
+var rest = new Rest("s3://", config, RestMode.S3);
+```
+
+**RabbitMQ:**
+```csharp
+var config = new RestConfig {
+    AuthKey = "guest",
+    AuthSecret = "guest"
+};
+var rest = new Rest("amqp://localhost", config, RestMode.RabbitMq);
+```
+
+**ClickHouse:**
+```csharp
+var config = new RestConfig {
+    AuthKey = "default",
+    AuthSecret = "password",
+    OperationMode = RestMode.ClickHouse
+};
+var rest = new Rest("clickhouse://localhost:8123", config);
+```
+
+**Kafka:**
+```csharp
+var config = new RestConfig {
+    AuthKey = "kafka-user",        // SASL username (optional)
+    AuthSecret = "kafka-password", // SASL password (optional)
+    OperationMode = RestMode.Kafka
+};
+var rest = new Rest("kafka://localhost:9092", config);
+```
+
+**OpenSearch:**
+```csharp
+var config = new RestConfig {
+    AuthKey = "admin",
+    AuthSecret = "password",
+    OperationMode = RestMode.OpenSearch
+};
+var rest = new Rest("opensearch://localhost:9200", config);
+```
+
+#### Legacy Connection Strings (Still Supported)
+
+**Redis:**
 ```
 localhost:6379
-redis://localhost:6379
-redis://user:password@localhost:6379
+redis://localhost:6379,password=your-password
 ```
 
-#### Azure Blob Storage
+**Azure Blob Storage:**
 ```
 DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=mykey;EndpointSuffix=core.windows.net;RootPath=my-app/uploads
 ```
 
-#### S3-Compatible Providers
+**S3-Compatible Providers:**
 ```
 AccessKeyId=your_key;SecretAccessKey=your_secret;ServiceUrl=https://your-endpoint.com;BucketName=your-bucket;ForcePathStyle=true;RootPath=my-app/uploads
 ```
 
-#### RabbitMQ
+**RabbitMQ:**
 ```
 amqp://localhost
 amqp://user:password@localhost:5672
@@ -332,7 +605,7 @@ amqp://user:password@localhost:5672
 The `Rest` class provides generic operations that work across all backends:
 
 ```csharp
-var rest = new Rest(connectionString, RestMode.S3Client);
+var rest = new Rest(connectionString, RestMode.S3);
 
 // GET - retrieves from cache or storage
 var data = await rest.GetAsync<MyData>("key");
@@ -452,7 +725,7 @@ The `RootPath` parameter allows you to organize your storage with logical path p
 **Example:**
 ```csharp
 // Connection string with rootPath
-var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;RootPath=my-app/uploads", RestMode.S3Client);
+var rest = new Rest("AccessKeyId=...;SecretAccessKey=...;RootPath=my-app/uploads", RestMode.S3);
 
 // Operations automatically use the root path
 await rest.StoremAsync("documents/file.pdf", data); // Stored as "my-app/uploads/documents/file.pdf"
@@ -1062,8 +1335,8 @@ public class DocumentService
 
     public DocumentService()
     {
-        _storage = new Rest("AccessKeyId=...;ServiceUrl=https://s3.amazonaws.com", RestMode.S3Client);
-        _cache = new Rest("localhost:6379", RestMode.RedisCacheClient);
+        _storage = new Rest("AccessKeyId=...;ServiceUrl=https://s3.amazonaws.com", RestMode.S3);
+        _cache = new Rest("localhost:6379", RestMode.Redis);
         _queue = new Rest("amqp://localhost", RestMode.RabbitMq);
     }
 

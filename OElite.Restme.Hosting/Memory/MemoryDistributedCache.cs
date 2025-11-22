@@ -3,7 +3,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Restme.Hosting.Memory
 {

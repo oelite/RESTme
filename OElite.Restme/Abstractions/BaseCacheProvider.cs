@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Base implementation for cache providers with common functionality
@@ -15,6 +15,21 @@ namespace OElite.Abstractions
         {
             Config = config ?? throw new ArgumentNullException(nameof(config));
         }
+
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public abstract string ProviderName { get; }
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => Config;
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public abstract ProviderCapabilities Capabilities { get; }
 
         // Methods with cancellation token support (default parameter provides backward compatibility)
         public abstract Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class;

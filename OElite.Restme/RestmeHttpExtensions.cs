@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using OElite.Restme.Utils;
 
-namespace OElite
+namespace OElite.Restme
 {
     public static class RestmeHttpExtensions
     {

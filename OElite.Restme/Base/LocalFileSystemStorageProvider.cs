@@ -3,9 +3,9 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Base
+namespace OElite.Restme.Base
 {
     /// <summary>
     /// Local filesystem storage provider. Uses a base directory as the storage root.
@@ -15,6 +15,21 @@ namespace OElite.Base
     {
         private readonly string _baseDirectory;
         private bool _disposed;
+
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "LocalFileSystem";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new RestConfig();
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Storage;
 
         public LocalFileSystemStorageProvider(string? baseDirectory = null)
         {

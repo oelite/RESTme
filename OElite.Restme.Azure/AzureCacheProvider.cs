@@ -1,11 +1,11 @@
 using System;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
-using OElite.Abstractions;
-using OElite.Utils;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
+using OElite.Restme.Azure;
 
 namespace OElite.Providers
 {
@@ -16,31 +16,94 @@ namespace OElite.Providers
     public class AzureCacheProvider : BaseCacheProvider
     {
         private readonly CloudBlobClient _blobClient;
-        private readonly CloudBlobContainer _container;
-        private readonly AzureConfiguration _azureConfig;
 
-        public AzureCacheProvider(string connectionString, RestConfig config) : base(config)
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public override string ProviderName => "AzureCache";
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public override ProviderCapabilities Capabilities => ProviderCapabilities.Cache;
+
+        /// <summary>
+        /// Ensure the cache container exists
+        /// </summary>
+        private async Task EnsureContainerExistsAsync()
         {
-            if (string.IsNullOrEmpty(connectionString))
-                throw new ArgumentException("Connection string cannot be null or empty", nameof(connectionString));
+            if (_container != null)
+            {
+                await _container.CreateIfNotExistsAsync();
+            }
+        }
 
+        private readonly CloudBlobContainer _container;
+        private readonly string? _rootPath;
+
+        public AzureCacheProvider(RestConfig config) : base(config)
+        {
             try
             {
-                _azureConfig = AzureConnectionStringParser.ParseConnectionString(connectionString);
-                var storageAccount = CloudStorageAccount.Parse(_azureConfig.ConnectionString);
-                _blobClient = storageAccount.CreateCloudBlobClient();
-                
+
+                // Use pre-parsed config values directly
+                var accountName = config.AuthKey;
+                var accountKey = config.AuthSecret;
+
+                // If AuthKey/AuthSecret are not provided, try parsing connection string
+                if (string.IsNullOrEmpty(accountName) || string.IsNullOrEmpty(accountKey))
+                {
+                    if (!string.IsNullOrEmpty(config.ConnectionString))
+                    {
+                        var azureConfig = AzureConnectionStringParser.ParseConnectionString(config.ConnectionString);
+                        var storageAccount = CloudStorageAccount.Parse(azureConfig.ConnectionString);
+                        _blobClient = storageAccount.CreateCloudBlobClient();
+                        _rootPath = azureConfig.RootPath;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Azure credentials not provided. Set AuthKey and AuthSecret in RestConfig, or provide a connection string.");
+                    }
+                }
+                else
+                {
+                    // Use AuthKey/AuthSecret directly
+                    var credentials = new Microsoft.WindowsAzure.Storage.Auth.StorageCredentials(accountName, accountKey);
+                    var storageAccount = new CloudStorageAccount(credentials, config.Endpoint ?? "core.windows.net", useHttps: config.RestSsl);
+                    _blobClient = storageAccount.CreateCloudBlobClient();
+                    _rootPath = config.RootPath;
+                }
+
                 // Use a dedicated cache container
                 var containerName = "restme-cache";
                 _container = _blobClient.GetContainerReference(containerName);
-                
-                // Create container if it doesn't exist
-                _container.CreateIfNotExistsAsync().Wait();
+
+                // Note: Container creation is now done lazily to avoid authentication during construction
+                // This allows for unit testing without requiring actual Azure credentials
             }
             catch (Exception ex)
             {
                 throw new InvalidOperationException($"Failed to initialize Azure cache provider: {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// Initialize the provider asynchronously
+        /// </summary>
+        public async Task InitializeAsync()
+        {
+            // Container creation is already done in constructor
+            // This method exists for interface compatibility
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Dispose the provider
+        /// </summary>
+        public async Task DisposeAsync()
+        {
+            // Cleanup resources if needed
+            await Task.CompletedTask;
         }
 
 
@@ -50,8 +113,10 @@ namespace OElite.Providers
 
             try
             {
+                // Ensure container exists before operations
+                await EnsureContainerExistsAsync();
                 // Apply root path if specified
-                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blobKey = AzureConnectionStringParser.CombinePath(_rootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -59,8 +124,13 @@ namespace OElite.Providers
                     return null;
 
                 cancellationToken.ThrowIfCancellationRequested();
-                var json = await blob.DownloadTextAsync();
-                return json.JsonDeserialize<T>();
+                var textValue = await blob.DownloadTextAsync();
+
+                // Special handling for strings to avoid JSON serialization wrapper
+                if (typeof(T) == typeof(string))
+                    return (T)(object)textValue;
+
+                return textValue.JsonDeserialize<T>();
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
@@ -76,10 +146,18 @@ namespace OElite.Providers
 
             try
             {
+                // Ensure container exists before operations
+                await EnsureContainerExistsAsync();
                 // Apply root path if specified
-                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blobKey = AzureConnectionStringParser.CombinePath(_rootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
-                var json = value.JsonSerialize();
+
+                // Special handling for strings to avoid JSON serialization wrapper
+                string textValue;
+                if (typeof(T) == typeof(string))
+                    textValue = value.ToString()!;
+                else
+                    textValue = value.JsonSerialize();
 
                 // Set cache control headers for CDN scenarios
                 blob.Properties.CacheControl = "public, max-age=3600"; // Default 1 hour
@@ -91,7 +169,7 @@ namespace OElite.Providers
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                await blob.UploadTextAsync(json);
+                await blob.UploadTextAsync(textValue);
 
                 // Set metadata for expiry tracking
                 if (expiry.HasValue)
@@ -117,8 +195,10 @@ namespace OElite.Providers
 
             try
             {
+                // Ensure container exists before operations
+                await EnsureContainerExistsAsync();
                 // Apply root path if specified
-                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blobKey = AzureConnectionStringParser.CombinePath(_rootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
                 cancellationToken.ThrowIfCancellationRequested();
                 return await blob.DeleteIfExistsAsync();
@@ -137,7 +217,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blobKey = AzureConnectionStringParser.CombinePath(_rootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
                 cancellationToken.ThrowIfCancellationRequested();
                 return await blob.ExistsAsync();
@@ -156,7 +236,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var blobKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, key);
+                var blobKey = AzureConnectionStringParser.CombinePath(_rootPath, key);
                 var blob = _container.GetBlockBlobReference(blobKey);
 
                 cancellationToken.ThrowIfCancellationRequested();

@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Linq;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Service locator for dynamic provider loading

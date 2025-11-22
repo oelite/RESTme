@@ -178,6 +178,7 @@ public class GdprComplianceTests : TestBase
         {
             new GdprCustomerData
             {
+                Id = DbObjectId.NewId(),
                 Email = "eu.customer@example.com",
                 FirstName = "Hans",
                 LastName = "Mueller",
@@ -192,6 +193,7 @@ public class GdprComplianceTests : TestBase
             },
             new GdprCustomerData
             {
+                Id = DbObjectId.NewId(),
                 Email = "us.customer@example.com",
                 FirstName = "John",
                 LastName = "Smith",
@@ -214,6 +216,7 @@ public class GdprComplianceTests : TestBase
             // Create audit log for consent
             var auditLog = new GdprAuditLog
             {
+                Id = DbObjectId.NewId(),
                 Email = customer.Email,
                 ActionType = "consent_given",
                 AuditDate = DateTime.UtcNow,
@@ -245,6 +248,7 @@ public class GdprComplianceTests : TestBase
 
         var testCustomer = new GdprCustomerData
         {
+            Id = DbObjectId.NewId(),
             Email = "sar.request@example.com",
             FirstName = "Maria",
             LastName = "Garcia",
@@ -261,6 +265,7 @@ public class GdprComplianceTests : TestBase
         // Act - Create Subject Access Request
         var accessRequest = new GdprDataRequest
         {
+            Id = DbObjectId.NewId(),
             RequestId = Guid.NewGuid().ToString(),
             Email = testCustomer.Email,
             RequestType = "access",
@@ -303,6 +308,7 @@ public class GdprComplianceTests : TestBase
 
         var testCustomer = new GdprCustomerData
         {
+            Id = DbObjectId.NewId(),
             Email = "erasure.request@example.com",
             FirstName = "Pierre",
             LastName = "Dubois",
@@ -318,6 +324,7 @@ public class GdprComplianceTests : TestBase
         // Act - Create Right to Erasure Request
         var erasureRequest = new GdprDataRequest
         {
+            Id = DbObjectId.NewId(),
             RequestId = Guid.NewGuid().ToString(),
             Email = testCustomer.Email,
             RequestType = "erasure",
@@ -344,6 +351,7 @@ public class GdprComplianceTests : TestBase
         // Create audit log for deletion
         var auditLog = new GdprAuditLog
         {
+            Id = DbObjectId.NewId(),
             Email = testCustomer.Email,
             ActionType = "data_deleted",
             AuditDate = DateTime.UtcNow,
@@ -377,6 +385,7 @@ public class GdprComplianceTests : TestBase
         {
             new GdprCustomerData
             {
+                Id = DbObjectId.NewId(),
                 Email = "eu.restricted@example.com",
                 FirstName = "Anna",
                 LastName = "Schmidt",
@@ -387,6 +396,7 @@ public class GdprComplianceTests : TestBase
             },
             new GdprCustomerData
             {
+                Id = DbObjectId.NewId(),
                 Email = "us.customer@example.com",
                 FirstName = "Michael",
                 LastName = "Johnson",
@@ -431,6 +441,7 @@ public class GdprComplianceTests : TestBase
         {
             new GdprCustomerData
             {
+                Id = DbObjectId.NewId(),
                 Email = "retention.expired@example.com",
                 FirstName = "Luigi",
                 LastName = "Rossi",
@@ -442,6 +453,7 @@ public class GdprComplianceTests : TestBase
             },
             new GdprCustomerData
             {
+                Id = DbObjectId.NewId(),
                 Email = "retention.active@example.com",
                 FirstName = "Emma",
                 LastName = "Wilson",
@@ -490,6 +502,7 @@ public class GdprComplianceTests : TestBase
 
         var testCustomer = new GdprCustomerData
         {
+            Id = DbObjectId.NewId(),
             Email = "consent.withdrawal@example.com",
             FirstName = "Sofia",
             LastName = "Andersson",
@@ -516,6 +529,7 @@ public class GdprComplianceTests : TestBase
         // Create audit log
         var auditLog = new GdprAuditLog
         {
+            Id = DbObjectId.NewId(),
             Email = testCustomer.Email,
             ActionType = "consent_withdrawn",
             AuditDate = DateTime.UtcNow,

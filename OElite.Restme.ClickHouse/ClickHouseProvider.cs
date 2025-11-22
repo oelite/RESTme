@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
-using OElite.Abstractions;
+using System.Text;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Restme.ClickHouse
 {
@@ -14,14 +11,64 @@ namespace OElite.Restme.ClickHouse
     /// </summary>
     public class ClickHouseProvider : IColumnarProvider
     {
-        private readonly ClickHouseConnection _connection;
-        private readonly RestConfig _config;
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "ClickHouse";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration { get; }
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Columnar;
+
+        private readonly ClickHouseConnectionWrapper _connection;
         private bool _disposed = false;
 
-        public ClickHouseProvider(string connectionString, RestConfig config)
+        public ClickHouseProvider(RestConfig config)
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
-            _connection = new ClickHouseConnection(connectionString);
+            Configuration = config ?? throw new ArgumentNullException(nameof(config));
+
+            // Use RestConfig authentication fields to build connection string
+            var username = config.AuthKey;
+            var password = config.AuthSecret;
+
+            string effectiveConnectionString;
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+            {
+                // Build connection string with authentication from config
+                var baseConnection = config.ConnectionString ?? "clickhouse://localhost:8123";
+                if (!baseConnection.Contains("@"))
+                {
+                    // Insert credentials into connection string
+                    var protocolEnd = baseConnection.IndexOf("://", StringComparison.Ordinal);
+                    if (protocolEnd >= 0)
+                    {
+                        var protocol = baseConnection.Substring(0, protocolEnd + 3);
+                        var rest = baseConnection.Substring(protocolEnd + 3);
+                        effectiveConnectionString = $"{protocol}{username}:{password}@{rest}";
+                    }
+                    else
+                    {
+                        effectiveConnectionString = baseConnection;
+                    }
+                }
+                else
+                {
+                    effectiveConnectionString = baseConnection;
+                }
+            }
+            else
+            {
+                // Use connection string as-is (may contain authentication)
+                effectiveConnectionString = config.ConnectionString ?? "clickhouse://localhost:8123";
+            }
+
+            _connection = new ClickHouseConnectionWrapper(effectiveConnectionString);
         }
 
         public async Task InsertAsync<T>(T data, string tableName = null, CancellationToken cancellationToken = default)
@@ -29,10 +76,15 @@ namespace OElite.Restme.ClickHouse
             if (data == null) throw new ArgumentNullException(nameof(data));
 
             tableName ??= GetTableName<T>();
-            var sql = ClickHouseSqlBuilder.BuildInsertSql(data, tableName);
-            var parameters = ClickHouseParameterBuilder.BuildParameters(data);
-
-            await _connection.ExecuteNonQueryAsync(sql, parameters, cancellationToken);
+            
+            // Generate INSERT statement from object properties
+            var properties = typeof(T).GetProperties();
+            var columnNames = string.Join(", ", properties.Select(p => p.Name));
+            var values = properties.Select(p => FormatValue(p.GetValue(data)));
+            var valuesStr = string.Join(", ", values);
+            
+            var sql = $"INSERT INTO {tableName} ({columnNames}) VALUES ({valuesStr})";
+            await _connection.ExecuteNonQueryAsync(sql, cancellationToken);
         }
 
         public async Task BulkInsertAsync<T>(IEnumerable<T> data, string tableName = null, CancellationToken cancellationToken = default)
@@ -40,30 +92,49 @@ namespace OElite.Restme.ClickHouse
             if (data == null) throw new ArgumentNullException(nameof(data));
 
             tableName ??= GetTableName<T>();
-            var sql = ClickHouseSqlBuilder.BuildBulkInsertSql<T>(tableName);
-            var parameters = ClickHouseParameterBuilder.BuildBulkParameters(data);
+            await _connection.BulkInsertAsync(data, tableName, cancellationToken);
+        }
 
-            await _connection.ExecuteNonQueryAsync(sql, parameters, cancellationToken);
+        private static string FormatValue(object? value)
+        {
+            if (value == null) return "NULL";
+
+            return value switch
+            {
+                string s => $"'{s.Replace("'", "''")}'",
+                DateTime dt => $"'{dt:yyyy-MM-dd HH:mm:ss}'",
+                bool b => b ? "1" : "0",
+                Guid g => $"'{g}'",
+                decimal d => d.ToString("0.################", System.Globalization.CultureInfo.InvariantCulture),
+                double d => d.ToString("0.################", System.Globalization.CultureInfo.InvariantCulture),
+                float f => f.ToString("0.################", System.Globalization.CultureInfo.InvariantCulture),
+                _ => value.ToString() ?? "NULL"
+            };
         }
 
         public async Task<List<T>> QueryAsync<T>(string sql, object parameters = null, CancellationToken cancellationToken = default)
         {
-            var paramDict = ConvertToDictionary(parameters);
-            return await _connection.ExecuteQueryAsync<T>(sql, paramDict, cancellationToken);
+            return await _connection.ExecuteQueryAsync<T>(sql, cancellationToken);
         }
 
         public async Task<List<T>> QueryAsync<T>(Expression<Func<T, bool>> predicate, string tableName = null, CancellationToken cancellationToken = default)
         {
             tableName ??= GetTableName<T>();
-
-            // Translate LINQ expression to ClickHouse SQL
-            var expressionTranslator = new ClickHouseExpressionTranslator();
-            var whereClause = expressionTranslator.Translate(predicate);
-
+            
+            // Use ClickHouseExpressionTranslator to convert LINQ to SQL
+            var translator = new ClickHouseExpressionTranslator();
+            var whereClause = translator.Translate(predicate);
+            
             var sql = $"SELECT * FROM {tableName} WHERE {whereClause}";
-            var parameters = expressionTranslator.GetParameters();
+            return await QueryAsync<T>(sql, null, cancellationToken);
+        }
 
-            return await _connection.ExecuteQueryAsync<T>(sql, parameters, cancellationToken);
+        public async Task<long> CountAsync<T>(Expression<Func<T, bool>> predicate = null, string tableName = null, CancellationToken cancellationToken = default)
+        {
+            tableName ??= GetTableName<T>();
+            var sql = $"SELECT COUNT(*) FROM {tableName}";
+            var results = await QueryAsync<long>(sql, null, cancellationToken);
+            return results.FirstOrDefault();
         }
 
         public async Task<long> CountAsync(string tableName, string whereClause = null, CancellationToken cancellationToken = default)
@@ -73,113 +144,137 @@ namespace OElite.Restme.ClickHouse
             {
                 sql += $" WHERE {whereClause}";
             }
-
-            var result = await _connection.ExecuteScalarAsync<long>(sql, null, cancellationToken);
-            return result;
+            var results = await QueryAsync<long>(sql, null, cancellationToken);
+            return results.FirstOrDefault();
         }
 
         public async Task<TimeSeriesResult<T>> TimeSeriesAsync<T>(string tableName, DateTime start, DateTime end, string groupBy = null, CancellationToken cancellationToken = default)
         {
-            var parameters = new Dictionary<string, object>
+            var sql = $"SELECT * FROM {tableName} WHERE timestamp >= '{start:yyyy-MM-dd HH:mm:ss}' AND timestamp < '{end:yyyy-MM-dd HH:mm:ss}'";
+            if (!string.IsNullOrEmpty(groupBy))
             {
-                ["start"] = start,
-                ["end"] = end
-            };
+                sql += $" ORDER BY {groupBy}";
+            }
 
-            var groupByClause = string.IsNullOrEmpty(groupBy) ? "" : $"GROUP BY {groupBy}";
-            var sql = $@"
-                SELECT 
-                    toStartOfHour(timestamp) as hour,
-                    count() as count,
-                    {groupBy ?? "1"} as group_key
-                FROM {tableName} 
-                WHERE timestamp >= @start AND timestamp < @end 
-                {groupByClause}
-                ORDER BY hour";
-
-            var data = await _connection.ExecuteQueryAsync<T>(sql, parameters, cancellationToken);
+            var data = await QueryAsync<T>(sql, null, cancellationToken);
 
             return new TimeSeriesResult<T>
             {
                 Data = data,
-                QueryDuration = TimeSpan.Zero, // Would be measured in real implementation
+                QueryDuration = TimeSpan.Zero,
                 TotalRecords = data.Count
             };
         }
 
         public async Task<AggregationResult> AggregateAsync(string tableName, string aggregationQuery, CancellationToken cancellationToken = default)
         {
-            var result = await _connection.ExecuteQueryAsync<Dictionary<string, object>>(
-                $"SELECT {aggregationQuery} FROM {tableName}", null, cancellationToken);
+            var sql = $"SELECT {aggregationQuery} FROM {tableName}";
+            var results = await QueryAsync<Dictionary<string, object>>(sql, null, cancellationToken);
 
             return new AggregationResult
             {
-                Aggregations = result.FirstOrDefault() ?? new Dictionary<string, object>(),
-                QueryDuration = TimeSpan.Zero, // Would be measured in real implementation
-                ProcessedRecords = 0 // Would be measured in real implementation
+                Aggregations = results.FirstOrDefault() ?? new Dictionary<string, object>()
             };
         }
 
         public async Task CreateTableAsync<T>(string tableName = null, ClickHouseEngine engine = ClickHouseEngine.MergeTree, CancellationToken cancellationToken = default)
         {
             tableName ??= GetTableName<T>();
-            var sql = ClickHouseTableBuilder.BuildCreateTableSql<T>(tableName, engine);
-            await _connection.ExecuteNonQueryAsync(sql, null, cancellationToken);
+            var engineName = engine.ToString();
+            
+            // Generate schema from type T
+            var schema = GenerateTableSchema<T>();
+            var sql = $"CREATE TABLE IF NOT EXISTS {tableName} ({schema}) ENGINE = {engineName}() ORDER BY tuple()";
+            await _connection.ExecuteNonQueryAsync(sql, cancellationToken);
+        }
+
+        private static string GenerateTableSchema<T>()
+        {
+            var properties = typeof(T).GetProperties();
+            var columns = new List<string>();
+            
+            foreach (var property in properties)
+            {
+                var columnName = property.Name;
+                var clickHouseType = MapToClickHouseType(property.PropertyType);
+                columns.Add($"{columnName} {clickHouseType}");
+            }
+            
+            return string.Join(", ", columns);
+        }
+
+        private static string MapToClickHouseType(Type type)
+        {
+            // Handle nullable types
+            var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+            
+            if (underlyingType == typeof(string))
+                return "String";
+            if (underlyingType == typeof(int))
+                return "Int32";
+            if (underlyingType == typeof(long))
+                return "Int64";
+            if (underlyingType == typeof(short))
+                return "Int16";
+            if (underlyingType == typeof(byte))
+                return "UInt8";
+            if (underlyingType == typeof(uint))
+                return "UInt32";
+            if (underlyingType == typeof(ulong))
+                return "UInt64";
+            if (underlyingType == typeof(float))
+                return "Float32";
+            if (underlyingType == typeof(double))
+                return "Float64";
+            if (underlyingType == typeof(decimal))
+                return "Decimal(18, 2)";
+            if (underlyingType == typeof(bool))
+                return "UInt8";
+            if (underlyingType == typeof(DateTime))
+                return "DateTime";
+            if (underlyingType == typeof(DateTimeOffset))
+                return "DateTime64(3)";
+            if (underlyingType == typeof(Guid))
+                return "UUID";
+            if (underlyingType == typeof(TimeSpan))
+                return "Int64";
+            
+            // Default to String for unknown types
+            return "String";
         }
 
         public async Task SetTableTTLAsync(string tableName, string ttlExpression, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(tableName)) throw new ArgumentNullException(nameof(tableName));
-            if (string.IsNullOrEmpty(ttlExpression)) throw new ArgumentNullException(nameof(ttlExpression));
-
             var sql = $"ALTER TABLE {tableName} MODIFY TTL {ttlExpression}";
-            await _connection.ExecuteNonQueryAsync(sql, null, cancellationToken);
+            await _connection.ExecuteNonQueryAsync(sql, cancellationToken);
         }
 
         public async Task CreateTTLIndexAsync(string tableName, string columnName, TimeSpan ttl, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(tableName)) throw new ArgumentNullException(nameof(tableName));
-            if (string.IsNullOrEmpty(columnName)) throw new ArgumentNullException(nameof(columnName));
-
-            var indexName = $"ttl_idx_{tableName}_{columnName}";
-            var ttlSeconds = (long)ttl.TotalSeconds;
-            var sql = $"ALTER TABLE {tableName} ADD INDEX {indexName} ({columnName}) TYPE minmax GRANULARITY 1";
-
-            await _connection.ExecuteNonQueryAsync(sql, null, cancellationToken);
-
-            // Set TTL on the table
-            var ttlSql = $"ALTER TABLE {tableName} MODIFY TTL {columnName} + INTERVAL {ttlSeconds} SECOND";
-            await _connection.ExecuteNonQueryAsync(ttlSql, null, cancellationToken);
+            // ClickHouse TTL syntax: ALTER TABLE table_name MODIFY TTL column + INTERVAL ttl_value unit
+            var sql = $"ALTER TABLE {tableName} MODIFY TTL {columnName} + INTERVAL {ttl.TotalSeconds} SECOND";
+            await _connection.ExecuteNonQueryAsync(sql, cancellationToken);
         }
 
-        private string GetTableName<T>()
+
+
+        public async Task DropTableAsync(string tableName, CancellationToken cancellationToken = default)
         {
-            // Use attribute-based table naming or default to type name
+            var sql = $"DROP TABLE IF EXISTS {tableName}";
+            await _connection.ExecuteNonQueryAsync(sql, cancellationToken);
+        }
+
+        public async Task TruncateTableAsync(string tableName, CancellationToken cancellationToken = default)
+        {
+            var sql = $"TRUNCATE TABLE {tableName}";
+            await _connection.ExecuteNonQueryAsync(sql, cancellationToken);
+        }
+
+        private static string GetTableName<T>()
+        {
             var type = typeof(T);
-            var attribute = type.GetCustomAttributes(typeof(ClickHouseTableAttribute), false)
-                .FirstOrDefault() as ClickHouseTableAttribute;
-            return attribute?.TableName ?? type.Name.ToLowerInvariant();
-        }
-
-        private Dictionary<string, object> ConvertToDictionary(object parameters)
-        {
-            if (parameters == null)
-                return new Dictionary<string, object>();
-
-            if (parameters is Dictionary<string, object> dict)
-                return dict;
-
-            // Handle anonymous objects or POCOs
-            var result = new Dictionary<string, object>();
-            var properties = parameters.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-
-            foreach (var prop in properties)
-            {
-                var value = prop.GetValue(parameters);
-                result[prop.Name] = value ?? DBNull.Value;
-            }
-
-            return result;
+            var tableAttr = type.GetCustomAttribute<TableAttribute>();
+            return tableAttr?.Name ?? type.Name.ToLower();
         }
 
         public void Dispose()
@@ -189,20 +284,6 @@ namespace OElite.Restme.ClickHouse
                 _connection?.Dispose();
                 _disposed = true;
             }
-        }
-    }
-
-    /// <summary>
-    /// Attribute to specify ClickHouse table name
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class)]
-    public class ClickHouseTableAttribute : Attribute
-    {
-        public string TableName { get; }
-
-        public ClickHouseTableAttribute(string tableName)
-        {
-            TableName = tableName;
         }
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Restme.Kafka
 {
@@ -13,25 +13,28 @@ namespace OElite.Restme.Kafka
     /// </summary>
     public class KafkaProvider : IStreamingProvider
     {
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "Kafka";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration { get; }
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Streaming;
+
         private readonly KafkaConnection _connection;
-        private readonly RestConfig _config;
         private bool _disposed = false;
 
-        public KafkaProvider(string connectionString, RestConfig config)
+        public KafkaProvider(RestConfig config)
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
-
-            // Check if Confluent.Kafka library is available
-            try
-            {
-                var testConfig = new Confluent.Kafka.ProducerConfig();
-            }
-            catch
-            {
-                throw new NotImplementedException("Confluent.Kafka library is not available. Please install the Confluent.Kafka NuGet package.");
-            }
-
-            _connection = new KafkaConnection(connectionString);
+            Configuration = config ?? throw new ArgumentNullException(nameof(config));
+            _connection = new KafkaConnection(config.ConnectionString ?? "kafka://localhost:9092", config);
         }
 
         public async Task PublishAsync<T>(T message, string topicName, string key = null, CancellationToken cancellationToken = default)
