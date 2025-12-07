@@ -183,7 +183,7 @@ deploy_packages:
         dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_TOKEN --skip-duplicate
       else
         DEPLOY_TARGET="phanes.dev"
-        NUGET_SOURCE="https://packages.services.phanes.technology/v3/index.json"
+        NUGET_SOURCE="https://packages.phanes.ltd/v3/index.json"
         echo "Deploying to $DEPLOY_TARGET"
         echo "Source: $NUGET_SOURCE - $PHANES_API_TOKEN"
         echo "Using Phanes NuGet feed authentication"

@@ -15,7 +15,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Adds a filter using LINQ expression - more efficient than string-based queries
     /// </summary>
-    public static IMongoQuery<T> Where<T>(this IMongoQuery<T> query, Expression<Func<T, bool>> filter) where T : BaseEntity
+    public static IMongoQuery<T> Where<T>(this IMongoQuery<T> query, Expression<Func<T, bool>> filter)
+        where T : BaseEntity
     {
         return query.Query(filter);
     }
@@ -23,19 +24,22 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Adds multiple filters using LINQ expressions - combines them with AND logic
     /// </summary>
-    public static IMongoQuery<T> Where<T>(this IMongoQuery<T> query, params Expression<Func<T, bool>>[] filters) where T : BaseEntity
+    public static IMongoQuery<T> Where<T>(this IMongoQuery<T> query, params Expression<Func<T, bool>>[] filters)
+        where T : BaseEntity
     {
         foreach (var filter in filters)
         {
             query = query.Query(filter);
         }
+
         return query;
     }
 
     /// <summary>
     /// Adds sorting using LINQ expression - more type-safe than string-based sorting
     /// </summary>
-    public static IMongoQuery<T> OrderBy<T, TKey>(this IMongoQuery<T> query, Expression<Func<T, TKey>> keySelector) where T : BaseEntity
+    public static IMongoQuery<T> OrderBy<T, TKey>(this IMongoQuery<T> query, Expression<Func<T, TKey>> keySelector)
+        where T : BaseEntity
     {
         // Convert Expression<Func<T, TKey>> to Expression<Func<T, object>>
         var objectSelector = Expression.Lambda<Func<T, object>>(
@@ -47,7 +51,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Adds descending sorting using LINQ expression
     /// </summary>
-    public static IMongoQuery<T> OrderByDescending<T, TKey>(this IMongoQuery<T> query, Expression<Func<T, TKey>> keySelector) where T : BaseEntity
+    public static IMongoQuery<T> OrderByDescending<T, TKey>(this IMongoQuery<T> query,
+        Expression<Func<T, TKey>> keySelector) where T : BaseEntity
     {
         // Convert Expression<Func<T, TKey>> to Expression<Func<T, object>>
         var objectSelector = Expression.Lambda<Func<T, object>>(
@@ -59,7 +64,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Adds secondary sorting using LINQ expression
     /// </summary>
-    public static IMongoQuery<T> ThenBy<T, TKey>(this IMongoQuery<T> query, Expression<Func<T, TKey>> keySelector) where T : BaseEntity
+    public static IMongoQuery<T> ThenBy<T, TKey>(this IMongoQuery<T> query, Expression<Func<T, TKey>> keySelector)
+        where T : BaseEntity
     {
         // Convert Expression<Func<T, TKey>> to Expression<Func<T, object>>
         var objectSelector = Expression.Lambda<Func<T, object>>(
@@ -71,7 +77,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Adds secondary descending sorting using LINQ expression
     /// </summary>
-    public static IMongoQuery<T> ThenByDescending<T, TKey>(this IMongoQuery<T> query, Expression<Func<T, TKey>> keySelector) where T : BaseEntity
+    public static IMongoQuery<T> ThenByDescending<T, TKey>(this IMongoQuery<T> query,
+        Expression<Func<T, TKey>> keySelector) where T : BaseEntity
     {
         // Convert Expression<Func<T, TKey>> to Expression<Func<T, object>>
         var objectSelector = Expression.Lambda<Func<T, object>>(
@@ -177,37 +184,38 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Checks if all documents match the additional filter using MongoDB aggregation
     /// </summary>
-    public static async Task<bool> AllAsync<T>(this IMongoQuery<T> query, Expression<Func<T, bool>> predicate) where T : BaseEntity
+    public static async Task<bool> AllAsync<T>(this IMongoQuery<T> query, Expression<Func<T, bool>> predicate)
+        where T : BaseEntity
     {
         var collection = GetCollectionFromQuery(query);
-        
+
         // Build aggregation pipeline to check if any documents don't match the predicate
         var pipeline = new List<BsonDocument>();
-        
+
         // Add match stage for existing filters
         var matchStage = GetMatchStageFromQuery(query);
         if (matchStage != null)
         {
             pipeline.Add(matchStage);
         }
-        
+
         // Add match stage for the predicate (inverted - find documents that DON'T match)
         var predicateFilter = Builders<T>.Filter.Not(Builders<T>.Filter.Where(predicate));
         var predicateFilterDoc = predicateFilter.Render(
             BsonSerializer.SerializerRegistry.GetSerializer<T>(),
             BsonSerializer.SerializerRegistry);
         pipeline.Add(new BsonDocument("$match", predicateFilterDoc));
-        
+
         // Add limit 1 to stop at first non-matching document
         pipeline.Add(new BsonDocument("$limit", 1));
-        
+
         // Add count stage
         pipeline.Add(new BsonDocument("$count", "nonMatchingCount"));
-        
+
         // Execute aggregation
         var cursor = await collection.AggregateAsync<BsonDocument>(pipeline);
         var result = await cursor.FirstOrDefaultAsync();
-        
+
         // If we found any non-matching documents, return false
         return result == null;
     }
@@ -216,7 +224,8 @@ public static class MongoQueryExtensions
     /// Projects the query results to a different type - deferred execution version
     /// Returns a wrapper that defers execution until FetchAsync() or other execution methods are called
     /// </summary>
-    public static ProjectionQuery<T, TResult> Select<T, TResult>(this IMongoQuery<T> query, Expression<Func<T, TResult>> selector) where T : BaseEntity
+    public static ProjectionQuery<T, TResult> Select<T, TResult>(this IMongoQuery<T> query,
+        Expression<Func<T, TResult>> selector) where T : BaseEntity
     {
         return new ProjectionQuery<T, TResult>(query, selector);
     }
@@ -224,40 +233,42 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Projects the query results to a different type using MongoDB aggregation pipeline
     /// </summary>
-    public static async Task<List<TResult>> SelectAsync<T, TResult>(this IMongoQuery<T> query, Expression<Func<T, TResult>> selector) where T : BaseEntity
+    public static async Task<List<TResult>> SelectAsync<T, TResult>(this IMongoQuery<T> query,
+        Expression<Func<T, TResult>> selector) where T : BaseEntity
     {
         // Get the underlying collection from the query
         var collection = GetCollectionFromQuery(query);
-        
+
         // Build aggregation pipeline
         var pipeline = new List<BsonDocument>();
-        
+
         // Add match stage if there are filters
         var matchStage = GetMatchStageFromQuery(query);
         if (matchStage != null)
         {
             pipeline.Add(matchStage);
         }
-        
+
         // Add sort stage if there are sorts
         var sortStage = GetSortStageFromQuery(query);
         if (sortStage != null)
         {
             pipeline.Add(sortStage);
         }
-        
+
         // Add projection stage
         var projectStage = ExpressionToMongoPipeline.CreateProjectStage(selector);
         pipeline.Add(projectStage);
-        
+
         // Add limit and skip stages
-        var limitSkipStages = ExpressionToMongoPipeline.CreateLimitSkipStages(GetLimitFromQuery(query), GetSkipFromQuery(query));
+        var limitSkipStages =
+            ExpressionToMongoPipeline.CreateLimitSkipStages(GetLimitFromQuery(query), GetSkipFromQuery(query));
         pipeline.AddRange(limitSkipStages);
-        
+
         // Execute aggregation
         var cursor = await collection.AggregateAsync<BsonDocument>(pipeline);
         var bsonResults = await cursor.ToListAsync();
-        
+
         // Convert BsonDocument results to TResult
         var results = new List<TResult>();
         foreach (var bsonDoc in bsonResults)
@@ -275,63 +286,67 @@ public static class MongoQueryExtensions
                 results.Add(ConvertAnonymousToTResult<TResult>(anonymousObj));
             }
         }
-        
+
         return results;
     }
 
     /// <summary>
     /// Groups the query results by a key selector using MongoDB aggregation pipeline
     /// </summary>
-    public static async Task<Dictionary<TKey, List<T>>> GroupByAsync<T, TKey>(this IMongoQuery<T> query, Expression<Func<T, TKey>> keySelector) where T : BaseEntity where TKey : notnull
+    public static async Task<Dictionary<TKey, List<T>>> GroupByAsync<T, TKey>(this IMongoQuery<T> query,
+        Expression<Func<T, TKey>> keySelector) where T : BaseEntity where TKey : notnull
     {
         // Get the underlying collection from the query
         var collection = GetCollectionFromQuery(query);
-        
+
         // Build aggregation pipeline
         var pipeline = new List<BsonDocument>();
-        
+
         // Add match stage if there are filters
         var matchStage = GetMatchStageFromQuery(query);
         if (matchStage != null)
         {
             pipeline.Add(matchStage);
         }
-        
+
         // Add group stage
         var groupStage = ExpressionToMongoPipeline.CreateGroupStage(keySelector);
         pipeline.Add(groupStage);
-        
+
         // Add sort stage if there are sorts
         var sortStage = GetSortStageFromQuery(query);
         if (sortStage != null)
         {
             pipeline.Add(sortStage);
         }
-        
+
         // Add limit and skip stages
-        var limitSkipStages = ExpressionToMongoPipeline.CreateLimitSkipStages(GetLimitFromQuery(query), GetSkipFromQuery(query));
+        var limitSkipStages =
+            ExpressionToMongoPipeline.CreateLimitSkipStages(GetLimitFromQuery(query), GetSkipFromQuery(query));
         pipeline.AddRange(limitSkipStages);
-        
+
         // Execute aggregation
         var cursor = await collection.AggregateAsync<BsonDocument>(pipeline);
         var bsonResults = await cursor.ToListAsync();
-        
+
         // Convert results to dictionary
         var result = new Dictionary<TKey, List<T>>();
         foreach (var bsonDoc in bsonResults)
         {
             var key = ConvertBsonValue<TKey>(bsonDoc["_id"]);
-            var items = bsonDoc["items"].AsBsonArray.Select(item => BsonSerializer.Deserialize<T>(item.AsBsonDocument)).ToList();
+            var items = bsonDoc["items"].AsBsonArray.Select(item => BsonSerializer.Deserialize<T>(item.AsBsonDocument))
+                .ToList();
             result[key] = items;
         }
-        
+
         return result;
     }
 
     /// <summary>
     /// Executes the query with pagination - optimized for large datasets
     /// </summary>
-    public static async Task<(List<T> Items, long TotalCount)> ToPagedListAsync<T>(this IMongoQuery<T> query, int pageIndex, int pageSize) where T : BaseEntity
+    public static async Task<(List<T> Items, long TotalCount)> ToPagedListAsync<T>(this IMongoQuery<T> query,
+        int pageIndex, int pageSize) where T : BaseEntity
     {
         var totalCount = await query.CountAsync();
         var items = await query.Skip(pageIndex * pageSize).Take(pageSize).ToListAsync();
@@ -341,8 +356,9 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Executes the query with pagination and returns a BaseEntityCollection - optimized for large datasets
     /// </summary>
-    public static async Task<TCollection> ToPagedCollectionAsync<T, TCollection>(this IMongoQuery<T> query, int pageIndex, int pageSize) 
-        where T : BaseEntity 
+    public static async Task<TCollection> ToPagedCollectionAsync<T, TCollection>(this IMongoQuery<T> query,
+        int pageIndex, int pageSize)
+        where T : BaseEntity
         where TCollection : BaseEntityCollection<T>, new()
     {
         var (items, totalCount) = await query.ToPagedListAsync(pageIndex, pageSize);
@@ -355,43 +371,45 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Executes the query and returns distinct values for a specific field using MongoDB aggregation
     /// </summary>
-    public static async Task<List<TValue>> DistinctAsync<T, TValue>(this IMongoQuery<T> query, Expression<Func<T, TValue>> fieldSelector) where T : BaseEntity
+    public static async Task<List<TValue>> DistinctAsync<T, TValue>(this IMongoQuery<T> query,
+        Expression<Func<T, TValue>> fieldSelector) where T : BaseEntity
     {
         // Get the underlying collection from the query
         var collection = GetCollectionFromQuery(query);
         var fieldName = ExpressionToMongoPipeline.GetFieldNameForAggregation(fieldSelector);
-        
+
         // Build aggregation pipeline
         var pipeline = new List<BsonDocument>();
-        
+
         // Add match stage if there are filters
         var matchStage = GetMatchStageFromQuery(query);
         if (matchStage != null)
         {
             pipeline.Add(matchStage);
         }
-        
+
         // Add group stage to get distinct values
         pipeline.Add(new BsonDocument("$group", new BsonDocument("_id", $"${fieldName}")));
-        
+
         // Add project stage to rename _id to the field name
         pipeline.Add(new BsonDocument("$project", new BsonDocument(fieldName, "$_id")));
-        
+
         // Add sort stage if there are sorts
         var sortStage = GetSortStageFromQuery(query);
         if (sortStage != null)
         {
             pipeline.Add(sortStage);
         }
-        
+
         // Add limit and skip stages
-        var limitSkipStages = ExpressionToMongoPipeline.CreateLimitSkipStages(GetLimitFromQuery(query), GetSkipFromQuery(query));
+        var limitSkipStages =
+            ExpressionToMongoPipeline.CreateLimitSkipStages(GetLimitFromQuery(query), GetSkipFromQuery(query));
         pipeline.AddRange(limitSkipStages);
-        
+
         // Execute aggregation
         var cursor = await collection.AggregateAsync<BsonDocument>(pipeline);
         var bsonResults = await cursor.ToListAsync();
-        
+
         // Convert results to list
         var results = new List<TValue>();
         foreach (var bsonDoc in bsonResults)
@@ -405,14 +423,15 @@ public static class MongoQueryExtensions
                 }
             }
         }
-        
+
         return results;
     }
 
     /// <summary>
     /// Executes the query and returns the maximum value for a specific field using MongoDB aggregation
     /// </summary>
-    public static async Task<TValue?> MaxAsync<T, TValue>(this IMongoQuery<T> query, Expression<Func<T, TValue>> fieldSelector) where T : BaseEntity
+    public static async Task<TValue?> MaxAsync<T, TValue>(this IMongoQuery<T> query,
+        Expression<Func<T, TValue>> fieldSelector) where T : BaseEntity
     {
         var fieldName = ExpressionToMongoPipeline.GetFieldNameForAggregation(fieldSelector);
         return await ExecuteAggregationAsync<T, TValue>(query, new BsonDocument("$max", $"${fieldName}"));
@@ -421,7 +440,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Executes the query and returns the minimum value for a specific field using MongoDB aggregation
     /// </summary>
-    public static async Task<TValue?> MinAsync<T, TValue>(this IMongoQuery<T> query, Expression<Func<T, TValue>> fieldSelector) where T : BaseEntity
+    public static async Task<TValue?> MinAsync<T, TValue>(this IMongoQuery<T> query,
+        Expression<Func<T, TValue>> fieldSelector) where T : BaseEntity
     {
         var fieldName = ExpressionToMongoPipeline.GetFieldNameForAggregation(fieldSelector);
         return await ExecuteAggregationAsync<T, TValue>(query, new BsonDocument("$min", $"${fieldName}"));
@@ -430,7 +450,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Executes the query and returns the average value for a specific field using MongoDB aggregation
     /// </summary>
-    public static async Task<double> AverageAsync<T>(this IMongoQuery<T> query, Expression<Func<T, double>> fieldSelector) where T : BaseEntity
+    public static async Task<double> AverageAsync<T>(this IMongoQuery<T> query,
+        Expression<Func<T, double>> fieldSelector) where T : BaseEntity
     {
         var fieldName = ExpressionToMongoPipeline.GetFieldNameForAggregation(fieldSelector);
         var result = await ExecuteAggregationAsync<T, BsonValue>(query, new BsonDocument("$avg", $"${fieldName}"));
@@ -440,7 +461,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Executes the query and returns the sum of values for a specific field using MongoDB aggregation
     /// </summary>
-    public static async Task<decimal> SumAsync<T>(this IMongoQuery<T> query, Expression<Func<T, decimal>> fieldSelector) where T : BaseEntity
+    public static async Task<decimal> SumAsync<T>(this IMongoQuery<T> query, Expression<Func<T, decimal>> fieldSelector)
+        where T : BaseEntity
     {
         var fieldName = ExpressionToMongoPipeline.GetFieldNameForAggregation(fieldSelector);
         var result = await ExecuteAggregationAsync<T, BsonValue>(query, new BsonDocument("$sum", $"${fieldName}"));
@@ -460,14 +482,14 @@ public static class MongoQueryExtensions
         {
             return (IMongoCollection<T>)field.GetValue(query)!;
         }
-        
+
         // Fallback: try to get from property
         var property = query.GetType().GetProperty("Collection", BindingFlags.NonPublic | BindingFlags.Instance);
         if (property != null)
         {
             return (IMongoCollection<T>)property.GetValue(query)!;
         }
-        
+
         throw new InvalidOperationException("Cannot access underlying MongoDB collection from MongoQuery");
     }
 
@@ -490,6 +512,7 @@ public static class MongoQueryExtensions
                 return new BsonDocument("$match", filterDoc);
             }
         }
+
         return null;
     }
 
@@ -512,6 +535,7 @@ public static class MongoQueryExtensions
                 return new BsonDocument("$sort", sortDoc);
             }
         }
+
         return null;
     }
 
@@ -536,31 +560,32 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Executes a simple aggregation operation (max, min, avg, sum)
     /// </summary>
-    private static async Task<TResult?> ExecuteAggregationAsync<T, TResult>(IMongoQuery<T> query, BsonDocument groupOperation) where T : BaseEntity
+    private static async Task<TResult?> ExecuteAggregationAsync<T, TResult>(IMongoQuery<T> query,
+        BsonDocument groupOperation) where T : BaseEntity
     {
         var collection = GetCollectionFromQuery(query);
-        
+
         var pipeline = new List<BsonDocument>();
-        
+
         // Add match stage if there are filters
         var matchStage = GetMatchStageFromQuery(query);
         if (matchStage != null)
         {
             pipeline.Add(matchStage);
         }
-        
+
         // Add group stage with the operation
         pipeline.Add(new BsonDocument("$group", new BsonDocument("result", groupOperation)));
-        
+
         // Execute aggregation
         var cursor = await collection.AggregateAsync<BsonDocument>(pipeline);
         var result = await cursor.FirstOrDefaultAsync();
-        
+
         if (result != null && result.Contains("result"))
         {
             return ConvertBsonValue<TResult>(result["result"]);
         }
-        
+
         return default(TResult);
     }
 
@@ -612,6 +637,7 @@ public static class MongoQueryExtensions
         {
             dict[element.Name] = ConvertBsonValue<object>(element.Value);
         }
+
         return dict;
     }
 
@@ -628,9 +654,10 @@ public static class MongoQueryExtensions
             {
                 bsonDoc[kvp.Key] = MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value);
             }
+
             return BsonSerializer.Deserialize<TResult>(bsonDoc);
         }
-        
+
         // Fallback: try direct conversion
         return (TResult)anonymousObj;
     }
@@ -646,20 +673,21 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Executes the query and returns results as a BaseEntityCollection - equivalent to ToListAsync with collection wrapper
     /// </summary>
-    public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, bool returnTotalCount = false) 
-        where T : BaseEntity 
+    public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query,
+        bool returnTotalCount = false)
+        where T : BaseEntity
         where TCollection : BaseEntityCollection<T>, new()
     {
         var collection = new TCollection();
-        
+
         if (returnTotalCount)
         {
             // Execute count and data queries in parallel for better performance
             var countTask = query.CountAsync();
             var dataTask = query.ToListAsync();
-            
+
             await Task.WhenAll(countTask, dataTask);
-            
+
             collection.AddRange(await dataTask);
             collection.TotalRecordsCount = (int)await countTask;
         }
@@ -669,14 +697,15 @@ public static class MongoQueryExtensions
             var results = await query.ToListAsync();
             collection.AddRange(results);
         }
-        
+
         return collection;
     }
 
     /// <summary>
     /// Executes the query with pagination and returns results as a BaseEntityCollection with optional total count
     /// </summary>
-    public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, int pageIndex, int pageSize, bool returnTotalCount = false)
+    public static async Task<TCollection> FetchAsync<T, TCollection>(this IMongoQuery<T> query, int pageIndex,
+        int pageSize, bool returnTotalCount = false)
         where T : BaseEntity
         where TCollection : BaseEntityCollection<T>, new()
     {
@@ -705,6 +734,11 @@ public static class MongoQueryExtensions
     public static async Task InsertAsync<T>(this IMongoQuery<T> query, T entity) where T : BaseEntity
     {
         var collection = GetCollectionFromQuery(query);
+        if (entity.Id.IsNullOrEmpty())
+        {
+            entity.Id = DbObjectId.NewId();
+        }
+
         await collection.InsertOneAsync(entity);
     }
 
@@ -714,13 +748,22 @@ public static class MongoQueryExtensions
     public static async Task InsertManyAsync<T>(this IMongoQuery<T> query, IEnumerable<T> entities) where T : BaseEntity
     {
         var collection = GetCollectionFromQuery(query);
+        foreach (var entity in entities)
+        {
+            if (entity.Id.IsNullOrEmpty())
+            {
+                entity.Id = DbObjectId.NewId();
+            }
+        }
+
         await collection.InsertManyAsync(entities);
     }
 
     /// <summary>
     /// Replaces an entity matching the filter with a new entity (with upsert option)
     /// </summary>
-    public static async Task<ReplaceOneResult> ReplaceAsync<T>(this IMongoQuery<T> query, T entity, bool isUpsert = false) where T : BaseEntity
+    public static async Task<ReplaceOneResult> ReplaceAsync<T>(this IMongoQuery<T> query, T entity,
+        bool isUpsert = false) where T : BaseEntity
     {
         var collection = GetCollectionFromQuery(query);
         return await collection.ReplaceOneAsync(e => e.Id == entity.Id, entity, isUpsert);
@@ -729,7 +772,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Updates entities matching the query filters using a fluent UpdateBuilder for high performance
     /// </summary>
-    public static async Task<UpdateResult> UpdateAsync<T>(this IMongoQuery<T> query, Func<UpdateBuilder<T>, UpdateBuilder<T>> updateBuilder) where T : BaseEntity
+    public static async Task<UpdateResult> UpdateAsync<T>(this IMongoQuery<T> query,
+        Func<UpdateBuilder<T>, UpdateBuilder<T>> updateBuilder) where T : BaseEntity
     {
         var builder = new UpdateBuilder<T>();
         var configuredBuilder = updateBuilder(builder);
@@ -740,7 +784,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Updates entities matching the query filters with the specified update definition
     /// </summary>
-    public static async Task<UpdateResult> UpdateAsync<T>(this IMongoQuery<T> query, UpdateDefinition<T> update) where T : BaseEntity
+    public static async Task<UpdateResult> UpdateAsync<T>(this IMongoQuery<T> query, UpdateDefinition<T> update)
+        where T : BaseEntity
     {
         var collection = GetCollectionFromQuery(query);
 
@@ -782,13 +827,15 @@ public static class MongoQueryExtensions
         }
 
         // No filters - throw exception to prevent accidental deletion of all documents
-        throw new InvalidOperationException("Cannot delete without filters. Use Where() to specify which documents to delete.");
+        throw new InvalidOperationException(
+            "Cannot delete without filters. Use Where() to specify which documents to delete.");
     }
 
     /// <summary>
     /// Deletes a single entity by ID
     /// </summary>
-    public static async Task<DeleteResult> DeleteByIdAsync<T>(this IMongoQuery<T> query, DbObjectId id) where T : BaseEntity
+    public static async Task<DeleteResult> DeleteByIdAsync<T>(this IMongoQuery<T> query, DbObjectId id)
+        where T : BaseEntity
     {
         var collection = GetCollectionFromQuery(query);
         return await collection.DeleteOneAsync(e => e.Id == id);
@@ -797,7 +844,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Convenience method for setting a single field value with high performance
     /// </summary>
-    public static async Task<UpdateResult> SetAsync<T, TField>(this IMongoQuery<T> query, Expression<Func<T, TField>> field, TField value) where T : BaseEntity
+    public static async Task<UpdateResult> SetAsync<T, TField>(this IMongoQuery<T> query,
+        Expression<Func<T, TField>> field, TField value) where T : BaseEntity
     {
         return await query.UpdateAsync(u => u.Set(field, value));
     }
@@ -808,7 +856,8 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Convenience method for incrementing a numeric field with high performance
     /// </summary>
-    public static async Task<UpdateResult> IncrementAsync<T, TField>(this IMongoQuery<T> query, Expression<Func<T, TField>> field, TField value) where T : BaseEntity where TField : struct
+    public static async Task<UpdateResult> IncrementAsync<T, TField>(this IMongoQuery<T> query,
+        Expression<Func<T, TField>> field, TField value) where T : BaseEntity where TField : struct
     {
         return await query.UpdateAsync(u => u.Inc(field, value));
     }
@@ -816,18 +865,18 @@ public static class MongoQueryExtensions
     /// <summary>
     /// Convenience method for updating timestamp fields
     /// </summary>
-    public static async Task<UpdateResult> TouchAsync<T>(this IMongoQuery<T> query, Expression<Func<T, DateTime>> timestampField) where T : BaseEntity
+    public static async Task<UpdateResult> TouchAsync<T>(this IMongoQuery<T> query,
+        Expression<Func<T, DateTime>> timestampField) where T : BaseEntity
     {
         return await query.UpdateAsync(u => u.Set(timestampField, DateTime.UtcNow));
     }
 
 
-
-
     /// <summary>
     /// Convenience method for batch field updates with optimal performance
     /// </summary>
-    public static async Task<UpdateResult> SetFieldsAsync<T>(this IMongoQuery<T> query, params (Expression<Func<T, object>> field, object value)[] updates) where T : BaseEntity
+    public static async Task<UpdateResult> SetFieldsAsync<T>(this IMongoQuery<T> query,
+        params (Expression<Func<T, object>> field, object value)[] updates) where T : BaseEntity
     {
         return await query.UpdateAsync(u => u.Set(updates));
     }
@@ -946,4 +995,3 @@ public class ProjectionQuery<T, TResult> where T : BaseEntity
         return this;
     }
 }
-

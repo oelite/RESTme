@@ -96,12 +96,20 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 
     public async Task InsertOneAsync(MongoDbDocument document, CancellationToken cancellationToken = default)
     {
+        if (document != null && (!document.ContainsKey("_id") || document["_id"] == null || string.IsNullOrEmpty(document["_id"]?.ToString())))
+        {
+            document["_id"] = DbObjectId.NewId().ToString();
+        }
         var bsonDocument = ConvertToMongoDocument(document);
         await _collection.InsertOneAsync(bsonDocument, cancellationToken: cancellationToken);
     }
 
     public async Task InsertOneAsync(Dictionary<string, object> document, CancellationToken cancellationToken = default)
     {
+        if (document != null && (!document.ContainsKey("_id") || document["_id"] == null || string.IsNullOrEmpty(document["_id"]?.ToString())))
+        {
+            document["_id"] = DbObjectId.NewId().ToString();
+        }
         var bsonDocument = ConvertDictionaryToBsonDocument(document);
         await _collection.InsertOneAsync(bsonDocument, cancellationToken: cancellationToken);
     }
@@ -375,6 +383,10 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
 
     public async Task InsertOneAsync(T document, CancellationToken cancellationToken = default)
     {
+        if (document?.Id.IsNullOrEmpty() == true)
+        {
+            document.Id = DbObjectId.NewId();
+        }
         await _collection.InsertOneAsync(document, cancellationToken: cancellationToken);
     }
 

@@ -200,6 +200,10 @@ public class MongoDbAdapter
     public async Task InsertOneAsync<T>(string collectionName, T document) where T : BaseEntity
     {
         var collection = GetCollection<T>(collectionName);
+        if (document.Id.IsNullOrEmpty())
+        {
+            document.Id = DbObjectId.NewId();
+        }
         await collection.InsertOneAsync(document);
     }
 
@@ -209,6 +213,13 @@ public class MongoDbAdapter
     public async Task InsertManyAsync<T>(string collectionName, IEnumerable<T> documents) where T : BaseEntity
     {
         var collection = GetCollection<T>(collectionName);
+        foreach (var entity in documents)
+        {
+            if (entity.Id.IsNullOrEmpty())
+            {
+                entity.Id = DbObjectId.NewId();
+            }
+        }
         await collection.InsertManyAsync(documents);
     }
 
