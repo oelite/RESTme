@@ -83,6 +83,13 @@ public class RateLimitMiddleware
             // Continue to next middleware
             await _next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // Client disconnected - exit gracefully without logging
+            // TaskCanceledException inherits from OperationCanceledException, so this catches both
+            // The 'when' filter ensures we only catch CLIENT-initiated cancellations, not server-side timeouts
+            return;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in rate limiting middleware");
