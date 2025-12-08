@@ -8,10 +8,10 @@ using OElite.Restme.Abstractions;
 namespace OElite.Restme.Kafka
 {
     /// <summary>
-    /// Kafka streaming provider implementation
-    /// Provides simplified access to Kafka topics, partitions, and consumer groups
+    /// Kafka event streaming provider implementation
+    /// Provides distributed event log with replay capability, partitioning, and consumer groups
     /// </summary>
-    public class KafkaProvider : IStreamingProvider
+    public class KafkaProvider : IEventStreamProvider
     {
         /// <summary>
         /// Provider name for debugging and logging
@@ -26,7 +26,7 @@ namespace OElite.Restme.Kafka
         /// <summary>
         /// Capabilities supported by this provider
         /// </summary>
-        public ProviderCapabilities Capabilities => ProviderCapabilities.Streaming;
+        public ProviderCapabilities Capabilities => ProviderCapabilities.EventStream;
 
         private readonly KafkaConnection _connection;
         private bool _disposed = false;

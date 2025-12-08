@@ -35,8 +35,8 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
         // Assert
         Rest.Should().NotBeNull();
         Rest.CurrentMode.Should().Be(RestMode.Kafka);
-        Rest.GetProvider<IStreamingProvider>().Should().NotBeNull();
-        Rest.GetProvider<IStreamingProvider>().Should().BeOfType<KafkaProvider>();
+        Rest.GetProvider<IEventStreamProvider>().Should().NotBeNull();
+        Rest.GetProvider<IEventStreamProvider>().Should().BeOfType<KafkaProvider>();
 
         _output.WriteLine("✅ Kafka provider loaded and initialized successfully");
     }
@@ -178,7 +178,7 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
             Metadata = $"reliable test message {i}"
         }).ToList();
 
-        await Rest.GetProvider<IStreamingProvider>().PublishBatchAsync(messages, topicName, null);
+        await Rest.GetProvider<IEventStreamProvider>().PublishBatchAsync(messages, topicName, null);
         _output.WriteLine($"Published {messageCount} messages for consumption test");
 
         // Wait for the subscription task to complete
@@ -213,7 +213,7 @@ public class KafkaComprehensiveIntegrationTests : KafkaTestBase
             Metadata = $"initial message {i}"
         }).ToList();
 
-        await Rest.GetProvider<IStreamingProvider>().PublishBatchAsync(initialMessages, topicName, null);
+        await Rest.GetProvider<IEventStreamProvider>().PublishBatchAsync(initialMessages, topicName, null);
         await Task.Delay(1000);
 
         _output.WriteLine($"Published {initialMessages.Count} initial messages for offset test");

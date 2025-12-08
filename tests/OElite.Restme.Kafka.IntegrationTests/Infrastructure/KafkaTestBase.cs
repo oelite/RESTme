@@ -104,7 +104,7 @@ public abstract class KafkaTestBase : IAsyncLifetime
             });
 
             Logger.LogInformation("Rest instance created. StreamingProvider: {ProviderType}",
-                Rest.GetProvider<IStreamingProvider>()?.GetType().Name ?? "null");
+                Rest.GetProvider<IEventStreamProvider>()?.GetType().Name ?? "null");
         }
         catch (Exception ex)
         {

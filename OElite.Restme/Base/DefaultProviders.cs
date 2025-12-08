@@ -86,7 +86,7 @@ namespace OElite.Restme.Base
     /// <summary>
     /// Default Kafka provider that throws helpful error messages
     /// </summary>
-    public class DefaultStreamingProvider : IStreamingProvider
+    public class DefaultStreamingProvider : IEventStreamProvider
     {
         /// <summary>
         /// Provider name for debugging and logging
@@ -101,7 +101,7 @@ namespace OElite.Restme.Base
         /// <summary>
         /// Capabilities supported by this provider
         /// </summary>
-        public ProviderCapabilities Capabilities => ProviderCapabilities.Streaming;
+        public ProviderCapabilities Capabilities => ProviderCapabilities.EventStream;
 
         public Task PublishAsync<T>(T message, string topicName, string key = null, CancellationToken cancellationToken = default)
         {

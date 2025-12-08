@@ -82,7 +82,7 @@ namespace OElite.Providers
             return null;
         }
 
-        public IStreamingProvider? CreateStreamingProvider(RestConfig config)
+        public IEventStreamProvider? CreateStreamingProvider(RestConfig config)
         {
             return null;
         }

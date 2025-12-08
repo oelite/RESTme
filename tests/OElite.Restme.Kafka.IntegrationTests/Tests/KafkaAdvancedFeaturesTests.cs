@@ -79,7 +79,7 @@ public class KafkaAdvancedFeaturesTests : KafkaTestBase
             Metadata = $"message {i} for multiple consumer groups"
         }).ToList();
 
-        await Rest.GetProvider<IStreamingProvider>().PublishBatchAsync(messages, topicName, null);
+        await Rest.GetProvider<IEventStreamProvider>().PublishBatchAsync(messages, topicName, null);
         _output.WriteLine($"Published {messageCount} messages for multiple consumer groups");
 
         // Wait for consumers to process
@@ -151,7 +151,7 @@ public class KafkaAdvancedFeaturesTests : KafkaTestBase
             Metadata = $"load balance message {i}"
         }).ToList();
 
-        await Rest.GetProvider<IStreamingProvider>().PublishBatchAsync(messages, topicName, null);
+        await Rest.GetProvider<IEventStreamProvider>().PublishBatchAsync(messages, topicName, null);
         _output.WriteLine($"Published {messageCount} messages for load balancing test");
 
         // Wait for processing
@@ -427,7 +427,7 @@ public class KafkaAdvancedFeaturesTests : KafkaTestBase
             Metadata = $"first batch message {i}"
         }).ToList();
 
-        await Rest.GetProvider<IStreamingProvider>().PublishBatchAsync(firstBatch, topicName, null);
+        await Rest.GetProvider<IEventStreamProvider>().PublishBatchAsync(firstBatch, topicName, null);
         _output.WriteLine("Published first batch of messages");
 
         // Let first consumer run then cancel it (simulating failure)
@@ -470,7 +470,7 @@ public class KafkaAdvancedFeaturesTests : KafkaTestBase
             Metadata = $"second batch message {i}"
         }).ToList();
 
-        await Rest.GetProvider<IStreamingProvider>().PublishBatchAsync(secondBatch, topicName, null);
+        await Rest.GetProvider<IEventStreamProvider>().PublishBatchAsync(secondBatch, topicName, null);
         _output.WriteLine("Published second batch of messages");
 
         try

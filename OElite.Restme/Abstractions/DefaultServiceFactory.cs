@@ -77,7 +77,7 @@ namespace OElite.Restme.Abstractions
                 "ClickHouse provider not loaded. Please reference OElite.Restme.ClickHouse package.");
         }
 
-        public IStreamingProvider CreateStreamingProvider(RestConfig config)
+        public IEventStreamProvider CreateStreamingProvider(RestConfig config)
         {
             throw new NotImplementedException(
                 "Kafka provider not loaded. Please reference OElite.Restme.Kafka package.");

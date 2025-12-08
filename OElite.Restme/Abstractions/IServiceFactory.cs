@@ -56,7 +56,7 @@ namespace OElite.Restme.Abstractions
         /// <summary>
         /// Create streaming provider (returns null if not supported)
         /// </summary>
-        IStreamingProvider? CreateStreamingProvider(RestConfig config);
+        IEventStreamProvider? CreateStreamingProvider(RestConfig config);
 
         /// <summary>
         /// Create search provider (returns null if not supported)

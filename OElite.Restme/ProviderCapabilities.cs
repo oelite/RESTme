@@ -35,9 +35,10 @@ namespace OElite.Restme
         Columnar = 1 << 3,
 
         /// <summary>
-        /// Supports streaming operations (publish, subscribe, process).
+        /// Supports event streaming operations (distributed event log with replay capability, partitioning, and consumer groups).
+        /// Used by Apache Kafka, Apache Pulsar, and similar event streaming platforms.
         /// </summary>
-        Streaming = 1 << 4,
+        EventStream = 1 << 4,
 
         /// <summary>
         /// Supports search operations (index, search, delete).
@@ -54,6 +55,6 @@ namespace OElite.Restme
         /// <summary>
         /// Supports all capabilities.
         /// </summary>
-        All = Cache | Storage | Queue | Columnar | Streaming | Search
+        All = Cache | Storage | Queue | Columnar | EventStream | Search
     }
 }

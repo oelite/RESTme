@@ -79,7 +79,7 @@ namespace OElite.Restme.ClickHouse
             return new ClickHouseProvider(config);
         }
 
-        public IStreamingProvider? CreateStreamingProvider(RestConfig config)
+        public IEventStreamProvider? CreateStreamingProvider(RestConfig config)
         {
             return null;
         }

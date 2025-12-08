@@ -21,7 +21,7 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            var streamingProvider = rest.GetProvider<IEventStreamProvider>();
             if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
@@ -37,7 +37,7 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            var streamingProvider = rest.GetProvider<IEventStreamProvider>();
             if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
@@ -53,7 +53,7 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            var streamingProvider = rest.GetProvider<IEventStreamProvider>();
             if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
@@ -69,7 +69,7 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            var streamingProvider = rest.GetProvider<IEventStreamProvider>();
             if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
@@ -85,7 +85,7 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            var streamingProvider = rest.GetProvider<IEventStreamProvider>();
             if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
@@ -101,7 +101,7 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            var streamingProvider = rest.GetProvider<IEventStreamProvider>();
             if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
@@ -117,7 +117,7 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            var streamingProvider = rest.GetProvider<IEventStreamProvider>();
             if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 
@@ -133,7 +133,7 @@ namespace OElite
             if (rest.CurrentMode != RestMode.Kafka)
                 throw new OEliteException("Kafka mode required");
 
-            var streamingProvider = rest.GetProvider<IStreamingProvider>();
+            var streamingProvider = rest.GetProvider<IEventStreamProvider>();
             if (streamingProvider == null)
                 throw new OEliteException("Kafka provider not initialized");
 

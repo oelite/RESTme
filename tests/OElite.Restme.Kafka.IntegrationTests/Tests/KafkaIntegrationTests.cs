@@ -112,7 +112,7 @@ public class KafkaRealIntegrationTests : KafkaTestBase
             Timestamp = DateTime.UtcNow
         }).ToList();
 
-        await Rest.GetProvider<IStreamingProvider>().PublishBatchAsync(messages, topicName, null);
+        await Rest.GetProvider<IEventStreamProvider>().PublishBatchAsync(messages, topicName, null);
         _output.WriteLine($"Published {messageCount} messages");
 
         // Wait for the subscription task to complete or timeout
@@ -213,7 +213,7 @@ public class KafkaRealIntegrationTests : KafkaTestBase
             Timestamp = DateTime.UtcNow
         }).ToList();
 
-        await Rest.GetProvider<IStreamingProvider>().PublishBatchAsync(initialMessages, topicName, null);
+        await Rest.GetProvider<IEventStreamProvider>().PublishBatchAsync(initialMessages, topicName, null);
         await Task.Delay(1000);
 
         _output.WriteLine($"Published {initialMessages.Count} initial messages");

@@ -15,14 +15,14 @@ namespace OElite.Restme.Kafka
         /// <summary>
         /// Kafka supports Streaming capability only
         /// </summary>
-        public ProviderCapabilities SupportedCapabilities => ProviderCapabilities.Streaming;
+        public ProviderCapabilities SupportedCapabilities => ProviderCapabilities.EventStream;
 
         /// <summary>
         /// Checks if this factory can create the requested provider type
         /// </summary>
         public bool CanCreateProvider<T>() where T : class, IRestmeProvider
         {
-            return typeof(T) == typeof(IStreamingProvider);
+            return typeof(T) == typeof(IEventStreamProvider);
         }
 
         /// <summary>
@@ -30,7 +30,7 @@ namespace OElite.Restme.Kafka
         /// </summary>
         public T? CreateProvider<T>(RestConfig config) where T : class, IRestmeProvider
         {
-            if (typeof(T) == typeof(IStreamingProvider))
+            if (typeof(T) == typeof(IEventStreamProvider))
             {
                 return new KafkaProvider(config) as T;
             }
@@ -68,7 +68,7 @@ namespace OElite.Restme.Kafka
             return null;
         }
 
-        public IStreamingProvider? CreateStreamingProvider(RestConfig config)
+        public IEventStreamProvider? CreateStreamingProvider(RestConfig config)
         {
             return new KafkaProvider(config);
         }
