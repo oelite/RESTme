@@ -39,7 +39,7 @@ dotnet add package Microsoft.Extensions.Caching.StackExchangeRedis
 
 ## 🏗️ Quick Start
 
-### Basic Setup
+### Basic Setup (v2.1.0+ Simplified API)
 
 ```csharp
 // Program.cs
@@ -47,12 +47,11 @@ using OElite.Restme.RateLimiting.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add rate limiting services
+// Intelligent auto-detection: uses Redis from ICacheProvider or IConnectionMultiplexer, otherwise memory
 builder.Services.AddRateLimiting(options =>
 {
     options.Limit = 100;
     options.WindowInSeconds = 60;
-    options.StorageType = RateLimitStorageType.Memory;
 });
 
 var app = builder.Build();
@@ -64,10 +63,54 @@ app.MapControllers();
 app.Run();
 ```
 
+### Seamless Integration with OElite.Restme.Redis
+
+```csharp
+using OElite.Restme;
+using OElite.Restme.RateLimiting.Extensions;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Setup Redis cache provider
+var rest = new Rest("redis://localhost:6379", RestMode.Redis);
+builder.Services.AddSingleton(rest.GetProvider<ICacheProvider>());
+
+// Rate limiting automatically detects and uses Redis - zero extra config!
+builder.Services.AddRateLimiting(options =>
+{
+    options.Limit = 100;
+    options.WindowInSeconds = 60;
+});
+
+var app = builder.Build();
+app.UseRateLimiting();
+app.Run();
+```
+
+### Redis Distributed Storage (Simplified)
+
+```csharp
+// Single line setup with optimized connection
+builder.Services.AddRateLimiting("localhost:6379", options =>
+{
+    options.Limit = 1000;
+    options.WindowInSeconds = 60;
+    options.RedisKeyPrefix = "myapp:rate_limit:";
+});
+
+// Or with connection string from config
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+builder.Services.AddRateLimiting(redisConnection, options =>
+{
+    options.Limit = 1000;
+    options.WindowInSeconds = 60;
+});
+```
+
 ### Advanced Configuration
 
 ```csharp
-builder.Services.AddRateLimiting(options =>
+builder.Services.AddRateLimiting("redis.example.com:6379,password=secret", options =>
 {
     // Basic settings
     options.Limit = 1000;
@@ -95,9 +138,6 @@ builder.Services.AddRateLimiting(options =>
     
     // Algorithm selection
     options.Algorithm = RateLimitAlgorithm.TokenBucket;
-    
-    // Redis for distributed scenarios
-    options.StorageType = RateLimitStorageType.Redis;
     options.RedisConnectionString = "localhost:6379";
 });
 ```
