@@ -94,9 +94,9 @@ public class RateLimitMiddleware
         {
             _logger.LogError(ex, "Error in rate limiting middleware");
 
-            // In case of error, allow the request to continue
-            // This ensures rate limiting failures don't break the application
-            await _next(context);
+            // BUG FIX: Do NOT retry the request - request body is already consumed
+            // Rethrow the exception to let the global exception handler deal with it
+            throw;
         }
         finally
         {

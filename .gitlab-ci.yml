@@ -8,6 +8,7 @@ variables:
     OElite.Restme.Azure
     OElite.Restme.S3
     OElite.Restme.ClickHouse
+    OElite.Restme.GoogleUtils
     OElite.Restme.Kafka
     OElite.Restme.OpenSearch
     OElite.Restme.Utils
@@ -182,7 +183,7 @@ deploy_packages:
         echo "Using NuGet.org authentication"
         dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key $NUGET_TOKEN --skip-duplicate
       else
-        DEPLOY_TARGET="phanes.dev"
+        DEPLOY_TARGET="packages.phanes.ltd"
         NUGET_SOURCE="https://packages.phanes.ltd/v3/index.json"
         echo "Deploying to $DEPLOY_TARGET"
         echo "Source: $NUGET_SOURCE - $PHANES_API_TOKEN"
