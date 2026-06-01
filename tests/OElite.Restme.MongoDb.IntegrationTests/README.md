@@ -25,7 +25,7 @@ The core MongoDB integration functionality is working correctly with basic CRUD 
 ### Infrastructure
 - `TestBase`: Base class providing MongoDB setup, cleanup, and utility methods
 - `TestMongoDbCentre`: Concrete implementation for testing
-- Connection string configured for `mongodb://root:3dj8uV5tiFK6ZSgwYovGL6ays358Y9ovNzqo@mongo.services.k8sdev:27017/dev-tests?authSource=admin`
+- Connection string configured for `mongodb://root:3dj8uV5tiFK6ZSgwYovGL6ays358Y9ovNzqo@mongo.services.oelite.io:27017/dev-tests?authSource=admin`
 
 ### Test Models
 - `TestProduct`: Product entity with various field types and attributes
@@ -143,7 +143,7 @@ await query.Query(p => p.Id == id).DeleteOneAsync();
 
 ### Prerequisites
 - .NET 10.0 (preview)
-- MongoDB server accessible at `mongo.services.k8sdev:27017`
+- MongoDB server accessible at `mongo.services.oelite.io:27017`
 - Valid credentials: `root:3dj8uV5tiFK6ZSgwYovGL6ays358Y9ovNzqo`
 
 ### Commands

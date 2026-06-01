@@ -90,12 +90,22 @@ public class RateLimitMiddleware
             // The 'when' filter ensures we only catch CLIENT-initiated cancellations, not server-side timeouts
             return;
         }
+        catch (OElite.OEliteAuthorizationException authEx)
+        {
+            // Authorization exceptions should be handled by global exception handler
+            // Don't log as error, just rethrow
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // Request was cancelled, exit gracefully
+            throw;
+        }
         catch (Exception ex)
         {
+            // Log other exceptions but don't rethrow to avoid double-handling
             _logger.LogError(ex, "Error in rate limiting middleware");
-
-            // BUG FIX: Do NOT retry the request - request body is already consumed
-            // Rethrow the exception to let the global exception handler deal with it
+            // Let the exception continue up the pipeline naturally
             throw;
         }
         finally

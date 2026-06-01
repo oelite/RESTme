@@ -179,13 +179,11 @@ namespace OElite.Restme.Kafka
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     loopCount++;
-                    Console.WriteLine($"Consumer loop iteration {loopCount}, calling Consume()...");
 
                     try
                     {
                         // Use timeout for Consume to prevent infinite blocking
                         var consumeResult = consumer.Consume(TimeSpan.FromSeconds(1));
-                        Console.WriteLine($"Consume() returned, IsPartitionEOF: {consumeResult?.IsPartitionEOF}, Topic: {consumeResult?.Topic}, Offset: {consumeResult?.Offset}");
 
                         if (consumeResult != null && consumeResult.Message != null)
                         {
@@ -212,7 +210,8 @@ namespace OElite.Restme.Kafka
                         }
                         else
                         {
-                            Console.WriteLine("Consumer received null result or null message - continuing to poll");
+                            // No message received, add small backoff to prevent busy-looping during idle periods
+                            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
                         }
                     }
                     catch (ConsumeException ex)

@@ -196,10 +196,10 @@ public class MyService
   "oelite": {
     "data": {
       "redis": {
-        "kortex": "redis.services.k8sdev:6379,db=0",
-        "platform": "redis.services.k8sdev:6379,db=1",
-        "obelisk": "redis.services.k8sdev:6379,db=2",
-        "oesterling": "redis.services.k8sdev:6379,db=3"
+        "kortex": "redis.services.oelite.io:6379,db=0",
+        "platform": "redis.services.oelite.io:6379,db=1",
+        "obelisk": "redis.services.oelite.io:6379,db=2",
+        "oesterling": "redis.services.oelite.io:6379,db=3"
       }
     }
   }
