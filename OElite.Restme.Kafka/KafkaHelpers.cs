@@ -62,19 +62,34 @@ namespace OElite.Restme.Kafka
 
                 if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
                 {
-                    // Configure SASL authentication
-                    _producerConfig.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                    _producerConfig.SaslMechanism = SaslMechanism.Plain;
+                    // Configure SASL authentication - use custom mechanism if specified, default to Plain
+                    var securityProtocol = config.SecurityProtocol switch
+                    {
+                        "SaslSsl" => SecurityProtocol.SaslSsl,
+                        "SaslPlaintext" => SecurityProtocol.SaslPlaintext,
+                        _ => SecurityProtocol.SaslPlaintext
+                    };
+
+                    var saslMechanism = config.SaslMechanism?.ToUpperInvariant() switch
+                    {
+                        "SCRAM-SHA-256" => SaslMechanism.ScramSha256,
+                        "SCRAM-SHA-512" => SaslMechanism.ScramSha512,
+                        "PLAIN" => SaslMechanism.Plain,
+                        _ => SaslMechanism.Plain
+                    };
+
+                    _producerConfig.SecurityProtocol = securityProtocol;
+                    _producerConfig.SaslMechanism = saslMechanism;
                     _producerConfig.SaslUsername = username;
                     _producerConfig.SaslPassword = password;
 
-                    _consumerConfig.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                    _consumerConfig.SaslMechanism = SaslMechanism.Plain;
+                    _consumerConfig.SecurityProtocol = securityProtocol;
+                    _consumerConfig.SaslMechanism = saslMechanism;
                     _consumerConfig.SaslUsername = username;
                     _consumerConfig.SaslPassword = password;
 
-                    _adminConfig.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                    _adminConfig.SaslMechanism = SaslMechanism.Plain;
+                    _adminConfig.SecurityProtocol = securityProtocol;
+                    _adminConfig.SaslMechanism = saslMechanism;
                     _adminConfig.SaslUsername = username;
                     _adminConfig.SaslPassword = password;
                 }

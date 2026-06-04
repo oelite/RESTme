@@ -34,6 +34,10 @@ namespace OElite.Restme
         public bool UseRestConvertForCollectionSerialization { get; set; }
         public int DefaultTimeout { get; set; }
 
+        // Kafka-specific authentication properties override defaults
+        public string? SaslMechanism { get; set; }
+        public string? SecurityProtocol { get; set; }
+
         public RestConfig(RestMode restMode, JsonSerializerSettings? jsonSerializerSettings = null,
             Encoding? encoding = null,
             bool useRestConvertForCollectionSerialization = true, int timeout = 0)
