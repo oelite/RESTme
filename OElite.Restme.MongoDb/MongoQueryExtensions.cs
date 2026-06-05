@@ -201,9 +201,9 @@ public static class MongoQueryExtensions
 
         // Add match stage for the predicate (inverted - find documents that DON'T match)
         var predicateFilter = Builders<T>.Filter.Not(Builders<T>.Filter.Where(predicate));
-        var predicateFilterDoc = predicateFilter.Render(
+        var predicateFilterDoc = predicateFilter.Render(new RenderArgs<T>(
             BsonSerializer.SerializerRegistry.GetSerializer<T>(),
-            BsonSerializer.SerializerRegistry);
+            BsonSerializer.SerializerRegistry));
         pipeline.Add(new BsonDocument("$match", predicateFilterDoc));
 
         // Add limit 1 to stop at first non-matching document
@@ -506,9 +506,9 @@ public static class MongoQueryExtensions
             if (filters.Count > 0)
             {
                 var combinedFilter = filters.Count == 1 ? filters[0] : Builders<T>.Filter.And(filters);
-                var filterDoc = combinedFilter.Render(
+                var filterDoc = combinedFilter.Render(new RenderArgs<T>(
                     BsonSerializer.SerializerRegistry.GetSerializer<T>(),
-                    BsonSerializer.SerializerRegistry);
+                    BsonSerializer.SerializerRegistry));
                 return new BsonDocument("$match", filterDoc);
             }
         }
@@ -529,9 +529,9 @@ public static class MongoQueryExtensions
             if (sorts.Count > 0)
             {
                 var combinedSort = sorts.Count == 1 ? sorts[0] : Builders<T>.Sort.Combine(sorts);
-                var sortDoc = combinedSort.Render(
+                var sortDoc = combinedSort.Render(new RenderArgs<T>(
                     BsonSerializer.SerializerRegistry.GetSerializer<T>(),
-                    BsonSerializer.SerializerRegistry);
+                    BsonSerializer.SerializerRegistry));
                 return new BsonDocument("$sort", sortDoc);
             }
         }

@@ -1,8 +1,12 @@
+using System.Linq;
 using System.Linq.Expressions;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 
 namespace OElite.Restme.MongoDb;
+
+// MongoDB 3.0 breaking change: IMongoQueryable<> and IOrderedMongoQueryable<> replaced with standard LINQ types
+// This file provides the same fluent querying capabilities using IQueryable<> and IOrderedQueryable<>
 
 /// <summary>
 /// Extension methods for IMongoCollection to provide fluent querying capabilities for any entity type
@@ -32,7 +36,7 @@ public static class DbCollectionExtensions
     /// <summary>
     /// Add Where filter using LINQ expression
     /// </summary>
-    public static IMongoQueryable<T> Where<T>(this IMongoCollection<T> collection, Expression<Func<T, bool>> filter)
+    public static IQueryable<T> Where<T>(this IMongoCollection<T> collection, Expression<Func<T, bool>> filter)
     {
         return collection.AsQueryable().Where(filter);
     }
@@ -40,7 +44,7 @@ public static class DbCollectionExtensions
     /// <summary>
     /// Add OrderBy using LINQ expression
     /// </summary>
-    public static IOrderedMongoQueryable<T> OrderBy<T, TKey>(this IMongoCollection<T> collection, Expression<Func<T, TKey>> keySelector)
+    public static IOrderedQueryable<T> OrderBy<T, TKey>(this IMongoCollection<T> collection, Expression<Func<T, TKey>> keySelector)
     {
         return collection.AsQueryable().OrderBy(keySelector);
     }
@@ -48,7 +52,7 @@ public static class DbCollectionExtensions
     /// <summary>
     /// Add OrderByDescending using LINQ expression
     /// </summary>
-    public static IOrderedMongoQueryable<T> OrderByDescending<T, TKey>(this IMongoCollection<T> collection, Expression<Func<T, TKey>> keySelector)
+    public static IOrderedQueryable<T> OrderByDescending<T, TKey>(this IMongoCollection<T> collection, Expression<Func<T, TKey>> keySelector)
     {
         return collection.AsQueryable().OrderByDescending(keySelector);
     }

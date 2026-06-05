@@ -57,8 +57,10 @@ namespace OElite.Restme.Kafka
             // Add authentication if provided via RestConfig
             if (config != null)
             {
-                var username = config.AuthKey;
-                var password = config.AuthSecret;
+                var username = config.AuthKey?.Trim();
+                var password = config.AuthSecret?.Trim();
+
+                Console.WriteLine($"[Kafka] Auth configured - User: '{username}' (len:{username?.Length}), Mechanism: '{config.SaslMechanism}', Protocol: '{config.SecurityProtocol}'");
 
                 if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
                 {
@@ -78,20 +80,25 @@ namespace OElite.Restme.Kafka
                         _ => SaslMechanism.Plain
                     };
 
+                    Console.WriteLine($"[Kafka] Confluent config - BootstrapServers: '{_bootstrapServers}', SecurityProtocol: {securityProtocol}, SaslMechanism: {saslMechanism}, SaslUsername: '{username}', SaslPassword: (len:{password.Length})");
+
+                    var rawPassword = password;
+                    Console.WriteLine($"[Kafka] SASL handshake - Username: '{username}', Password (raw): '{rawPassword}', Mechanism: {saslMechanism}");
+
                     _producerConfig.SecurityProtocol = securityProtocol;
                     _producerConfig.SaslMechanism = saslMechanism;
                     _producerConfig.SaslUsername = username;
-                    _producerConfig.SaslPassword = password;
+                    _producerConfig.SaslPassword = rawPassword;
 
                     _consumerConfig.SecurityProtocol = securityProtocol;
                     _consumerConfig.SaslMechanism = saslMechanism;
                     _consumerConfig.SaslUsername = username;
-                    _consumerConfig.SaslPassword = password;
+                    _consumerConfig.SaslPassword = rawPassword;
 
                     _adminConfig.SecurityProtocol = securityProtocol;
                     _adminConfig.SaslMechanism = saslMechanism;
                     _adminConfig.SaslUsername = username;
-                    _adminConfig.SaslPassword = password;
+                    _adminConfig.SaslPassword = rawPassword;
                 }
             }
         }
