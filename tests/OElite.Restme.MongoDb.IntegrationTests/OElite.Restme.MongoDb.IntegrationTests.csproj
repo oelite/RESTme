@@ -28,7 +28,7 @@
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
-        <PackageReference Include="MongoDB.Driver" Version="3.5.0" />
+        <PackageReference Include="MongoDB.Driver" Version="3.9.0" />
         <PackageReference Include="Testcontainers.MongoDb" Version="4.8.1" />
         <PackageReference Include="JunitXml.TestLogger" Version="3.0.134" />
     </ItemGroup>

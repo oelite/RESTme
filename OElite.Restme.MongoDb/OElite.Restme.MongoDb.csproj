@@ -18,7 +18,7 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="MongoDB.Driver" Version="3.5.0" />
+        <PackageReference Include="MongoDB.Driver" Version="3.9.0" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
