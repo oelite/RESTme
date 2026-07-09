@@ -36,11 +36,10 @@ public static class MongoPropertyConflictResolver
     {
         try
         {
-            var memberMap = classMap.GetMemberMap(conflict.PropertyName);
-            if (memberMap != null)
+            classMap.UnmapMember(conflict.BaseProperty);
+
+            if (classMap.GetMemberMap(conflict.DerivedProperty.Name) == null)
             {
-                // Re-map to use the derived class property specifically
-                classMap.UnmapMember(memberMap.MemberInfo);
                 classMap.MapMember(conflict.DerivedProperty);
             }
         }
@@ -53,7 +52,10 @@ public static class MongoPropertyConflictResolver
             // Try to map the derived property directly as fallback
             try
             {
-                classMap.MapMember(conflict.DerivedProperty);
+                if (classMap.GetMemberMap(conflict.DerivedProperty.Name) == null)
+                {
+                    classMap.MapMember(conflict.DerivedProperty);
+                }
             }
             catch (Exception fallbackEx)
             {
