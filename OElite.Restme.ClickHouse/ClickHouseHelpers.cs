@@ -28,6 +28,18 @@ namespace OElite.Restme.ClickHouse
 
         private static string ParseConnectionString(string connectionString)
         {
+            // Handle both URI-style (clickhouse://user:pass@host:port/db) and ADO.NET-style (Host=...;Username=...)
+            if (connectionString.StartsWith("clickhouse://"))
+            {
+                return ParseUriBasedConnectionString(connectionString);
+            }
+            
+            // ADO.NET-style connection string - parse key=value pairs
+            return ParseAdoNetConnectionString(connectionString);
+        }
+
+        private static string ParseUriBasedConnectionString(string connectionString)
+        {
             // Convert from clickhouse://host:port/database to ClickHouse.Client format
             var uri = connectionString.Replace("clickhouse://", "");
             
@@ -63,6 +75,63 @@ namespace OElite.Restme.ClickHouse
             }
 
             // Build ClickHouse.Client connection string
+            var builder = new System.Text.StringBuilder();
+            builder.Append($"Host={host};Port={port};Database={database}");
+            
+            if (!string.IsNullOrEmpty(username))
+                builder.Append($";Username={username}");
+            
+            if (!string.IsNullOrEmpty(password))
+                builder.Append($";Password={password}");
+
+            builder.Append(";Compress=false");
+
+            return builder.ToString();
+        }
+
+        private static string ParseAdoNetConnectionString(string connectionString)
+        {
+            // Parse ADO.NET-style: Host=localhost;Port=8123;Username=user;Password=pass;Database=db
+            var host = "localhost";
+            var port = "8123";
+            var database = "default";
+            var username = "";
+            var password = "";
+
+            // Split by semicolon and parse key=value pairs
+            var parts = connectionString.Split(';');
+            foreach (var part in parts)
+            {
+                var kv = part.Trim();
+                if (string.IsNullOrEmpty(kv)) continue;
+                
+                var eqIndex = kv.IndexOf('=');
+                if (eqIndex <= 0) continue;
+                
+                var key = kv.Substring(0, eqIndex).Trim().ToLowerInvariant();
+                var value = kv.Substring(eqIndex + 1).Trim();
+
+                switch (key)
+                {
+                    case "host":
+                        host = value;
+                        break;
+                    case "port":
+                        port = value;
+                        break;
+                    case "database":
+                        database = value;
+                        break;
+                    case "username":
+                        username = value;
+                        break;
+                    case "password":
+                        password = value;
+                        break;
+                }
+            }
+
+            // Build standardized ClickHouse.Client connection string
             var builder = new System.Text.StringBuilder();
             builder.Append($"Host={host};Port={port};Database={database}");
             
