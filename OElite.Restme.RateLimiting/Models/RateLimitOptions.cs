@@ -116,6 +116,21 @@ public class RateLimitOptions
     /// Rate limiting algorithm to use
     /// </summary>
     public RateLimitAlgorithm Algorithm { get; set; } = RateLimitAlgorithm.TokenBucket;
+
+    /// <summary>
+    /// Fallback IP address to use when client IP cannot be determined
+    /// </summary>
+    public string FallbackIpAddress { get; set; } = "127.0.0.1";
+
+    /// <summary>
+    /// Fallback maximum requests when rate limit configuration is not found
+    /// </summary>
+    public int FallbackMaxRequests { get; set; } = 1000;
+
+    /// <summary>
+    /// Fallback window in seconds when rate limit configuration is not found
+    /// </summary>
+    public int FallbackWindowSeconds { get; set; } = 60;
 }
 
 /// <summary>

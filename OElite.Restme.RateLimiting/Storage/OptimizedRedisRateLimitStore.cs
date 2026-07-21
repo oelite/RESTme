@@ -293,6 +293,38 @@ public class OptimizedRedisRateLimitStore : IRateLimitStore
         }
     }
 
+    public async Task<int> ScanAndDeleteKeysAsync(string pattern)
+    {
+        try
+        {
+            var server = _redis.GetServer(_redis.GetEndPoints().First());
+            var keys = server.Keys(pattern: pattern).ToArray();
+            
+            if (keys.Length == 0)
+            {
+                _logger.LogDebug("No keys found matching pattern: {Pattern}", pattern);
+                return 0;
+            }
+
+            var deletedCount = 0;
+            const int batchSize = 100;
+
+            for (int i = 0; i < keys.Length; i += batchSize)
+            {
+                var batch = keys.Skip(i).Take(batchSize).ToArray();
+                deletedCount += (int)await _database.KeyDeleteAsync(batch);
+            }
+
+            _logger.LogInformation("Deleted {Count} keys matching pattern: {Pattern}", deletedCount, pattern);
+            return deletedCount;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error scanning and deleting Redis keys for pattern: {Pattern}", pattern);
+            return 0;
+        }
+    }
+
     public void Dispose()
     {
         if (_ownsConnection)

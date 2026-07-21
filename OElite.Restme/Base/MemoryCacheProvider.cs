@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using OElite.Restme.Abstractions;
@@ -113,6 +115,28 @@ namespace OElite.Restme.Base
             return Task.FromResult(false);
         }
 
+        /// <summary>
+        /// Get all keys matching a glob-style pattern (Redis SCAN compatible).
+        /// Supports * (any sequence) and ? (single character) wildcards.
+        /// </summary>
+        public IEnumerable<string> GetKeys(string pattern)
+        {
+            if (string.IsNullOrEmpty(pattern))
+                return Array.Empty<string>();
+
+            // Convert glob pattern to regex: * → .*, ? → .
+            var regexPattern = "^" + Regex.Escape(pattern)
+                .Replace("\\*", ".*")
+                .Replace("\\?", ".") + "$";
+            var regex = new Regex(regexPattern, RegexOptions.Compiled);
+
+            // Filter out expired keys so callers don't operate on stale entries
+            var now = DateTime.UtcNow;
+            return _cache
+                .Where(kvp => now <= kvp.Value.ExpiryOnUtc && regex.IsMatch(kvp.Key))
+                .Select(kvp => kvp.Key)
+                .ToList();
+        }
 
         private void CleanupExpiredItems(object? state)
         {

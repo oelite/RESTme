@@ -2,9 +2,8 @@
 
 > **⚠️ REQUIRED READING**: Before starting, use your Read tool to load the root platform context:
 > - `../../AGENTS.md` — Platform context, roles, workflow chains, OElite framework patterns
-> - `../../CLAUDE.md` — Additional platform standards and conventions
 > 
-> This file is repo-specific orientation and does NOT contain the full platform context.
+> **🚨 CRITICAL**: You MUST `cd` into this repository FIRST before running the bootstrap from `../../AGENTS.md`. The root `oelite/` folder is NOT a git repository and has no `.git` directory. All git operations (worktree-create, pull, push, MR) must run from inside this repo.
 
 ## What This Repo Is
 
