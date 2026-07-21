@@ -36,42 +36,25 @@ public static class MongoPropertyConflictResolver
     {
         try
         {
-            classMap.UnmapMember(conflict.BaseProperty);
-
-            if (classMap.GetMemberMap(conflict.DerivedProperty.Name) == null)
+            // For shadowed properties (new keyword), map the derived property with a unique element name
+            // The base property cannot be unmapped from base class maps, so we need a different approach
+            var derivedMemberMap = classMap.GetMemberMap(conflict.DerivedProperty.Name);
+            if (derivedMemberMap == null)
             {
-                classMap.MapMember(conflict.DerivedProperty);
+                derivedMemberMap = classMap.MapMember(conflict.DerivedProperty);
             }
+
+            // Use a unique element name to avoid conflict with base class property
+            // Format: derivedtype_propertyname (e.g., tenant_status)
+            var derivedTypeName = classMap.ClassType.Name.ToLowerInvariant();
+            var uniqueElementName = $"{derivedTypeName}_{conflict.PropertyName.ToLowerInvariant()}";
+            derivedMemberMap.SetElementName(uniqueElementName);
         }
         catch (Exception ex)
         {
-            // Enhanced error handling with proper logging instead of silent Console.WriteLine
             var errorMessage = $"MongoDB property conflict resolution failed for property '{conflict.PropertyName}' " +
                 $"in class '{classMap.ClassType.Name}': {ex.Message}";
-
-            // Try to map the derived property directly as fallback
-            try
-            {
-                if (classMap.GetMemberMap(conflict.DerivedProperty.Name) == null)
-                {
-                    classMap.MapMember(conflict.DerivedProperty);
-                }
-            }
-            catch (Exception fallbackEx)
-            {
-                // Log detailed error information and throw to prevent silent failures
-                var detailedError = $"Critical MongoDB mapping failure: Could not resolve property conflict for '{conflict.PropertyName}' " +
-                    $"in class '{classMap.ClassType.Name}'. Primary error: {ex.Message}. " +
-                    $"Fallback error: {fallbackEx.Message}. This may cause serialization issues.";
-
-                Console.WriteLine($"ERROR: {detailedError}");
-
-                // For critical properties like Status, we need to ensure the mapping doesn't silently fail
-                if (conflict.PropertyName == "Status")
-                {
-                    throw new InvalidOperationException(detailedError, ex);
-                }
-            }
+            Console.WriteLine($"ERROR: {errorMessage}");
         }
     }
 
