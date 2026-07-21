@@ -53,6 +53,17 @@ public static class MongoClassMapConfigurator
                     // Use AutoMap first to handle inheritance properly
                     cm.AutoMap();
 
+                    // Remove inherited member maps to prevent duplicate _id/status conflicts
+                    // Base class maps handle inherited properties; derived maps should only
+                    // map properties declared directly on the type
+                    var inheritedMembers = cm.AllMemberMaps
+                        .Where(m => m.MemberInfo.DeclaringType != typeof(T))
+                        .ToList();
+                    foreach (var inherited in inheritedMembers)
+                    {
+                        cm.UnmapMember(inherited.MemberInfo);
+                    }
+
                     // Then apply our custom attribute mappings
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(cm);
