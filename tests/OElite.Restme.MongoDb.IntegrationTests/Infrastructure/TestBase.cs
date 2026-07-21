@@ -32,7 +32,7 @@ public abstract class TestBase : IAsyncLifetime
 
         // Setup MongoDB test container
         _mongoContainer = new MongoDbBuilder()
-            .WithImage("mongo:8.0.15")
+            .WithImage("mongo:8.0")
             .WithPortBinding(27017, true)
             .Build();
 
