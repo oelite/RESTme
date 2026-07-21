@@ -178,6 +178,18 @@ public static class MongoClassMapConfigurator
                     var classMap = new BsonClassMap(type);
                     BsonClassMap.RegisterClassMap(classMap);
                     classMap.AutoMap();
+
+                    // Remove inherited member maps to prevent duplicate _id/status conflicts
+                    // Base class maps handle inherited properties; derived maps should only
+                    // map properties declared directly on the type
+                    var inheritedMembers = classMap.AllMemberMaps
+                        .Where(m => m.MemberInfo.DeclaringType != type)
+                        .ToList();
+                    foreach (var inherited in inheritedMembers)
+                    {
+                        classMap.UnmapMember(inherited.MemberInfo);
+                    }
+
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(classMap);
                     MongoPropertyConflictResolver.ResolvePropertyConflicts(classMap, type);
