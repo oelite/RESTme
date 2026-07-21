@@ -50,25 +50,14 @@ public static class MongoClassMapConfigurator
             {
                 BsonClassMap.RegisterClassMap<T>(cm =>
                 {
-                    // Use AutoMap first to handle inheritance properly
-                    cm.AutoMap();
-
-                    // Remove inherited member maps to prevent duplicate _id/status conflicts
-                    // Base class maps handle inherited properties; derived maps should only
-                    // map properties declared directly on the type
-                    var inheritedMembers = cm.AllMemberMaps
-                        .Where(m => m.MemberInfo.DeclaringType != typeof(T))
-                        .ToList();
-                    foreach (var inherited in inheritedMembers)
-                    {
-                        cm.UnmapMember(inherited.MemberInfo);
-                    }
-
-                    // Then apply our custom attribute mappings
+                    // Only map properties declared directly on this type.
+                    // Inherited properties are handled by the base class maps.
+                    // AutoMap is intentionally NOT called here because it recreates
+                    // inherited member maps that conflict with base class registrations.
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(cm);
 
-                    // Finally, resolve property conflicts
+                    // Resolve property conflicts (e.g., Status hiding base Status)
                     MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, typeof(T));
                 });
 
@@ -177,19 +166,10 @@ public static class MongoClassMapConfigurator
                     // Create a new BsonClassMap and register it manually
                     var classMap = new BsonClassMap(type);
                     BsonClassMap.RegisterClassMap(classMap);
-                    classMap.AutoMap();
 
-                    // Remove inherited member maps to prevent duplicate _id/status conflicts
-                    // Base class maps handle inherited properties; derived maps should only
-                    // map properties declared directly on the type
-                    var inheritedMembers = classMap.AllMemberMaps
-                        .Where(m => m.MemberInfo.DeclaringType != type)
-                        .ToList();
-                    foreach (var inherited in inheritedMembers)
-                    {
-                        classMap.UnmapMember(inherited.MemberInfo);
-                    }
-
+                    // Only map properties declared directly on this type.
+                    // AutoMap is intentionally NOT called to avoid recreating
+                    // inherited member maps that conflict with base class maps.
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(classMap);
                     MongoPropertyConflictResolver.ResolvePropertyConflicts(classMap, type);
