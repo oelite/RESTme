@@ -57,6 +57,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.RabbitMQ.Inte
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.Redis.IntegrationTests", "tests\OElite.Restme.Redis.IntegrationTests\OElite.Restme.Redis.IntegrationTests.csproj", "{FEB20C63-5D47-4F6A-8E23-45D7658A1F83}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OElite.Restme.RateLimiting.UnitTests", "tests\OElite.Restme.RateLimiting.UnitTests\OElite.Restme.RateLimiting.UnitTests.csproj", "{88153B78-9A69-48EA-9397-C8D5DE0C7D53}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -319,6 +323,18 @@ Global
 		{FEB20C63-5D47-4F6A-8E23-45D7658A1F83}.Release|x64.Build.0 = Release|Any CPU
 		{FEB20C63-5D47-4F6A-8E23-45D7658A1F83}.Release|x86.ActiveCfg = Release|Any CPU
 		{FEB20C63-5D47-4F6A-8E23-45D7658A1F83}.Release|x86.Build.0 = Release|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Debug|x64.Build.0 = Debug|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Debug|x86.Build.0 = Debug|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Release|Any CPU.Build.0 = Release|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Release|x64.ActiveCfg = Release|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Release|x64.Build.0 = Release|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Release|x86.ActiveCfg = Release|Any CPU
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -333,5 +349,6 @@ Global
 		{A52FDC04-4B5E-482B-A740-37819FD6F1C0} = {D28EB5C5-D596-4D42-AA20-E56A5F27B3C1}
 		{88080F9F-76CA-496D-B80D-249FB2D7AC76} = {D28EB5C5-D596-4D42-AA20-E56A5F27B3C1}
 		{FEB20C63-5D47-4F6A-8E23-45D7658A1F83} = {D28EB5C5-D596-4D42-AA20-E56A5F27B3C1}
+		{88153B78-9A69-48EA-9397-C8D5DE0C7D53} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
