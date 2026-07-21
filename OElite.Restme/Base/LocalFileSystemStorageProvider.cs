@@ -3,9 +3,10 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Base
+namespace OElite.Restme.Base
 {
     /// <summary>
     /// Local filesystem storage provider. Uses a base directory as the storage root.
@@ -15,6 +16,21 @@ namespace OElite.Base
     {
         private readonly string _baseDirectory;
         private bool _disposed;
+
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "LocalFileSystem";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new(RestMode.LocalFileSystem);
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Storage;
 
         public LocalFileSystemStorageProvider(string? baseDirectory = null)
         {
@@ -42,11 +58,12 @@ namespace OElite.Base
             }
 
             var json = File.ReadAllText(path, Encoding.UTF8);
-            var obj = json.JsonDeserialize<T>();
+            var obj = StringUtils.JsonDeserialize<T>(json);
             return Task.FromResult(obj);
         }
 
-        public Task<T?> PutAsync<T>(string objectKey, T value, CancellationToken cancellationToken = default) where T : class
+        public Task<T?> PutAsync<T>(string objectKey, T value, CancellationToken cancellationToken = default)
+            where T : class
         {
             var path = ResolvePath(objectKey);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -64,7 +81,7 @@ namespace OElite.Base
                 return Task.FromResult(value);
             }
 
-            var json = value.JsonSerialize();
+            var json = StringUtils.JsonSerialize(value);
             File.WriteAllText(path, json, Encoding.UTF8);
             return Task.FromResult(value);
         }
@@ -90,7 +107,8 @@ namespace OElite.Base
             return Task.FromResult<string?>(File.ReadAllText(path, Encoding.UTF8));
         }
 
-        public Task<string?> PutStringAsync(string objectKey, string value, CancellationToken cancellationToken = default)
+        public Task<string?> PutStringAsync(string objectKey, string value,
+            CancellationToken cancellationToken = default)
         {
             var path = ResolvePath(objectKey);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -114,13 +132,15 @@ namespace OElite.Base
             return Task.FromResult(true);
         }
 
-        public Task<T> GetStreamAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : Stream
+        public Task<T> GetStreamAsync<T>(string objectKey, CancellationToken cancellationToken = default)
+            where T : Stream
         {
             var stream = File.OpenRead(ResolvePath(objectKey));
             if (stream is T typed)
             {
                 return Task.FromResult(typed);
             }
+
             stream.Dispose();
             throw new InvalidCastException($"Stored stream is not of type {typeof(T).FullName}");
         }
@@ -138,5 +158,3 @@ namespace OElite.Base
         }
     }
 }
-
-

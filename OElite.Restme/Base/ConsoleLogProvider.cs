@@ -1,7 +1,7 @@
 using System;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Base
+namespace OElite.Restme.Base
 {
     /// <summary>
     /// Simple console logger provider without external dependencies.
@@ -9,6 +9,21 @@ namespace OElite.Base
     public sealed class ConsoleLogProvider : ILogProvider
     {
         private bool _disposed;
+
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "ConsoleLog";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new (RestMode.LocalFileSystem);
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.None;
 
         public void LogError(string? message, Exception? exception = null, int eventId = 0)
         {

@@ -15,15 +15,6 @@ public struct DbObjectId : IComparable<DbObjectId>, IEquatable<DbObjectId>
     private readonly string? _stringValue;
 
     /// <summary>
-    /// Creates a new DbObjectId with a unique value
-    /// </summary>
-    public DbObjectId()
-    {
-        _bytes = GenerateNewId();
-        _stringValue = ToHexString(_bytes);
-    }
-
-    /// <summary>
     /// Creates an DbObjectId from a string representation
     /// </summary>
     /// <param name="value">24-character hex string</param>
@@ -265,7 +256,7 @@ public struct DbObjectId : IComparable<DbObjectId>, IEquatable<DbObjectId>
     /// </summary>
     public static DbObjectId NewId()
     {
-        return new DbObjectId();
+        return new DbObjectId(GenerateNewId());
     }
 
     /// <summary>

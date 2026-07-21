@@ -1,12 +1,13 @@
 using System;
 using System.IO;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
-using OElite.Utils;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using OElite;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
+using OElite.Restme.Azure;
 
 namespace OElite.Providers
 {
@@ -16,13 +17,48 @@ namespace OElite.Providers
     public class AzureStorageProvider : BaseStorageProvider
     {
         private readonly CloudBlobClient _blobClient;
-        private readonly AzureConfiguration _azureConfig;
+        private readonly string? _rootPath;
 
-        public AzureStorageProvider(string connectionString, RestConfig config) : base(config)
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public override string ProviderName => "AzureStorage";
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public override ProviderCapabilities Capabilities => ProviderCapabilities.Storage;
+
+        public AzureStorageProvider(RestConfig config) : base(config)
         {
-            _azureConfig = AzureConnectionStringParser.ParseConnectionString(connectionString);
-            var storageAccount = CloudStorageAccount.Parse(_azureConfig.ConnectionString);
-            _blobClient = storageAccount.CreateCloudBlobClient();
+
+            // Use pre-parsed config values directly
+            var accountName = config.AuthKey;
+            var accountKey = config.AuthSecret;
+
+            // If AuthKey/AuthSecret are not provided, try parsing connection string
+            if (string.IsNullOrEmpty(accountName) || string.IsNullOrEmpty(accountKey))
+            {
+                if (!string.IsNullOrEmpty(config.ConnectionString))
+                {
+                    var azureConfig = AzureConnectionStringParser.ParseConnectionString(config.ConnectionString);
+                    var storageAccount = CloudStorageAccount.Parse(azureConfig.ConnectionString);
+                    _blobClient = storageAccount.CreateCloudBlobClient();
+                    _rootPath = azureConfig.RootPath;
+                }
+                else
+                {
+                    throw new InvalidOperationException("Azure credentials not provided. Set AuthKey and AuthSecret in RestConfig, or provide a connection string.");
+                }
+            }
+            else
+            {
+                // Use AuthKey/AuthSecret directly
+                var credentials = new Microsoft.WindowsAzure.Storage.Auth.StorageCredentials(accountName, accountKey);
+                var storageAccount = new CloudStorageAccount(credentials, config.Endpoint ?? "core.windows.net", useHttps: config.RestSsl);
+                _blobClient = storageAccount.CreateCloudBlobClient();
+                _rootPath = config.RootPath;
+            }
         }
 
         public override async Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : class
@@ -33,7 +69,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+                var finalKey = AzureConnectionStringParser.CombinePath(_rootPath, objectKey);
 
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
@@ -62,7 +98,7 @@ namespace OElite.Providers
                 if (typeof(T) == typeof(string))
                     return (T)Convert.ChangeType(jsonStringValue, typeof(T));
 
-                return jsonStringValue.JsonDeserialize<T>();
+                return StringUtils.JsonDeserialize<T>(jsonStringValue);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
@@ -79,7 +115,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+                var finalKey = AzureConnectionStringParser.CombinePath(_rootPath, objectKey);
 
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
@@ -124,7 +160,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+                var finalKey = AzureConnectionStringParser.CombinePath(_rootPath, objectKey);
 
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
@@ -149,7 +185,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+                var finalKey = AzureConnectionStringParser.CombinePath(_rootPath, objectKey);
 
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
@@ -174,7 +210,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+                var finalKey = AzureConnectionStringParser.CombinePath(_rootPath, objectKey);
 
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
@@ -205,7 +241,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+                var finalKey = AzureConnectionStringParser.CombinePath(_rootPath, objectKey);
 
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
@@ -232,7 +268,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+                var finalKey = AzureConnectionStringParser.CombinePath(_rootPath, objectKey);
 
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
@@ -267,7 +303,7 @@ namespace OElite.Providers
             try
             {
                 // Apply root path if specified
-                var finalKey = AzureConnectionStringParser.CombinePath(_azureConfig.RootPath, objectKey);
+                var finalKey = AzureConnectionStringParser.CombinePath(_rootPath, objectKey);
 
                 var container = await GetContainerAsync(finalKey);
                 var blobItemPath = AzureConnectionStringParser.GetBlobItemPath(finalKey);
@@ -314,6 +350,25 @@ namespace OElite.Providers
             var container = _blobClient.GetContainerReference(containerName);
             await container.CreateIfNotExistsAsync();
             return container;
+        }
+
+        /// <summary>
+        /// Initialize the provider asynchronously
+        /// </summary>
+        public async Task InitializeAsync()
+        {
+            // Container creation is already done in constructor
+            // This method exists for interface compatibility
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Dispose the provider
+        /// </summary>
+        public async Task DisposeAsync()
+        {
+            // Cleanup resources if needed
+            await Task.CompletedTask;
         }
 
         public override void Dispose()

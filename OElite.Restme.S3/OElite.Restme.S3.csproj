@@ -2,16 +2,17 @@
     <PropertyGroup>
         <Description>OElite.Restme S3 provider implementation</Description>
         <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
-        <AssemblyVersion>2.0.9</AssemblyVersion>
-        <VersionPrefix>2.0.9</VersionPrefix>
+        <AssemblyVersion>2.1.1</AssemblyVersion>
+        <VersionPrefix>2.1.1</VersionPrefix>
         <AssemblyName>OElite.Restme.S3</AssemblyName>
         <PackageTags>OElite;Restme;S3;AWS;Storage</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
-        <Authors>OElite Limited</Authors>
-        <Copyright>OElite Limited</Copyright>
+        <Authors>Phanes Technology Ltd</Authors>
+        <Copyright>Phanes Technology Ltd</Copyright>
         <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
         <Title>OElite.Restme.S3</Title>
         <Nullable>enable</Nullable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
     
     <ItemGroup>
@@ -20,5 +21,9 @@
     
     <ItemGroup>
         <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 </Project>

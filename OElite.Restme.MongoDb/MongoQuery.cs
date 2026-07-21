@@ -238,7 +238,8 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
 
         // Convert to BSON pipeline
         var bsonPipeline = allPipelineStages.Select(stage =>
-            new BsonDocument(stage.Select(kvp => new BsonElement(kvp.Key, MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value))))).ToArray();
+            new BsonDocument(stage.Select(kvp =>
+                new BsonElement(kvp.Key, MongoDbCollectionImplementation.ConvertToBsonValue(kvp.Value))))).ToArray();
         var aggregationPipeline = PipelineDefinition<T, TResult>.Create(bsonPipeline);
 
         if (_session != null)
@@ -256,6 +257,11 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
     // Write operations
     public async Task<T> InsertOneAsync(T document)
     {
+        if (document?.Id.IsNullOrEmpty() == true)
+        {
+            document.Id = DbObjectId.NewId();
+        }
+
         if (_session != null)
         {
             await _collection.InsertOneAsync(_session, document);
@@ -271,6 +277,14 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
     public async Task<List<T>> InsertManyAsync(IEnumerable<T> documents)
     {
         var documentList = documents.ToList();
+        foreach (var document in documentList)
+        {
+            if (document?.Id.IsNullOrEmpty() == true)
+            {
+                document.Id = DbObjectId.NewId();
+            }
+        }
+
         if (_session != null)
         {
             await _collection.InsertManyAsync(_session, documentList);
@@ -717,7 +731,7 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
     {
         // Limit to 2 to check for uniqueness
         var options = new FindOptions<T> { Limit = 2 };
-        
+
         if (_skip.HasValue)
             options.Skip = _skip.Value;
 
@@ -782,7 +796,7 @@ public class MongoQuery<T> : IMongoQuery<T> where T : BaseEntity
     /// <summary>
     /// Executes the query and returns results as a BaseEntityCollection with total count
     /// </summary>
-    public async Task<TCollection> ToPagedCollectionAsync<TCollection>(int pageIndex, int pageSize) 
+    public async Task<TCollection> ToPagedCollectionAsync<TCollection>(int pageIndex, int pageSize)
         where TCollection : BaseEntityCollection<T>, new()
     {
         var (items, totalCount) = await ToPagedListAsync(pageIndex, pageSize);

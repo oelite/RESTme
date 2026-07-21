@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Base implementation for cache providers with common functionality
@@ -16,6 +16,21 @@ namespace OElite.Abstractions
             Config = config ?? throw new ArgumentNullException(nameof(config));
         }
 
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public abstract string ProviderName { get; }
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => Config;
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public abstract ProviderCapabilities Capabilities { get; }
+
         // Methods with cancellation token support (default parameter provides backward compatibility)
         public abstract Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class;
         public abstract Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null, CancellationToken cancellationToken = default) where T : class;
@@ -26,36 +41,12 @@ namespace OElite.Abstractions
         public abstract void Dispose();
 
         /// <summary>
-        /// Common implementation for GetOriginalData method
-        /// </summary>
-        public virtual T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class
-        {
-            if (responseMessage?.Data == null)
-                return null;
-
-            try
-            {
-                if (responseMessage.Data is T directData)
-                    return directData;
-
-                if (responseMessage.Data is string jsonString)
-                    return jsonString.JsonDeserialize<T>();
-
-                return responseMessage.Data.JsonSerialize().JsonDeserialize<T>();
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
         /// Validates cache key input
         /// </summary>
         protected static void ValidateKey(string key, string operation)
         {
-            if (string.IsNullOrEmpty(key))
-                throw new ArgumentException($"Cache key cannot be null or empty for {operation}", nameof(key));
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException($"Cache key cannot be null, empty, or whitespace for {operation}", nameof(key));
         }
 
         /// <summary>

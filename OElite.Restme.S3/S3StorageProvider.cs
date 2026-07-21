@@ -2,10 +2,11 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using OElite.Abstractions;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Providers
 {
@@ -18,35 +19,111 @@ namespace OElite.Providers
         private readonly string _bucketName;
         private readonly S3Configuration _s3Config;
 
-        public S3StorageProvider(string connectionString, RestConfig config) : base(config)
-        {
-            // Parse connection string to extract S3 configuration
-            _s3Config = S3ConnectionStringParser.ParseConnectionString(connectionString);
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public override string ProviderName => "S3Storage";
 
-            // Use credentials from config or parsed connection string
-            var accessKey = !string.IsNullOrEmpty(_s3Config.AccessKeyId) ? _s3Config.AccessKeyId : config.RestKey;
-            var secretKey = !string.IsNullOrEmpty(_s3Config.SecretAccessKey)
-                ? _s3Config.SecretAccessKey
-                : config.RestSecret;
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public override ProviderCapabilities Capabilities => ProviderCapabilities.Storage;
+
+        public S3StorageProvider(RestConfig config) : base(config)
+        {
+            // Always parse connection string for endpoint and configuration
+            S3Configuration? parsedConfig = null;
+            if (!string.IsNullOrEmpty(config.ConnectionString))
+            {
+                try
+                {
+                    parsedConfig = S3ConnectionStringParser.ParseConnectionString(config);
+                }
+                catch (ArgumentException)
+                {
+                    // If connection string parsing fails, continue with RestConfig values only
+                    parsedConfig = null;
+                }
+            }
+
+            // Prioritize RestConfig authentication fields, fallback to parsed credentials
+            var accessKey = config.AuthKey ?? parsedConfig?.AccessKeyId;
+            var secretKey = config.AuthSecret ?? parsedConfig?.SecretAccessKey;
+
 
             // Create AWS S3 client configuration
-            var s3Config = new AmazonS3Config
-            {
-                ServiceURL = _s3Config.ServiceUrl,
-                ForcePathStyle = _s3Config.ForcePathStyle,
-                UseHttp = _s3Config.UseHttp
-            };
+            var s3Config = new AmazonS3Config();
 
-            if (_s3Config.Region != null)
+            // Set region FIRST - must be done before setting ServiceURL to prevent AWS SDK from overriding
+            if (!string.IsNullOrEmpty(config.Region))
             {
-                s3Config.RegionEndpoint = _s3Config.Region;
+                s3Config.RegionEndpoint = RegionEndpoint.GetBySystemName(config.Region);
+            }
+            else if (parsedConfig?.Region != null)
+            {
+                s3Config.RegionEndpoint = parsedConfig.Region;
+            }
+            else
+            {
+                s3Config.RegionEndpoint = RegionEndpoint.USEast1; // Default
+            }
+
+            // Set additional S3 config from parsed connection string if available (before ServiceURL)
+            if (parsedConfig != null)
+            {
+                s3Config.ForcePathStyle = parsedConfig.ForcePathStyle;
+                s3Config.UseHttp = parsedConfig.UseHttp;
+            }
+
+            // Set ServiceURL LAST - after region and other settings to prevent overriding
+            if (!string.IsNullOrEmpty(config.Endpoint))
+            {
+                s3Config.ServiceURL = config.Endpoint;
+            }
+            else if (parsedConfig?.ServiceUrl != null)
+            {
+                s3Config.ServiceURL = parsedConfig.ServiceUrl;
             }
 
             _s3Client = new AmazonS3Client(accessKey, secretKey, s3Config);
-            _bucketName = _s3Config.BucketName ?? "restme-storage";
+            _bucketName = config.InstanceName ?? parsedConfig?.BucketName ?? "restme-storage";
+            _s3Config = parsedConfig ?? new S3Configuration { RootPath = config.RootPath };
+
+            // Ensure bucket exists synchronously for reliable initialization
+            try
+            {
+                EnsureBucketExistsAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"Warning: Could not ensure bucket exists: {ex.Message}");
+                // Continue anyway - bucket might be created later or already exist
+            }
         }
 
-        public override async Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : class
+        private async Task EnsureBucketExistsAsync()
+        {
+            try
+            {
+                var request = new GetBucketLocationRequest
+                {
+                    BucketName = _bucketName
+                };
+                await _s3Client.GetBucketLocationAsync(request);
+            }
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // Bucket doesn't exist, create it
+                var createRequest = new PutBucketRequest
+                {
+                    BucketName = _bucketName
+                };
+                await _s3Client.PutBucketAsync(createRequest);
+            }
+        }
+
+        public override async Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default)
+            where T : class
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "GetAsync");
@@ -77,7 +154,8 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
+                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}",
+                    ex);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
@@ -85,7 +163,8 @@ namespace OElite.Providers
             }
         }
 
-        public override async Task<T?> PutAsync<T>(string objectKey, T value, CancellationToken cancellationToken = default) where T : class
+        public override async Task<T?> PutAsync<T>(string objectKey, T value,
+            CancellationToken cancellationToken = default) where T : class
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "PutAsync");
@@ -104,10 +183,7 @@ namespace OElite.Providers
                     Key = finalObjectKey
                 };
 
-                await HandleStreamPutAsync(value, async stream =>
-                {
-                    request.InputStream = stream;
-                });
+                await HandleStreamPutAsync(value, async stream => { request.InputStream = stream; });
 
                 cancellationToken.ThrowIfCancellationRequested();
                 await _s3Client.PutObjectAsync(request, cancellationToken);
@@ -181,7 +257,8 @@ namespace OElite.Providers
             }
         }
 
-        public override async Task<string?> GetStringAsync(string objectKey, CancellationToken cancellationToken = default)
+        public override async Task<string?> GetStringAsync(string objectKey,
+            CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "GetStringAsync");
@@ -207,7 +284,8 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
+                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}",
+                    ex);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
@@ -215,7 +293,8 @@ namespace OElite.Providers
             }
         }
 
-        public override async Task<string?> PutStringAsync(string objectKey, string value, CancellationToken cancellationToken = default)
+        public override async Task<string?> PutStringAsync(string objectKey, string value,
+            CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "PutStringAsync");
@@ -246,7 +325,8 @@ namespace OElite.Providers
             }
         }
 
-        public override async Task<Stream?> GetStreamAsync(string objectKey, CancellationToken cancellationToken = default)
+        public override async Task<Stream?> GetStreamAsync(string objectKey,
+            CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "GetStreamAsync");
@@ -271,7 +351,8 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
+                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}",
+                    ex);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
@@ -279,7 +360,8 @@ namespace OElite.Providers
             }
         }
 
-        public override async Task<bool> PutStreamAsync(string objectKey, Stream stream, CancellationToken cancellationToken = default)
+        public override async Task<bool> PutStreamAsync(string objectKey, Stream stream,
+            CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateKey(objectKey, "PutStreamAsync");
@@ -340,7 +422,8 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}", ex);
+                throw new OEliteException($"S3 object '{objectKey}' does not exist or is not accessible: {ex.Message}",
+                    ex);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {

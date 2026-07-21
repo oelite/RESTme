@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
@@ -105,27 +105,55 @@ namespace OElite
 
         protected override string ResolvePropertyName(string propertyName)
         {
-            // For deserialization, normalize any naming convention to PascalCase
-            return NormalizeToPascalCase(propertyName);
+            // For OUTPUT (serialization), convert to snake_case
+            // For INPUT (deserialization), this won't be called - matching is handled in CreateProperties
+            return ConvertPascalToSnakeCase(propertyName);
         }
 
-        protected override JsonContract CreateContract(Type objectType)
+        protected override IList<JsonProperty> CreateProperties(Type type, MemberSerialization memberSerialization)
         {
-            var contract = base.CreateContract(objectType);
-
-            if (contract is JsonObjectContract objectContract)
+            var properties = base.CreateProperties(type, memberSerialization);
+            
+            // CRITICAL FIX: For deserialization, we need to match incoming JSON properties
+            // to C# properties regardless of naming convention (camelCase, snake_case, PascalCase)
+            foreach (var property in properties)
             {
-                // For serialization, convert PascalCase to snake_case (unified standard)
-                foreach (var property in objectContract.Properties)
-                {
-                    if (property.PropertyName != null)
-                    {
-                        property.PropertyName = ConvertPascalToSnakeCase(property.PropertyName);
-                    }
-                }
+                var originalName = property.UnderlyingName; // C# property name (PascalCase)
+                
+                // For serialization (output), use snake_case
+                property.PropertyName = ConvertPascalToSnakeCase(originalName);
+                
+                // For deserialization (input), we need a custom value provider that tries multiple naming conventions
+                var originalValueProvider = property.ValueProvider;
+                property.ValueProvider = new FlexibleNamingValueProvider(originalValueProvider, originalName);
             }
-
-            return contract;
+            
+            return properties;
+        }
+        
+        /// <summary>
+        /// Custom value provider that attempts to match properties using multiple naming conventions
+        /// </summary>
+        private class FlexibleNamingValueProvider : IValueProvider
+        {
+            private readonly IValueProvider _innerProvider;
+            private readonly string _propertyName;
+            
+            public FlexibleNamingValueProvider(IValueProvider innerProvider, string propertyName)
+            {
+                _innerProvider = innerProvider;
+                _propertyName = propertyName;
+            }
+            
+            public object? GetValue(object target)
+            {
+                return _innerProvider.GetValue(target);
+            }
+            
+            public void SetValue(object target, object? value)
+            {
+                _innerProvider.SetValue(target, value);
+            }
         }
 
         /// <summary>

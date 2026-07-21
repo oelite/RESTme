@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Base implementation for storage providers with common functionality
@@ -13,6 +13,21 @@ namespace OElite.Abstractions
     {
         protected readonly RestConfig Config = config ?? throw new ArgumentNullException(nameof(config));
         protected bool Disposed = false;
+
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public abstract string ProviderName { get; }
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => Config;
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public abstract ProviderCapabilities Capabilities { get; }
 
         // Methods with cancellation token support (default parameter provides backward compatibility)
         public abstract Task<T?> GetAsync<T>(string objectKey, CancellationToken cancellationToken = default) where T : class;

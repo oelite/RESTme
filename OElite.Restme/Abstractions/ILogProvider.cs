@@ -1,11 +1,11 @@
 using System;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Interface for logging operations
     /// </summary>
-    public interface ILogProvider : IDisposable
+    public interface ILogProvider : IRestmeProvider
     {
         /// <summary>
         /// Log error message

@@ -123,7 +123,8 @@ public abstract class MongoDbCentre : IDisposable
         }
 
         // Create clean connection string without database path
-        var cleanConnectionString = $"{uri.Scheme}://{uri.UserInfo}@{uri.Host}:{uri.Port}";
+        var userInfo = string.IsNullOrEmpty(uri.UserInfo) ? "" : $"{uri.UserInfo}@";
+        var cleanConnectionString = $"{uri.Scheme}://{userInfo}{uri.Host}:{uri.Port}";
 
         // Add query parameters if they exist (excluding database-related ones)
         if (!string.IsNullOrEmpty(uri.Query))

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <PackageId>OElite.Restme.OpenSearch</PackageId>
+    <AssemblyVersion>2.1.1</AssemblyVersion>
+    <VersionPrefix>2.1.1</VersionPrefix>
+    <Authors>OElite Team</Authors>
+    <Company>Phanes Technology Ltd</Company>
+    <Description>OpenSearch integration package for the Restme framework, providing search and analytics operations.</Description>
+    <PackageTags>opensearch;elasticsearch;search;analytics;restme;oelite</PackageTags>
+    <RepositoryUrl>https://github.com/oelite/restme</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenSearch.Client" Version="1.6.0" />
+    <PackageReference Include="OpenSearch.Net" Version="1.8.0" />
+    <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -2,8 +2,8 @@ using System;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using OElite.Abstractions;
 using OElite.Providers;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Restme.Hosting.Redis
 {
@@ -33,21 +33,18 @@ namespace OElite.Restme.Hosting.Redis
 
             // Register the OElite Redis cache provider
             // Instance name prefix will be handled by prepending to keys in the adapter
-            services.AddSingleton<ICacheProvider>(provider =>
+            var cacheProvider = new RedisCacheProvider(new RestConfig(RestMode.Redis)
             {
-                var config = new RestConfig
-                {
-                    OperationMode = RestMode.RedisAsCache
-                };
-                return new RedisCacheProvider(connectionString, config);
+                ConnectionString = connectionString,
+                InstanceName = instanceName
             });
+
+            services.AddSingleton<RedisCacheProvider>(_ => cacheProvider);
+            services.AddSingleton<ICacheProvider>(_ => cacheProvider);
 
             // Register the IDistributedCache adapter with instance prefix
             services.TryAddSingleton<IDistributedCache>(provider =>
-            {
-                var cacheProvider = provider.GetRequiredService<ICacheProvider>();
-                return new RedisDistributedCache(cacheProvider, instanceName);
-            });
+                new RedisDistributedCache(cacheProvider, instanceName));
 
             return services;
         }

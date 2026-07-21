@@ -2,12 +2,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Interface for cache operations (Redis, etc.)
     /// </summary>
-    public interface ICacheProvider : IDisposable
+    public interface ICacheProvider : IRestmeProvider
     {
         /// <summary>
         /// Get cached data by key
@@ -33,10 +33,5 @@ namespace OElite.Abstractions
         /// Set expiry for existing key
         /// </summary>
         Task<bool> SetExpiryAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Get original data from ResponseMessage wrapper
-        /// </summary>
-        T? GetOriginalData<T>(ResponseMessage? responseMessage) where T : class;
     }
 }

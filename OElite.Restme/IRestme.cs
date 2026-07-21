@@ -1,14 +1,14 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 using OElite.Restme.Utils;
 
-namespace OElite
+namespace OElite.Restme
 {
-    public interface IRestme
+    public interface IRestme : IDisposable
     {
-        Uri? BaseUri { get; set; }
+        RestConfig Configuration { get; }
         string? RequestUrlPath { get; set; }
 
         void Add(string key, string value);
@@ -19,14 +19,6 @@ namespace OElite
         void AddAuthorizationHeader(string token, string authTypePrefix = "Bearer ");
 
 
-        T? HttpRequest<T>(HttpMethod method, string? keyOrRelativePath = null);
-        Task<T?> HttpRequestAsync<T>(HttpMethod method, string? keyOrRelativePath = null);
-
-        HttpResponseMessage<T?>? HttpRequestFull<T>(HttpMethod method, string? keyOrRelativePath = null,
-            object? dataObject = null);
-
-        Task<HttpResponseMessage<T?>?> HttpRequestFullAsync<T>(HttpMethod method, string? keyOrRelativePath = null,
-            object? dataObject = null);
 
         T? Get<T>(string? keyOrRelativePath = null, object? dataObject = null) where T : class;
         Task<T?> GetAsync<T>(string? keyOrRelativePath = null, object? dataObject = null) where T : class;
@@ -74,10 +66,12 @@ namespace OElite
 
         RestMode CurrentMode { get; }
 
-        ICacheProvider? CacheProvider { get; }
-        IQueueProvider? QueueProvider { get; }
-        IStorageProvider? StorageProvider { get; }
-        IHttpProvider? HttpProvider { get; }
-        ILogProvider? LogProvider { get; }
+        /// <summary>
+        /// Get a provider instance based on the current RestMode configuration.
+        /// </summary>
+        /// <typeparam name="T">The provider interface type to retrieve.</typeparam>
+        /// <param name="name">Optional provider name for managing multiple instances of the same type. Defaults to "default".</param>
+        /// <returns>A provider instance if available for the current mode, null otherwise.</returns>
+        T? GetProvider<T>(string name = "default") where T : class, IRestmeProvider;
     }
 }

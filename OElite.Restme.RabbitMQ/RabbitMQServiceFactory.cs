@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
-using OElite.Abstractions;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Providers
 {
@@ -24,29 +25,71 @@ namespace OElite.Providers
             // Force static constructor to run
             ServiceLocator.RegisterFactory("rabbitmq", new RabbitMQServiceFactory());
         }
-        public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
+
+        /// <summary>
+        /// RabbitMQ supports Queue capability only
+        /// </summary>
+        public ProviderCapabilities SupportedCapabilities => ProviderCapabilities.Queue;
+
+        /// <summary>
+        /// Checks if this factory can create the requested provider type
+        /// </summary>
+        public bool CanCreateProvider<T>() where T : class, IRestmeProvider
         {
-            throw new NotImplementedException("Cache operations not supported by RabbitMQ provider. Use Redis provider instead.");
+            return typeof(T) == typeof(IQueueProvider);
         }
 
-        public IQueueProvider CreateQueueProvider(string connectionString, RestConfig config)
+        /// <summary>
+        /// Generic provider creation with capability detection
+        /// </summary>
+        public T? CreateProvider<T>(RestConfig config) where T : class, IRestmeProvider
         {
-            return new RabbitMQProvider(connectionString, config);
+            if (typeof(T) == typeof(IQueueProvider))
+            {
+                return new RabbitMQProvider(config) as T;
+            }
+
+            return null;
         }
 
-        public IStorageProvider CreateStorageProvider(string connectionString, RestConfig config)
+        public ICacheProvider? CreateCacheProvider(RestConfig config)
         {
-            throw new NotImplementedException("Storage operations not supported by RabbitMQ provider. Use Azure or S3 provider instead.");
+            return null;
         }
 
-        public IHttpProvider CreateHttpProvider(RestConfig config)
+        public IQueueProvider? CreateQueueProvider(RestConfig config)
         {
-            throw new NotImplementedException("HTTP operations not supported by RabbitMQ provider. Use HTTP provider instead.");
+            return new RabbitMQProvider(config);
+        }
+
+        public IStorageProvider? CreateStorageProvider(RestConfig config)
+        {
+            return null;
+        }
+
+        public IHttpProvider? CreateHttpProvider(RestConfig config)
+        {
+            return null;
         }
 
         public ILogProvider CreateLogProvider(RestConfig config)
         {
             return new DefaultLogProvider();
+        }
+
+        public IColumnarProvider? CreateColumnarProvider(RestConfig config)
+        {
+            return null;
+        }
+
+        public IEventStreamProvider? CreateStreamingProvider(RestConfig config)
+        {
+            return null;
+        }
+
+        public ISearchProvider? CreateSearchProvider(RestConfig config)
+        {
+            return null;
         }
     }
 }

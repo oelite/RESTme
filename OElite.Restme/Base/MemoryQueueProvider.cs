@@ -3,9 +3,9 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using OElite.Abstractions;
+using OElite.Restme.Abstractions;
 
-namespace OElite.Base
+namespace OElite.Restme.Base
 {
     /// <summary>
     /// In-memory queue provider using Channels. Suitable for single-process scenarios.
@@ -16,13 +16,35 @@ namespace OElite.Base
         private CancellationTokenSource? _cts;
         private bool _disposed;
 
-        public Task<bool> PublishAsync<T>(T message, string? queueName = null, string? routingKey = null, string? exchangeName = null, bool isDurable = true, bool isExclusive = false, bool autoDelete = true, string exchangeType = "direct", bool isMessagePersistent = true, CancellationToken cancellationToken = default) where T : class
+        /// <summary>
+        /// Provider name for debugging and logging
+        /// </summary>
+        public string ProviderName => "MemoryQueue";
+
+        /// <summary>
+        /// Configuration used to create this provider
+        /// </summary>
+        public RestConfig Configuration => new(RestMode.Memory);
+
+        /// <summary>
+        /// Capabilities supported by this provider
+        /// </summary>
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Queue;
+
+        public Task<bool> PublishAsync<T>(T message, string? queueName = null, string? routingKey = null,
+            string? exchangeName = null, bool isDurable = true, bool isExclusive = false, bool autoDelete = true,
+            string exchangeType = "direct", bool isMessagePersistent = true,
+            CancellationToken cancellationToken = default) where T : class
         {
             var q = GetOrCreateQueue(queueName ?? "default");
             return Task.FromResult(q.Writer.TryWrite(message));
         }
 
-        public Task StartConsumingAsync<T>(Func<T, Task<bool>> messageHandler, Func<Task<bool>>? completionCondition = null, string? exchangeName = null, string? queueName = null, string? routingKey = null, ushort prefetchCount = 1, bool isDurable = true, bool isExclusive = false, bool autoDelete = true, string exchangeType = "direct", CancellationToken cancellationToken = default) where T : class
+        public Task StartConsumingAsync<T>(Func<T, Task<bool>> messageHandler,
+            Func<Task<bool>>? completionCondition = null, string? exchangeName = null, string? queueName = null,
+            string? routingKey = null, ushort prefetchCount = 1, bool isDurable = true, bool isExclusive = false,
+            bool autoDelete = true, string exchangeType = "direct", CancellationToken cancellationToken = default)
+            where T : class
         {
             var q = GetOrCreateQueue(queueName ?? "default");
             _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -35,16 +57,26 @@ namespace OElite.Base
                     var msg = await q.Reader.ReadAsync(token).ConfigureAwait(false);
                     if (msg is T typed)
                     {
-                        try { await messageHandler(typed).ConfigureAwait(false); }
-                        catch { /* ignore handler errors for base provider */ }
+                        try
+                        {
+                            await messageHandler(typed).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                            /* ignore handler errors for base provider */
+                        }
                     }
+
                     if (completionCondition != null)
                     {
                         try
                         {
                             if (await completionCondition().ConfigureAwait(false)) break;
                         }
-                        catch { /* ignore */ }
+                        catch
+                        {
+                            /* ignore */
+                        }
                     }
                 }
             }, token);
@@ -58,20 +90,23 @@ namespace OElite.Base
             return Task.CompletedTask;
         }
 
-        public Task<string> DeclareQueueAsync(string? queueName = null, bool isDurable = true, bool isExclusive = false, bool autoDelete = true, CancellationToken cancellationToken = default)
+        public Task<string> DeclareQueueAsync(string? queueName = null, bool isDurable = true, bool isExclusive = false,
+            bool autoDelete = true, CancellationToken cancellationToken = default)
         {
             queueName ??= "default";
             GetOrCreateQueue(queueName);
             return Task.FromResult(queueName);
         }
 
-        public Task DeclareExchangeAsync(string exchangeName, string exchangeType = "direct", bool isDurable = true, bool autoDelete = true, CancellationToken cancellationToken = default)
+        public Task DeclareExchangeAsync(string exchangeName, string exchangeType = "direct", bool isDurable = true,
+            bool autoDelete = true, CancellationToken cancellationToken = default)
         {
             // No-op for in-memory base provider
             return Task.CompletedTask;
         }
 
-        public Task BindQueueAsync(string queueName, string exchangeName, string routingKey, CancellationToken cancellationToken = default)
+        public Task BindQueueAsync(string queueName, string exchangeName, string routingKey,
+            CancellationToken cancellationToken = default)
         {
             // No-op for in-memory base provider
             return Task.CompletedTask;
@@ -91,5 +126,3 @@ namespace OElite.Base
         }
     }
 }
-
-

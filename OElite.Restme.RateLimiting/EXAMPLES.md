@@ -4,22 +4,114 @@ This document provides comprehensive examples for using the OElite.Restme.RateLi
 
 ## Table of Contents
 
-1. [Basic Setup](#basic-setup)
-2. [Advanced Configuration](#advanced-configuration)
-3. [Per-Endpoint Rate Limiting](#per-endpoint-rate-limiting)
-4. [DDoS Protection](#ddos-protection)
-5. [Adaptive Rate Limiting](#adaptive-rate-limiting)
-6. [Redis Distributed Storage](#redis-distributed-storage)
-7. [Custom Storage Implementation](#custom-storage-implementation)
-8. [Testing Examples](#testing-examples)
-9. [Production Deployment](#production-deployment)
-10. [Troubleshooting Examples](#troubleshooting-examples)
+1. [API Migration Guide](#api-migration-guide) ⭐ **NEW - Simplified API**
+2. [Basic Setup](#basic-setup)
+3. [Advanced Configuration](#advanced-configuration)
+4. [Per-Endpoint Rate Limiting](#per-endpoint-rate-limiting)
+5. [DDoS Protection](#ddos-protection)
+6. [Adaptive Rate Limiting](#adaptive-rate-limiting)
+7. [Redis Distributed Storage](#redis-distributed-storage)
+8. [Custom Storage Implementation](#custom-storage-implementation)
+9. [Testing Examples](#testing-examples)
+10. [Production Deployment](#production-deployment)
+11. [Troubleshooting Examples](#troubleshooting-examples)
+
+---
+
+## API Migration Guide
+
+### New Simplified API (v2.1.0+)
+
+The rate limiting extension methods have been streamlined for better developer experience:
+
+#### **✅ New API (Recommended)**
+
+```csharp
+// 1. Auto-detection (memory or Redis based on DI)
+builder.Services.AddRateLimiting(options => { /* config */ });
+
+// 2. Explicit Redis with connection string
+builder.Services.AddRateLimiting("localhost:6379", options => { /* config */ });
+
+// 3. Custom storage implementations
+builder.Services.AddRateLimitingWithCustomStorage<MyStore, MyKeyGen, MyResponseBuilder>(options => { /* config */ });
+```
+
+#### **❌ Old API (Deprecated - Still Works)**
+
+```csharp
+// ❌ Removed: AddRateLimitingWithMemoryStorage()
+builder.Services.AddRateLimitingWithMemoryStorage(options => { /* config */ });
+// ✅ Replace with: AddRateLimiting() - auto-detects storage
+
+// ❌ Removed: AddRateLimitingWithRedisStorage(connectionString)
+builder.Services.AddRateLimitingWithRedisStorage("localhost:6379", options => { /* config */ });
+// ✅ Replace with: AddRateLimiting(connectionString, options)
+
+// ❌ Removed: AddRateLimitingWithExistingRedis()
+builder.Services.AddRateLimitingWithExistingRedis(options => { /* config */ });
+// ✅ Replace with: AddRateLimiting() - auto-detects existing Redis
+
+// ❌ Removed: AddHighPerformanceRateLimiting() - identical to AddRateLimitingWithRedisStorage
+builder.Services.AddHighPerformanceRateLimiting("localhost:6379", options => { /* config */ });
+// ✅ Replace with: AddRateLimiting(connectionString, options)
+```
+
+#### **Migration Examples**
+
+**Before (Old API):**
+```csharp
+// Memory storage
+builder.Services.AddRateLimitingWithMemoryStorage(options =>
+{
+    options.Limit = 100;
+    options.WindowInSeconds = 60;
+});
+
+// Redis storage
+builder.Services.AddRateLimitingWithRedisStorage("localhost:6379", options =>
+{
+    options.Limit = 1000;
+    options.WindowInSeconds = 60;
+});
+
+// High-performance Redis (duplicate of above)
+builder.Services.AddHighPerformanceRateLimiting("localhost:6379", options =>
+{
+    options.Limit = 1000;
+    options.WindowInSeconds = 60;
+});
+```
+
+**After (New Simplified API):**
+```csharp
+// Memory storage (auto-fallback when Redis not available)
+builder.Services.AddRateLimiting(options =>
+{
+    options.Limit = 100;
+    options.WindowInSeconds = 60;
+});
+
+// Redis storage (single method for all Redis scenarios)
+builder.Services.AddRateLimiting("localhost:6379", options =>
+{
+    options.Limit = 1000;
+    options.WindowInSeconds = 60;
+});
+```
+
+#### **Key Improvements**
+
+1. **Intelligent Auto-Detection**: `AddRateLimiting()` automatically uses Redis if `IConnectionMultiplexer` is registered, otherwise falls back to memory
+2. **Unified Redis Method**: Single `AddRateLimiting(connectionString)` replaces 3 redundant methods
+3. **No Breaking Changes**: Old methods removed, but migration is straightforward
+4. **Better Documentation**: Clear XML docs explain behavior and use cases
 
 ---
 
 ## Basic Setup
 
-### Minimal Configuration
+### Minimal Configuration (Intelligent Auto-Detection)
 
 ```csharp
 // Program.cs
@@ -27,7 +119,8 @@ using OElite.Restme.RateLimiting.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add basic rate limiting
+// Add basic rate limiting with intelligent storage selection
+// Automatically uses Redis if IConnectionMultiplexer is registered, otherwise uses memory
 builder.Services.AddRateLimiting();
 
 var app = builder.Build();
@@ -38,6 +131,50 @@ app.UseRateLimiting();
 app.MapControllers();
 app.Run();
 ```
+
+**How it works:**
+1. Checks if `ICacheProvider` (from OElite.Restme.Redis) is registered in DI
+2. If Redis cache provider found → reuses connection string and creates `OptimizedRedisRateLimitStore`
+3. If `IConnectionMultiplexer` is directly registered → uses `OptimizedRedisRateLimitStore`
+4. If neither found → falls back to `MemoryRateLimitStore`
+
+**Perfect for:**
+- Development (memory) and production (Redis) without code changes
+- OElite ecosystem where `Rest` class registers `ICacheProvider`
+- Applications already using `OElite.Restme.Redis` for caching
+
+### Auto-Detection with OElite.Restme.Redis
+
+```csharp
+// Program.cs - Typical OElite ecosystem setup
+using OElite.Restme;
+using OElite.Restme.RateLimiting.Extensions;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Step 1: Register OElite.Restme.Redis for caching
+var rest = new Rest("redis://localhost:6379", RestMode.Redis);
+builder.Services.AddSingleton(rest.GetProvider<ICacheProvider>());
+
+// Step 2: Add rate limiting - automatically detects Redis from ICacheProvider
+builder.Services.AddRateLimiting(options =>
+{
+    options.Limit = 100;
+    options.WindowInSeconds = 60;
+});
+
+var app = builder.Build();
+app.UseRateLimiting();
+app.MapControllers();
+app.Run();
+```
+
+**What happens:**
+- `AddRateLimiting()` detects `ICacheProvider` is registered
+- Checks `ProviderName == "RedisCache"`
+- Reuses the Redis connection string from the cache provider
+- Creates optimized `OptimizedRedisRateLimitStore` automatically
+- Zero additional configuration needed! ✨
 
 ### Custom Basic Configuration
 
@@ -354,29 +491,29 @@ builder.Services.AddRateLimiting(options =>
 
 ## Redis Distributed Storage
 
-### Basic Redis Setup
+### Basic Redis Setup (Recommended - Simplified API)
 
 ```csharp
-// Add Redis services
-builder.Services.AddStackExchangeRedisCache(options =>
-{
-    options.Configuration = "localhost:6379";
-});
-
-// Add rate limiting with Redis
-builder.Services.AddRateLimitingWithRedisStorage(options =>
+// New simplified API - creates optimized Redis connection automatically
+builder.Services.AddRateLimiting("localhost:6379", options =>
 {
     options.Limit = 1000;
     options.WindowInSeconds = 60;
-    options.RedisConnectionString = "localhost:6379";
     options.RedisKeyPrefix = "myapp:rate_limit:";
 });
 ```
 
-### Redis with Connection Pooling
+**Benefits of new API:**
+- Single line setup with connection string
+- Automatically creates optimized `IConnectionMultiplexer` with rate limiting tuned settings
+- Uses atomic Lua scripts for high-performance operations
+- Handles connection pooling and retry policies automatically
+
+### Redis with Existing Connection (Auto-Detection)
 
 ```csharp
-// Configure Redis with connection pooling
+// If you already have Redis registered in DI, just call AddRateLimiting()
+// Example: Using OElite.Restme.Redis or other Redis registrations
 builder.Services.AddSingleton<IConnectionMultiplexer>(provider =>
 {
     var configuration = ConfigurationOptions.Parse("localhost:6379");
@@ -388,32 +525,66 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(provider =>
     return ConnectionMultiplexer.Connect(configuration);
 });
 
-builder.Services.AddRateLimitingWithRedisStorage(options =>
+// This will automatically detect and use the existing Redis connection
+builder.Services.AddRateLimiting(options =>
 {
     options.Limit = 1000;
     options.WindowInSeconds = 60;
-    options.RedisConnectionString = "localhost:6379";
     options.RedisKeyPrefix = "myapp:rate_limit:";
 });
 ```
 
+**How auto-detection works:**
+1. Checks if `ICacheProvider` (OElite.Restme.Redis) exists in DI
+2. If Redis cache provider found → reuses connection string
+3. Checks if `IConnectionMultiplexer` exists in DI
+4. If found and connected → uses Redis storage
+5. If neither found → falls back to memory storage
+- No code changes needed between environments
+
 ### Redis Cluster Setup
 
 ```csharp
-builder.Services.AddSingleton<IConnectionMultiplexer>(provider =>
-{
-    var configuration = ConfigurationOptions.Parse("redis-cluster-node1:6379,redis-cluster-node2:6379,redis-cluster-node3:6379");
-    configuration.AbortOnConnectFail = false;
-    configuration.ConnectRetry = 3;
-    
-    return ConnectionMultiplexer.Connect(configuration);
-});
+// Simplified API with Redis cluster connection string
+var redisClusterConnection = "redis-cluster-node1:6379,redis-cluster-node2:6379,redis-cluster-node3:6379,password=secret";
 
-builder.Services.AddRateLimitingWithRedisStorage(options =>
+builder.Services.AddRateLimiting(redisClusterConnection, options =>
 {
     options.Limit = 1000;
     options.WindowInSeconds = 60;
     options.RedisKeyPrefix = "cluster:rate_limit:";
+});
+```
+
+### Advanced Redis Configuration
+
+```csharp
+// For custom Redis configuration, register IConnectionMultiplexer first
+builder.Services.AddSingleton<IConnectionMultiplexer>(provider =>
+{
+    var configuration = new ConfigurationOptions
+    {
+        EndPoints = { "redis1.example.com:6379", "redis2.example.com:6379" },
+        Password = "your-redis-password",
+        Ssl = true,
+        SslHost = "redis.example.com",
+        AbortOnConnectFail = false,
+        ConnectTimeout = 10000,
+        SyncTimeout = 5000,
+        AsyncTimeout = 5000,
+        ConnectRetry = 5,
+        ReconnectRetryPolicy = new ExponentialRetry(2000)
+    };
+    
+    return ConnectionMultiplexer.Connect(configuration);
+});
+
+// Then use auto-detection
+builder.Services.AddRateLimiting(options =>
+{
+    options.Limit = 1000;
+    options.WindowInSeconds = 60;
+    options.RedisKeyPrefix = "myapp:rate_limit:";
 });
 ```
 

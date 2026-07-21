@@ -1,6 +1,6 @@
 using System;
 
-namespace OElite.Utils
+namespace OElite.Restme.Azure
 {
     /// <summary>
     /// Azure configuration model for parsing connection strings

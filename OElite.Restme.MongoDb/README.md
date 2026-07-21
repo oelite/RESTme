@@ -1,8 +1,7 @@
 # OElite.Restme.MongoDb
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/oelite)
-[![NuGet](https://img.shields.io/badge/nuget-v2.1.0-blue.svg)](https://www.nuget.org/packages/OElite.Restme.MongoDb/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![NuGet Version](https://img.shields.io/nuget/v/OElite.Restme.MongoDb.svg)](https://www.nuget.org/packages/OElite.Restme.MongoDb)
+[![Target Framework](https://img.shields.io/badge/.NET-8%2C%209%2C%2010-blue)](https://dotnet.microsoft.com/)
 
 MongoDB integration package for OElite platform, providing enterprise-grade database management with GDPR compliance, region-aware sharding, and attribute-based configuration.
 
@@ -2659,7 +2658,7 @@ For comprehensive guides on specific features, see the detailed documentation:
 
 **Version**: 2.3.0
 **Last Updated**: 2024
-**Compatibility**: .NET 9.0+
+**Compatibility**: .NET 10.0+
 
 ## 🚀 High-Performance Update Operations
 

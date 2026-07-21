@@ -190,38 +190,65 @@ public class MongoDbManagementProvider : IDbManagementProvider
         try
         {
             var collection = _database.GetCollection<BsonDocument>(collectionName);
-            var indexModels = new List<CreateIndexModel<BsonDocument>>();
+
+            try
+            {
+                await _database.CreateCollectionAsync(collectionName);
+            }
+            catch (MongoCommandException)
+            {
+                // Collection already exists
+            }
+
+            var successCount = 0;
+            var errors = new List<string>();
 
             foreach (var indexDef in indexes)
             {
-                var indexKeys = ConvertIndexFieldsToBsonDocument(indexDef.Fields);
-                var options = new CreateIndexOptions
+                try
                 {
-                    Name = indexDef.Name,
-                    Unique = indexDef.IsUnique,
-                    Sparse = indexDef.IsSparse,
-                    Background = indexDef.CreateInBackground
-                };
+                    var indexKeys = ConvertIndexFieldsToBsonDocument(indexDef.Fields);
+                    var options = new CreateIndexOptions
+                    {
+                        Name = indexDef.Name,
+                        Unique = indexDef.IsUnique,
+                        Sparse = indexDef.IsSparse,
+                        Background = indexDef.CreateInBackground
+                    };
 
-                if (indexDef.TtlExpiration.HasValue)
-                {
-                    options.ExpireAfter = indexDef.TtlExpiration.Value;
+                    if (indexDef.TtlExpiration.HasValue)
+                    {
+                        options.ExpireAfter = indexDef.TtlExpiration.Value;
+                    }
+
+                    var model = new CreateIndexModel<BsonDocument>(indexKeys, options);
+                    await collection.Indexes.CreateOneAsync(model, cancellationToken: cancellationToken);
+                    successCount++;
                 }
-
-                // Note: PartialFilterExpression support requires specific MongoDB driver version
-                // Commented out for compatibility - can be enabled if needed
-                // if (indexDef.PartialFilterExpression != null)
-                // {
-                //     options.PartialFilterExpression = ConvertMongoDbDocumentToBsonDocument(indexDef.PartialFilterExpression);
-                // }
-
-                indexModels.Add(new CreateIndexModel<BsonDocument>(indexKeys, options));
+                catch (MongoCommandException ex) when (ex.CodeName == "IndexAlreadyExists")
+                {
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Index '{indexDef.Name}' failed: {ex.Message}");
+                }
             }
 
-            await collection.Indexes.CreateManyAsync(indexModels, cancellationToken);
+            if (successCount > 0)
+            {
+                result.Messages.Add($"Created {successCount}/{indexes.Count} indexes for collection: {collectionName}");
+            }
 
-            result.Success = true;
-            result.Messages.Add($"Created {indexes.Count} indexes for collection: {collectionName}");
+            if (errors.Count > 0 && successCount == 0)
+            {
+                result.Success = false;
+                result.ErrorMessage = string.Join("; ", errors);
+            }
+            else if (errors.Count > 0)
+            {
+                result.Messages.Add("Warnings: " + string.Join("; ", errors));
+            }
         }
         catch (Exception ex)
         {

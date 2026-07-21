@@ -246,9 +246,9 @@ public static class ExpressionToMongoPipeline
     {
         // Convert the expression to a MongoDB filter
         var mongoFilter = Builders<T>.Filter.Where(filter);
-        var filterDoc = mongoFilter.Render(
+        var filterDoc = mongoFilter.Render(new RenderArgs<T>(
             BsonSerializer.SerializerRegistry.GetSerializer<T>(),
-            BsonSerializer.SerializerRegistry);
+            BsonSerializer.SerializerRegistry));
         
         return new BsonDocument("$match", filterDoc);
     }

@@ -1,7 +1,8 @@
 ﻿using System;
 using Microsoft.Extensions.Logging;
+using OElite.Restme.Abstractions;
 
-namespace OElite
+namespace OElite.Restme
 {
     public partial class Rest
     {
@@ -11,9 +12,10 @@ namespace OElite
         {
             try
             {
-                if (LogProvider != null)
+                var logProvider = GetProvider<ILogProvider>();
+                if (logProvider != null)
                 {
-                    LogProvider.LogError(errorMessage, ex, eventId);
+                    logProvider.LogError(errorMessage, ex, eventId);
                 }
                 else
                 {
@@ -30,9 +32,10 @@ namespace OElite
         {
             try
             {
-                if (LogProvider != null)
+                var logProvider = GetProvider<ILogProvider>();
+                if (logProvider != null)
                 {
-                    LogProvider.LogWarning(errorMessage, ex, eventId);
+                    logProvider.LogWarning(errorMessage, ex, eventId);
                 }
                 else
                 {
@@ -49,9 +52,10 @@ namespace OElite
         {
             try
             {
-                if (LogProvider != null)
+                var logProvider = GetProvider<ILogProvider>();
+                if (logProvider != null)
                 {
-                    LogProvider.LogInformation(info, ex, eventId);
+                    logProvider.LogInformation(info, ex, eventId);
                 }
                 else
                 {
@@ -68,9 +72,10 @@ namespace OElite
         {
             try
             {
-                if (LogProvider != null)
+                var logProvider = GetProvider<ILogProvider>();
+                if (logProvider != null)
                 {
-                    LogProvider.LogDebug(debugInfo, ex, eventId);
+                    logProvider.LogDebug(debugInfo, ex, eventId);
                 }
                 else
                 {
@@ -87,9 +92,10 @@ namespace OElite
         {
             try
             {
-                if (LogProvider != null)
+                var logProvider = GetProvider<ILogProvider>();
+                if (logProvider != null)
                 {
-                    LogProvider.LogCritical(fatalInfo, ex, eventId);
+                    logProvider.LogCritical(fatalInfo, ex, eventId);
                 }
                 else
                 {

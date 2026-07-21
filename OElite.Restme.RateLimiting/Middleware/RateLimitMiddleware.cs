@@ -83,13 +83,30 @@ public class RateLimitMiddleware
             // Continue to next middleware
             await _next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // Client disconnected - exit gracefully without logging
+            // TaskCanceledException inherits from OperationCanceledException, so this catches both
+            // The 'when' filter ensures we only catch CLIENT-initiated cancellations, not server-side timeouts
+            return;
+        }
+        catch (OElite.OEliteAuthorizationException authEx)
+        {
+            // Authorization exceptions should be handled by global exception handler
+            // Don't log as error, just rethrow
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // Request was cancelled, exit gracefully
+            throw;
+        }
         catch (Exception ex)
         {
+            // Log other exceptions but don't rethrow to avoid double-handling
             _logger.LogError(ex, "Error in rate limiting middleware");
-
-            // In case of error, allow the request to continue
-            // This ensures rate limiting failures don't break the application
-            await _next(context);
+            // Let the exception continue up the pipeline naturally
+            throw;
         }
         finally
         {

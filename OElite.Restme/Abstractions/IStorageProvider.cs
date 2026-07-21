@@ -1,14 +1,13 @@
-using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OElite.Abstractions
+namespace OElite.Restme.Abstractions
 {
     /// <summary>
     /// Interface for storage operations (Azure Blob, S3, etc.)
     /// </summary>
-    public interface IStorageProvider : IDisposable
+    public interface IStorageProvider : IRestmeProvider
     {
         /// <summary>
         /// Get data from storage

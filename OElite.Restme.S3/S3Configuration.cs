@@ -1,6 +1,7 @@
 using System;
 using Amazon;
 using Amazon.S3;
+using OElite.Restme;
 
 namespace OElite.Providers
 {
@@ -26,36 +27,54 @@ namespace OElite.Providers
     {
         /// <summary>
         /// Parses S3 connection string into configuration object
+        /// Supports both URI format (s3://host:port/bucket) and key=value format
         /// </summary>
-        public static S3Configuration ParseConnectionString(string connectionString)
+        public static S3Configuration ParseConnectionString(RestConfig restConfig)
         {
-            if (string.IsNullOrEmpty(connectionString))
-                throw new ArgumentException("Connection string cannot be null or empty", nameof(connectionString));
+            if (string.IsNullOrEmpty(restConfig.ConnectionString))
+                throw new ArgumentException("Connection string cannot be null or empty",
+                    nameof(restConfig.ConnectionString));
 
             var config = new S3Configuration();
-            var parts = connectionString.Split(';');
-            
+
+            // Check if this is a URI-style connection string
+            if (restConfig.ConnectionString.StartsWith("s3://") || restConfig.ConnectionString.StartsWith("s3s://"))
+            {
+                return ParseS3Uri(restConfig.ConnectionString);
+            }
+
+            // Parse key=value style connection string
+            var parts = restConfig.ConnectionString.Split(';');
+
             foreach (var part in parts)
             {
                 var keyValue = part.Split('=');
                 if (keyValue.Length != 2) continue;
-                
+
                 var key = keyValue[0].Trim().ToLowerInvariant();
                 var value = keyValue[1].Trim();
-                
+
                 switch (key)
                 {
                     case "accesskeyid":
+                    case "accesskey":
                         config.AccessKeyId = value;
                         break;
                     case "secretaccesskey":
+                    case "secretkey":
                         config.SecretAccessKey = value;
                         break;
                     case "region":
                         config.Region = RegionEndpoint.GetBySystemName(value);
                         break;
                     case "bucketname":
+                    case "bucket":
                         config.BucketName = value;
+                        if (restConfig.InstanceName.IsNotNullOrEmpty())
+                        {
+                            config.BucketName = restConfig.InstanceName;
+                        }
+
                         break;
                     case "serviceurl":
                     case "endpoint":
@@ -72,15 +91,65 @@ namespace OElite.Providers
                         break;
                 }
             }
-            
+
             if (string.IsNullOrEmpty(config.AccessKeyId) || string.IsNullOrEmpty(config.SecretAccessKey))
                 throw new ArgumentException("AccessKeyId and SecretAccessKey are required in connection string");
-            
+
             // Set defaults for S3-compatible providers
-            if (config.Region == null && string.IsNullOrEmpty(config.ServiceUrl))
+            if (config.Region == null)
+            {
+                // Always set a region - required by AWS SDK
                 config.Region = RegionEndpoint.USEast1;
-                
+            }
+
             return config;
+        }
+
+        /// <summary>
+        /// Parses URI-style S3 connection string (e.g., s3://host:port/bucket)
+        /// </summary>
+        private static S3Configuration ParseS3Uri(string connectionString)
+        {
+            var config = new S3Configuration();
+
+            try
+            {
+                var uri = new Uri(connectionString);
+                var useHttps = uri.Scheme == "s3s";
+
+                // Build service URL
+                var port = uri.Port > 0 ? uri.Port : (useHttps ? 443 : 80);
+                var protocol = useHttps ? "https" : "http";
+                config.ServiceUrl = $"{protocol}://{uri.Host}:{port}";
+                config.UseHttp = !useHttps;
+                config.ForcePathStyle = true; // Required for MinIO and custom endpoints
+
+                // Extract bucket name from path
+                if (!string.IsNullOrEmpty(uri.AbsolutePath) && uri.AbsolutePath != "/")
+                {
+                    var pathSegments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+                    if (pathSegments.Length > 0)
+                    {
+                        config.BucketName = pathSegments[0];
+
+                        // If there are more path segments, use them as root path
+                        if (pathSegments.Length > 1)
+                        {
+                            config.RootPath = string.Join("/", pathSegments, 1, pathSegments.Length - 1);
+                        }
+                    }
+                }
+
+                // Set default region for custom endpoints
+                config.Region = RegionEndpoint.USEast1;
+
+                return config;
+            }
+            catch (UriFormatException ex)
+            {
+                throw new ArgumentException($"Invalid S3 URI format: {connectionString}",
+                    nameof(connectionString), ex);
+            }
         }
 
         /// <summary>
@@ -105,7 +174,7 @@ namespace OElite.Providers
         {
             if (string.IsNullOrEmpty(s3Path))
                 return null;
-            
+
             var segments = s3Path.Split('/', StringSplitOptions.RemoveEmptyEntries);
             return segments.Length > 0 ? segments[0] : null;
         }
@@ -117,11 +186,11 @@ namespace OElite.Providers
         {
             if (string.IsNullOrEmpty(s3Path))
                 return null;
-            
+
             var segments = s3Path.Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (segments.Length <= 1)
                 return null;
-            
+
             // Join all segments except the first one (bucket name) to form the object key
             return string.Join("/", segments, 1, segments.Length - 1);
         }

@@ -22,6 +22,13 @@ public interface IRateLimitStore
     // Leaky Bucket methods
     Task<LeakyBucket?> GetLeakyBucketAsync(string key);
     Task SetLeakyBucketAsync(LeakyBucket bucket);
+
+    /// <summary>
+    /// Scan storage for keys matching the given pattern and delete them
+    /// </summary>
+    /// <param name="pattern">Glob-style pattern (e.g. "rate_limit:*")</param>
+    /// <returns>Number of keys deleted</returns>
+    Task<int> ScanAndDeleteKeysAsync(string pattern);
 }
 
 /// <summary>

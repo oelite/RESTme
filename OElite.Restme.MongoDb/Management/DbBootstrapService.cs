@@ -184,17 +184,7 @@ public class DbBootstrapService
         {
             try
             {
-                // Debug: Log configuration details
-                Console.WriteLine($"DEBUG: Attempting bootstrap with {configuration.Collections?.Count ?? 0} collections");
-                foreach (var col in configuration.Collections ?? Enumerable.Empty<DbCollectionConfiguration>())
-                {
-                    Console.WriteLine($"DEBUG: Collection: {col.CollectionName}");
-                }
-
                 var managementResult = await _managementProvider.InitializeDatabaseAsync(configuration, cancellationToken);
-
-                Console.WriteLine($"DEBUG: InitializeDatabaseAsync returned Success = {managementResult.Success}");
-                Console.WriteLine($"DEBUG: Error message: {managementResult.ErrorMessage}");
 
                 // Convert DbManagementResult to DbBootstrapResult
                 var result = new DbBootstrapResult
@@ -208,34 +198,25 @@ public class DbBootstrapService
 
                 if (result.Success)
                 {
-                    Console.WriteLine($"DEBUG: Bootstrap SUCCESS branch entered");
                     result.Messages.Add($"Bootstrap completed successfully on attempt {attempt}");
 
                     // Populate ConfiguredCollections and ShardKeysConfigured
                     if (configuration.Collections != null)
                     {
-                        Console.WriteLine($"DEBUG: Populating ConfiguredCollections with {configuration.Collections.Count} collections");
                         var configuredCollections = new List<string>();
                         foreach (var collection in configuration.Collections)
                         {
                             if (!string.IsNullOrEmpty(collection.CollectionName))
                             {
                                 configuredCollections.Add(collection.CollectionName);
-                                Console.WriteLine($"DEBUG: Added collection: {collection.CollectionName}");
                             }
                         }
                         result.ConfiguredCollections = configuredCollections;
-                        Console.WriteLine($"DEBUG: Final ConfiguredCollections count: {result.ConfiguredCollections?.Count ?? 0}");
 
                         // Count shard keys configured
                         var shardKeysCount = configuration.Collections
                             .Count(c => c.ShardKey != null && c.ShardKey.Fields?.Any() == true);
                         result.ShardKeysConfigured = shardKeysCount;
-                        Console.WriteLine($"DEBUG: ShardKeysConfigured: {result.ShardKeysConfigured}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"DEBUG: configuration.Collections is null!");
                     }
 
                     return result;

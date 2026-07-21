@@ -1,25 +1,28 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <Description>Restme.Utils (RESTme) is the common library for Restme</Description>
         <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
         <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
-        <AssemblyVersion>2.0.9</AssemblyVersion>
-        <VersionPrefix>2.0.9</VersionPrefix>
+        <AssemblyVersion>2.1.1</AssemblyVersion>
+        <VersionPrefix>2.1.1</VersionPrefix>
         <AssemblyName>OElite.Restme.Utils</AssemblyName>
         <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
-        <Authors>OElite Limited</Authors>
-        <Copyright>OElite Limited</Copyright>
+        <Authors>Phanes Technology Ltd</Authors>
+        <Copyright>Phanes Technology Ltd</Copyright>
         <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
         <Nullable>enable</Nullable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="HtmlAgilityPack.NetCore" Version="1.5.0.1" />
-        <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
         <PackageReference Include="System.Reflection.TypeExtensions" Version="4.7.0" />
-        <PackageReference Include="System.Security.Cryptography.Algorithms" Version="4.3.1">
-        </PackageReference>
+
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 </Project>

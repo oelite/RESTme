@@ -2,14 +2,14 @@
 
     <PropertyGroup>
         <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
-        <AssemblyVersion>2.0.9</AssemblyVersion>
-        <VersionPrefix>2.0.9</VersionPrefix>
+        <AssemblyVersion>2.1.1</AssemblyVersion>
+        <VersionPrefix>2.1.1</VersionPrefix>
         <AssemblyName>OElite.Restme.GoogleUtils</AssemblyName>
         <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
         <Nullable>enable</Nullable>
-        <Authors>OElite Limited</Authors>
-        <Copyright>OElite Limited</Copyright>
+        <Authors>Phanes Technology Ltd</Authors>
+        <Copyright>Phanes Technology Ltd</Copyright>
         <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
     </PropertyGroup>
 

@@ -1,5 +1,6 @@
 using System;
-using OElite.Abstractions;
+using OElite.Restme;
+using OElite.Restme.Abstractions;
 
 namespace OElite.Providers
 {
@@ -13,29 +14,71 @@ namespace OElite.Providers
             // Auto-register this factory when the assembly is loaded
             ServiceLocator.RegisterFactory("redis", new RedisServiceFactory());
         }
-        public ICacheProvider CreateCacheProvider(string connectionString, RestConfig config)
+
+        /// <summary>
+        /// Redis supports Cache capability only
+        /// </summary>
+        public ProviderCapabilities SupportedCapabilities => ProviderCapabilities.Cache;
+
+        /// <summary>
+        /// Checks if this factory can create the requested provider type
+        /// </summary>
+        public bool CanCreateProvider<T>() where T : class, IRestmeProvider
         {
-            return new RedisCacheProvider(connectionString, config);
+            return typeof(T) == typeof(ICacheProvider);
         }
 
-        public IQueueProvider CreateQueueProvider(string connectionString, RestConfig config)
+        /// <summary>
+        /// Generic provider creation with capability detection
+        /// </summary>
+        public T? CreateProvider<T>(RestConfig config) where T : class, IRestmeProvider
         {
-            throw new NotImplementedException("Queue operations not supported by Redis provider. Use RabbitMQ provider instead.");
+            if (typeof(T) == typeof(ICacheProvider))
+            {
+                return new RedisCacheProvider(config) as T;
+            }
+
+            return null;
         }
 
-        public IStorageProvider CreateStorageProvider(string connectionString, RestConfig config)
+        public ICacheProvider? CreateCacheProvider(RestConfig config)
         {
-            throw new NotImplementedException("Storage operations not supported by Redis provider. Use Azure or S3 provider instead.");
+            return new RedisCacheProvider(config);
         }
 
-        public IHttpProvider CreateHttpProvider(RestConfig config)
+        public IQueueProvider? CreateQueueProvider(RestConfig config)
         {
-            throw new NotImplementedException("HTTP operations not supported by Redis provider. Use HTTP provider instead.");
+            return null;
+        }
+
+        public IStorageProvider? CreateStorageProvider(RestConfig config)
+        {
+            return null;
+        }
+
+        public IHttpProvider? CreateHttpProvider(RestConfig config)
+        {
+            return null;
         }
 
         public ILogProvider CreateLogProvider(RestConfig config)
         {
             return new DefaultLogProvider();
+        }
+
+        public IColumnarProvider? CreateColumnarProvider(RestConfig config)
+        {
+            return null;
+        }
+
+        public IEventStreamProvider? CreateStreamingProvider(RestConfig config)
+        {
+            return null;
+        }
+
+        public ISearchProvider? CreateSearchProvider(RestConfig config)
+        {
+            return null;
         }
     }
 }

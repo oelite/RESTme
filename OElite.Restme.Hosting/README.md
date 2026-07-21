@@ -1,5 +1,8 @@
 # OElite.Restme.Hosting
 
+[![NuGet Version](https://img.shields.io/nuget/v/OElite.Restme.Hosting.svg)](https://www.nuget.org/packages/OElite.Restme.Hosting)
+[![Target Framework](https://img.shields.io/badge/.NET-8%2C%209%2C%2010-blue)](https://dotnet.microsoft.com/)
+
 ASP.NET Core integration extensions for **OElite.Restme** - provides dependency injection, IDistributedCache adapters, and middleware for seamless integration with Hosting/ASP.NET Core applications.
 
 ## Purpose
@@ -193,10 +196,10 @@ public class MyService
   "oelite": {
     "data": {
       "redis": {
-        "kortex": "redis.services.k8sdev:6379,db=0",
-        "platform": "redis.services.k8sdev:6379,db=1",
-        "obelisk": "redis.services.k8sdev:6379,db=2",
-        "oesterling": "redis.services.k8sdev:6379,db=3"
+        "kortex": "redis.services.oelite.io:6379,db=0",
+        "platform": "redis.services.oelite.io:6379,db=1",
+        "obelisk": "redis.services.oelite.io:6379,db=2",
+        "oesterling": "redis.services.oelite.io:6379,db=3"
       }
     }
   }
@@ -613,4 +616,4 @@ This package will be expanded to include:
 
 ## License
 
-Copyright © OElite Limited. All rights reserved.
+Copyright © Phanes Technology Ltd. All rights reserved.

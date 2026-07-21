@@ -74,30 +74,41 @@ var rest = new Rest(connectionString, RestMode.S3Client);
 ```csharp
 // Initialize with S3-compatible provider
 var rest = new Rest(connectionString, RestMode.S3Client);
+var cacheProvider = rest.GetProvider<ICacheProvider>();
 
-// Cache data with expiry
-await rest.CachemeAsync("user:123", userData, 60); // 60 minutes
+// Cache data with expiry (using ICacheProvider directly)
+await cacheProvider.SetAsync("user:123", userData, TimeSpan.FromMinutes(60));
 
-// Retrieve cached data
-var cachedUser = await rest.FindmeAsync<User>("user:123");
+// Cache data with expiry (using CachemeAsync extension)
+var success = await cacheProvider.CachemeAsync("user:123", userData, expiryInSeconds: 3600); // 60 minutes
+
+// Retrieve cached data (using ICacheProvider directly)
+var cachedUser = await cacheProvider.GetAsync<User>("user:123");
+
+// Retrieve cached data (using FindmeAsync extension with validation)
+var cachedUserWithValidation = await cacheProvider.FindmeAsync<User>("user:123");
 
 // Remove from cache
-await rest.RemovemeAsync("user:123");
+await cacheProvider.RemoveAsync("user:123");
+
+// Force expiry (using ExpiremeAsync extension)
+await cacheProvider.ExpiremeAsync("user:123");
 ```
 
 ### Storage Operations
 ```csharp
-// Store data
-await rest.StoremAsync("documents/report.pdf", fileData);
+// Get storage provider and store data
+var storageProvider = rest.GetProvider<IStorageProvider>();
+await storageProvider.PutAsync("documents/report.pdf", fileData);
 
 // Retrieve data
-var fileData = await rest.RetrievemeAsync<byte[]>("documents/report.pdf");
+var fileData = await storageProvider.GetAsync<byte[]>("documents/report.pdf");
 
 // Check if exists
-var exists = await rest.ExistsInStorage("documents/report.pdf");
+var exists = await storageProvider.ExistsAsync("documents/report.pdf");
 
 // Delete data
-await rest.Deleteme("documents/report.pdf");
+await storageProvider.DeleteAsync("documents/report.pdf");
 ```
 
 ### Generic Operations

@@ -50,14 +50,14 @@ public static class MongoClassMapConfigurator
             {
                 BsonClassMap.RegisterClassMap<T>(cm =>
                 {
-                    // Use AutoMap first to handle inheritance properly
-                    cm.AutoMap();
-
-                    // Then apply our custom attribute mappings
+                    // Only map properties declared directly on this type.
+                    // Inherited properties are handled by the base class maps.
+                    // AutoMap is intentionally NOT called here because it recreates
+                    // inherited member maps that conflict with base class registrations.
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(cm);
 
-                    // Finally, resolve property conflicts
+                    // Resolve property conflicts (e.g., Status hiding base Status)
                     MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, typeof(T));
                 });
 
@@ -166,7 +166,10 @@ public static class MongoClassMapConfigurator
                     // Create a new BsonClassMap and register it manually
                     var classMap = new BsonClassMap(type);
                     BsonClassMap.RegisterClassMap(classMap);
-                    classMap.AutoMap();
+
+                    // Only map properties declared directly on this type.
+                    // AutoMap is intentionally NOT called to avoid recreating
+                    // inherited member maps that conflict with base class maps.
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(classMap);
                     MongoPropertyConflictResolver.ResolvePropertyConflicts(classMap, type);

@@ -4,19 +4,24 @@
             Client, Redis Client as well as many Convertors &amp; Extensions implemented in .NET Core
         </Description>
         <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
-        <AssemblyVersion>2.0.9</AssemblyVersion>
-        <VersionPrefix>2.0.9</VersionPrefix>
+        <AssemblyVersion>2.1.1</AssemblyVersion>
+        <VersionPrefix>2.1.1</VersionPrefix>
         <AssemblyName>OElite.Restme</AssemblyName>
         <PackageTags>RESTme;HTTP;REST;RESTful-Client;AzureBlob-Client;Redis;RedisClient;AzureStorage;.Net-Core</PackageTags>
         <RepositoryUrl>https://oelite.visualstudio.com/Uranus</RepositoryUrl>
-        <Authors>OElite Limited</Authors>
-        <Copyright>OElite Limited</Copyright>
+        <Authors>Phanes Technology Ltd</Authors>
+        <Copyright>Phanes Technology Ltd</Copyright>
         <PackageProjectUrl>https://www.oelite.com</PackageProjectUrl>
         <DebugType Condition="'$(OS)' != 'Windows_NT'">portable</DebugType>
         <Title>OElite.Restme</Title>
         <Nullable>enable</Nullable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\OElite.Restme.Utils\OElite.Restme.Utils.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 </Project>
