@@ -97,6 +97,8 @@ public static class MongoClassMapConfigurator
             }
         }
 
+        SuppressInheritedStatusIfNeeded(typeof(T));
+
         var currentType = typeof(T);
         var baseTypes = new List<Type>();
 
@@ -139,6 +141,31 @@ public static class MongoClassMapConfigurator
                     _registeredTypes.Add(baseType);
                 }
             }
+
+            SuppressInheritedStatusIfNeeded(baseType);
+        }
+    }
+
+    /// <summary>
+    /// If the given type has [BsonSuppressInheritedStatus], unmaps the inherited BaseEntity.Status
+    /// member from the BaseEntity class map so only the shadow property is serialized.
+    /// </summary>
+    private static void SuppressInheritedStatusIfNeeded(Type type)
+    {
+        if (!type.IsDefined(typeof(BsonSuppressInheritedStatusAttribute), true))
+            return;
+
+        if (!BsonClassMap.IsClassMapRegistered(typeof(BaseEntity)))
+            return;
+
+        var baseClassMap = BsonClassMap.LookupClassMap(typeof(BaseEntity));
+        if (baseClassMap == null || baseClassMap.IsFrozen)
+            return;
+
+        var statusMember = baseClassMap.GetMemberMap("Status");
+        if (statusMember != null)
+        {
+            baseClassMap.UnmapProperty("Status");
         }
     }
 
