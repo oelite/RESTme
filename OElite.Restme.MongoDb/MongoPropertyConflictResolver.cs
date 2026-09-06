@@ -63,13 +63,49 @@ public static class MongoPropertyConflictResolver
     /// </summary>
     /// <param name="classMap">The class map to configure</param>
     /// <param name="type">The type to configure</param>
-    public static void ConfigureClassMapWithConflictResolution(BsonClassMap classMap, Type type)
+    /// <param name="derivedType">
+    /// The most-derived type being registered; used to detect if any derived class shadows Status with 'new'.
+    /// Pass <paramref name="type"/> itself if no derived type is available.
+    /// </param>
+    public static void ConfigureClassMapWithConflictResolution(
+        BsonClassMap classMap,
+        Type type,
+        Type? derivedType = null)
     {
-        // First, auto-map the class
+        // Detect if any type in the inheritance chain shadows BaseEntity.Status with 'new'.
+        // Unmap must happen before AutoMap() freezes the map.
+        if (derivedType != null)
+        {
+            UnmapStatusIfShadowed(classMap, derivedType, type);
+        }
         classMap.AutoMap();
-        
-        // Then resolve conflicts
         ResolvePropertyConflicts(classMap, type);
+    }
+
+    private static void UnmapStatusIfShadowed(BsonClassMap classMap, Type derivedType, Type targetType)
+    {
+        if (!BsonClassMap.IsClassMapRegistered(typeof(BaseEntity)))
+            return;
+
+        var current = derivedType;
+        while (current != null && current != typeof(BaseEntity) && typeof(BaseEntity).IsAssignableFrom(current))
+        {
+            if (current != targetType && current.IsSubclassOf(targetType))
+            {
+                // DeclaredOnly avoids AmbiguousMatchException when multiple Status properties exist.
+                var statusProperty = current.GetProperty("Status", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                if (statusProperty != null)
+                {
+                    var memberMap = classMap.GetMemberMap("Status");
+                    if (memberMap != null)
+                    {
+                        classMap.UnmapProperty("Status");
+                    }
+                    break;
+                }
+            }
+            current = current.BaseType!;
+        }
     }
 
     /// <summary>
@@ -80,7 +116,7 @@ public static class MongoPropertyConflictResolver
     public static void EnsureBaseClassesConfigured(Type type, HashSet<Type> configuredTypes)
     {
         var baseTypes = AttributeResolver.GetInheritanceChain(type);
-        
+
         foreach (var baseType in baseTypes)
         {
             if (!configuredTypes.Contains(baseType))
@@ -91,7 +127,7 @@ public static class MongoPropertyConflictResolver
                     {
                         var baseClassMap = new BsonClassMap(baseType);
                         BsonClassMap.RegisterClassMap(baseClassMap);
-                        ConfigureClassMapWithConflictResolution(baseClassMap, baseType);
+                        ConfigureClassMapWithConflictResolution(baseClassMap, baseType, type);
                     }
                     else
                     {
