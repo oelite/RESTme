@@ -1,5 +1,6 @@
 using System.Reflection;
 using MongoDB.Bson.Serialization;
+using OElite;
 using OElite.Restme.Utils.Data;
 
 namespace OElite.Restme.MongoDb;
@@ -36,19 +37,23 @@ public static class MongoPropertyConflictResolver
     {
         try
         {
-            // For shadowed properties (new keyword), map the derived property with a unique element name
-            // The base property cannot be unmapped from base class maps, so we need a different approach
             var derivedMemberMap = classMap.GetMemberMap(conflict.DerivedProperty.Name);
             if (derivedMemberMap == null)
             {
                 derivedMemberMap = classMap.MapMember(conflict.DerivedProperty);
             }
 
-            // Use a unique element name to avoid conflict with base class property
-            // Format: derivedtype_propertyname (e.g., tenant_status)
-            var derivedTypeName = classMap.ClassType.Name.ToLowerInvariant();
-            var uniqueElementName = $"{derivedTypeName}_{conflict.PropertyName.ToLowerInvariant()}";
-            derivedMemberMap.SetElementName(uniqueElementName);
+            var dbFieldAttr = conflict.DerivedProperty.GetCustomAttribute<DbFieldAttribute>();
+            if (dbFieldAttr != null && !string.IsNullOrEmpty(dbFieldAttr.FieldName))
+            {
+                derivedMemberMap.SetElementName(dbFieldAttr.FieldName);
+            }
+            else
+            {
+                var derivedTypeName = classMap.ClassType.Name.ToLowerInvariant();
+                var uniqueElementName = $"{derivedTypeName}_{conflict.PropertyName.ToLowerInvariant()}";
+                derivedMemberMap.SetElementName(uniqueElementName);
+            }
         }
         catch (Exception ex)
         {
