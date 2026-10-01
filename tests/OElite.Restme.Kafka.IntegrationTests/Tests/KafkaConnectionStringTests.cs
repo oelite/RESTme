@@ -11,6 +11,7 @@ public class KafkaConnectionStringTests
     [InlineData("kafka://localhost:9092", "localhost:9092")]
     [InlineData("localhost:9092", "localhost:9092")]
     [InlineData("  bootstrap.servers=host1:9092,host2:9092  ", "host1:9092,host2:9092")]
+    [InlineData("bootstrap.servers=localhost:9092&sasl.mechanism=PLAIN&security.protocol=SaslSsl&sasl.username=test-user&sasl.password=secret-value", "localhost:9092")]
     public void Normalize_returns_broker_endpoints_for_supported_connection_strings(
         string connectionString,
         string expectedBootstrapServers)
@@ -27,6 +28,7 @@ public class KafkaConnectionStringTests
     [InlineData("")]
     [InlineData("  ")]
     [InlineData("bootstrap.servers=")]
+    [InlineData("bootstrap.servers=&sasl.password=secret-value")]
     [InlineData("kafka://")]
     public void Normalize_rejects_connection_strings_without_broker_endpoints(string connectionString)
     {

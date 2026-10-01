@@ -20,7 +20,14 @@ internal static class KafkaConnectionString
 
         if (value.StartsWith(BootstrapServersPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            value = value[BootstrapServersPrefix.Length..].Trim();
+            var endpoint = value[BootstrapServersPrefix.Length..];
+            var propertySeparator = endpoint.IndexOf('&');
+            if (propertySeparator >= 0)
+            {
+                endpoint = endpoint[..propertySeparator];
+            }
+
+            value = endpoint.Trim();
         }
 
         if (value.StartsWith(KafkaScheme, StringComparison.OrdinalIgnoreCase))
