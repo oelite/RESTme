@@ -27,9 +27,7 @@ namespace OElite.Restme.Kafka
 
         public KafkaConnection(string connectionString, RestConfig? config = null)
         {
-            // Parse connection string to extract bootstrap servers
-            // Format: kafka://host:port or just host:port
-            _bootstrapServers = connectionString.Replace("kafka://", "");
+            _bootstrapServers = KafkaConnectionString.Normalize(connectionString);
 
             _producerConfig = new ProducerConfig
             {
