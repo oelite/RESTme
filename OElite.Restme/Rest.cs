@@ -243,9 +243,11 @@ namespace OElite.Restme
                     {
                         Logger?.LogWarning("Failed to load provider assembly: {AssemblyName}", assemblyName);
 
-                        // Try discovery as a fallback
+                        // Preserve existing registrations (typed + named) — do NOT Clear the
+                        // process-global ServiceLocator registry, since factory static
+                        // constructors only run once per process and Clear() would
+                        // permanently wipe them. Discovery below only ADDS missing ones.
                         Logger?.LogDebug("Attempting provider auto-discovery as fallback");
-                        ServiceLocator.Clear(); // Clear cache to force discovery
                         var factory = ServiceLocator.GetFactory(Configuration.OperationMode switch
                         {
                             RestMode.Redis => "redis",
