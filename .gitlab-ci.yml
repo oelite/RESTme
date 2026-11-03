@@ -124,13 +124,15 @@ run_unit_tests:
       while IFS= read -r project || [ -n "$project" ]; do
         if [ -n "$project" ]; then
           echo "Running unit tests for $project"
-          # Pin to net10.0 — the CI image carries only the .NET 10 runtime, so
-          # multi-target test projects abort on their net8.0/net9.0 testhosts.
+          # Pin to net10.0 — the CI image (mcr.microsoft.com/dotnet/sdk:10.0) ships
+          # only the .NET 10 runtime, so multi-targeted test projects abort when
+          # their net8.0/net9.0 testhosts start (Microsoft.NETCore.App 8.0/9.0 not found).
+          # Local developers keep the full net8.0/net9.0/net10.0 matrix via plain `dotnet test`.
           dotnet test "$project" --configuration Release --no-restore \
             --framework net10.0 \
             --filter "Category!=Integration" \
-            --logger "junit;LogFilePath=$PWD/unit-test-results/{assembly}-unit-test-results.xml" \
-            --results-directory ./unit-test-results || exit $?
+            --logger "junit;LogFileName={assembly}-test-results.xml" \
+            --results-directory "$PWD/unit-test-results" || exit $?
         fi
       done <<< "$UNIT_TEST_PROJECTS"
   artifacts:
