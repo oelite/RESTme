@@ -99,11 +99,12 @@ namespace OElite.Providers
                     cancellationToken);
 
                 var rules = response.ServerSideEncryptionConfiguration?.ServerSideEncryptionRules;
-                if (rules is { Count: > 0 })
+                if (rules is { Count: > 0 } &&
+                    rules[0].ServerSideEncryptionByDefault?.ServerSideEncryptionAlgorithm != null)
                 {
                     var byDefault = rules[0].ServerSideEncryptionByDefault;
-                    var algorithm = byDefault?.ServerSideEncryptionAlgorithm?.Value;
-                    var kmsKeyId = string.IsNullOrWhiteSpace(byDefault?.ServerSideEncryptionKeyManagementServiceKeyId)
+                    var algorithm = byDefault.ServerSideEncryptionAlgorithm.Value;
+                    var kmsKeyId = string.IsNullOrWhiteSpace(byDefault.ServerSideEncryptionKeyManagementServiceKeyId)
                         ? null
                         : byDefault.ServerSideEncryptionKeyManagementServiceKeyId;
 
@@ -189,11 +190,19 @@ namespace OElite.Providers
 
                 // Re-verify fail-closed: encryption must confirm as Enabled after apply.
                 var status = await GetBucketEncryptionStatusAsync(bucketName, cancellationToken);
-                if (!status.IsEncryptionVerified)
+                var expectedAlgorithm = config.Algorithm == BucketEncryptionAlgorithm.SseKms
+                    ? ServerSideEncryptionMethod.AWSKMS.Value
+                    : ServerSideEncryptionMethod.AES256.Value;
+                if (!status.IsEncryptionVerified ||
+                    !string.Equals(status.SseAlgorithm, expectedAlgorithm, StringComparison.Ordinal) ||
+                    (config.Algorithm == BucketEncryptionAlgorithm.SseKms &&
+                     !string.Equals(status.KmsKeyId, config.KmsKeyId, StringComparison.Ordinal)))
                 {
                     throw new OEliteException(
                         $"Bucket encryption enforcement failed for bucket '{bucketName}': " +
-                        $"backend reports {status.Status} after PutBucketEncryption. Evidence: {status.Evidence}");
+                        $"backend reports {status.Status} after PutBucketEncryption; " +
+                        $"requested algorithm={expectedAlgorithm}, observed algorithm={status.SseAlgorithm ?? "none"}. " +
+                        $"Evidence: {status.Evidence}");
                 }
             }
             catch (AmazonS3Exception ex)
