@@ -1,20 +1,20 @@
-using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Logging;
-using Testcontainers.OpenSearch;
 using Xunit;
 
 namespace OElite.Restme.OpenSearch.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Base class for OpenSearch integration tests using test containers
+/// Base class for OpenSearch integration tests against the shared local stack
 /// </summary>
 public abstract class OpenSearchTestBase : IAsyncLifetime
 {
     protected Rest Rest = null!;
     protected readonly ILogger Logger;
 
-    private OpenSearchContainer _openSearchContainer = null!;
     private readonly ILoggerFactory _loggerFactory;
+
+    // Integration tests use the shared local OpenSearch stack.
+    private const string SharedOpenSearchConnectionString = "https://localhost:9200";
 
     protected OpenSearchTestBase()
     {
@@ -23,42 +23,32 @@ public abstract class OpenSearchTestBase : IAsyncLifetime
             builder.AddConsole().SetMinimumLevel(LogLevel.Information));
         Logger = _loggerFactory.CreateLogger(GetType());
 
-        // Setup OpenSearch test container with security plugin properly configured
-        _openSearchContainer = new OpenSearchBuilder()
-            .WithImage("opensearchproject/opensearch:2.8.0")
-            .WithPassword("admin")
-            // .WithPortBinding(9200, true)
-            // .WithEnvironment("discovery.type", "single-node")
-            // .WithEnvironment("bootstrap.memory_lock", "true")
-            // .WithEnvironment("OPENSEARCH_JAVA_OPTS", "-Xms256m -Xmx256m")
-            // .WithWaitStrategy(Wait.ForUnixContainer()
-            //     .UntilInternalTcpPortIsAvailable(9200)
-            //     .UntilHttpRequestIsSucceeded(request =>
-            //         request.ForPort(9200).ForPath("/_cluster/health")))
-            .Build();
-
-        Logger.LogInformation("OpenSearch test container initialized");
+        Logger.LogInformation("OpenSearch integration tests will target the shared local stack");
     }
 
     public async Task InitializeAsync()
     {
-        await _openSearchContainer.StartAsync();
-        var connectionString = _openSearchContainer.GetConnectionString();
+        // Configure Rest with OpenSearch against the shared stack; credentials are
+        // injected via OELITE_TEST_OPENSEARCH_PASSWORD so they never appear in source.
+        var password = Environment.GetEnvironmentVariable("OELITE_TEST_OPENSEARCH_PASSWORD")
+                       ?? throw new InvalidOperationException(
+                           "OELITE_TEST_OPENSEARCH_PASSWORD must be set to the shared-stack OpenSearch admin password.");
+        var username = Environment.GetEnvironmentVariable("OELITE_TEST_OPENSEARCH_USERNAME") ?? "admin";
 
-        // Configure Rest with OpenSearch with authentication and explicit mode
-        Logger.LogInformation("Container connection string: {ConnectionString}", connectionString);
-        Rest = new Rest(connectionString, new RestConfig(RestMode.OpenSearch)
+        Rest = new Rest(SharedOpenSearchConnectionString, new RestConfig(RestMode.OpenSearch)
         {
-            AuthKey = "admin",
-            AuthSecret = "admin"
+            AuthKey = username,
+            AuthSecret = password
         });
+
+        await Task.CompletedTask;
     }
 
     public async Task DisposeAsync()
     {
-        await _openSearchContainer.DisposeAsync();
+        Rest.Dispose();
         _loggerFactory?.Dispose();
-        Logger.LogInformation("OpenSearch container disposed");
+        Logger.LogInformation("OpenSearch integration test context disposed");
     }
 
     /// <summary>

@@ -27,6 +27,24 @@ public class OpenSearchCredentialLoggingTests
     }
 
     [Fact]
+    public void Constructor_SeparateAuthCredentials_DoNotAppearInConsole()
+    {
+        var config = new RestConfig(RestMode.OpenSearch)
+        {
+            ConnectionString = "https://localhost:9200",
+            AuthKey = "user-marker",
+            AuthSecret = "secret-marker"
+        };
+        var output = CaptureConsole(() =>
+        {
+            using var provider = new OpenSearchProvider(config);
+        });
+
+        Assert.DoesNotContain("user-marker", output, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret-marker", output, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Constructor_InvalidConnectionString_DoesNotWriteCredentialsToConsole()
     {
         var config = new RestConfig(RestMode.OpenSearch)
