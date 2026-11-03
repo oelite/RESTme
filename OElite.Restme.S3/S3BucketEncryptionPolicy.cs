@@ -104,6 +104,14 @@ namespace OElite.Providers
                 {
                     var byDefault = rules[0].ServerSideEncryptionByDefault;
                     var algorithm = byDefault.ServerSideEncryptionAlgorithm.Value;
+                    if (algorithm != ServerSideEncryptionMethod.AES256.Value &&
+                        algorithm != ServerSideEncryptionMethod.AWSKMS.Value)
+                    {
+                        return new BucketEncryptionStatusResult(
+                            BucketEncryptionStatus.Unavailable, null, null,
+                            $"GetBucketEncryption returned an unrecognized SSE algorithm: {algorithm}",
+                            DateTimeOffset.UtcNow);
+                    }
                     var kmsKeyId = string.IsNullOrWhiteSpace(byDefault.ServerSideEncryptionKeyManagementServiceKeyId)
                         ? null
                         : byDefault.ServerSideEncryptionKeyManagementServiceKeyId;
@@ -125,8 +133,17 @@ namespace OElite.Providers
             }
             catch (AmazonS3Exception ex)
             {
+                var status = ClassifyS3Error(ex);
+                if (status == BucketEncryptionStatus.Disabled &&
+                    !await BucketExistsAsync(bucketName, cancellationToken))
+                {
+                    // MinIO answers ServerSideEncryptionConfigurationNotFound for missing
+                    // buckets too — disambiguate so a missing bucket is Unavailable.
+                    status = BucketEncryptionStatus.Unavailable;
+                }
+
                 return new BucketEncryptionStatusResult(
-                    ClassifyS3Error(ex),
+                    status,
                     null,
                     null,
                     $"S3 API error: HTTP {(int)ex.StatusCode} {ex.StatusCode}, error code {ex.ErrorCode ?? "none"}",
@@ -155,7 +172,11 @@ namespace OElite.Providers
             if (string.IsNullOrEmpty(bucketName))
                 throw new ArgumentException("Bucket name cannot be null or empty.", nameof(bucketName));
 
-            config ??= new BucketEncryptionConfig();
+            if (config == null)
+                throw new ArgumentNullException(nameof(config));
+            if (config.Algorithm != BucketEncryptionAlgorithm.SseS3 &&
+                config.Algorithm != BucketEncryptionAlgorithm.SseKms)
+                throw new ArgumentOutOfRangeException(nameof(config), "Unsupported bucket encryption algorithm.");
 
             if (config.Algorithm == BucketEncryptionAlgorithm.SseKms && string.IsNullOrWhiteSpace(config.KmsKeyId))
                 throw new ArgumentException("KmsKeyId is required when Algorithm is SSE-KMS.", nameof(config));
@@ -244,25 +265,16 @@ namespace OElite.Providers
                         $"on an existing bucket by backends such as MinIO — create the bucket with Object Lock enabled.");
                 }
 
-                // Lock is already enabled: apply/adjust default retention.
+                // Lock is already enabled: apply/adjust default retention, then read back
+                // to verify the requested retention was actually accepted (fail-closed).
                 await _s3Client.PutObjectLockConfigurationAsync(
                     new PutObjectLockConfigurationRequest
                     {
                         BucketName = bucketName,
-                        ObjectLockConfiguration = new ObjectLockConfiguration
-                        {
-                            ObjectLockEnabled = "Enabled",
-                            Rule = new ObjectLockRule
-                            {
-                                DefaultRetention = new DefaultRetention
-                                {
-                                    Mode = modeValue,
-                                    Days = retentionDays
-                                }
-                            }
-                        }
+                        ObjectLockConfiguration = BuildObjectLockConfiguration(modeValue, retentionDays)
                     },
                     cancellationToken);
+                await VerifyObjectLockAsync(bucketName, modeValue, retentionDays, cancellationToken);
                 return;
             }
             catch (AmazonS3Exception ex) when (
@@ -290,20 +302,10 @@ namespace OElite.Providers
                             new PutObjectLockConfigurationRequest
                             {
                                 BucketName = bucketName,
-                                ObjectLockConfiguration = new ObjectLockConfiguration
-                                {
-                                    ObjectLockEnabled = "Enabled",
-                                    Rule = new ObjectLockRule
-                                    {
-                                        DefaultRetention = new DefaultRetention
-                                        {
-                                            Mode = modeValue,
-                                            Days = retentionDays
-                                        }
-                                    }
-                                }
+                                ObjectLockConfiguration = BuildObjectLockConfiguration(modeValue, retentionDays)
                             },
                             cancellationToken);
+                        await VerifyObjectLockAsync(bucketName, modeValue, retentionDays, cancellationToken);
                     }
                     catch (AmazonS3Exception ex2)
                     {
@@ -377,5 +379,35 @@ namespace OElite.Providers
                 return false;
             }
         }
+
+        private async Task VerifyObjectLockAsync(string bucketName, string modeValue, int retentionDays,
+            CancellationToken cancellationToken)
+        {
+            var response = await _s3Client.GetObjectLockConfigurationAsync(
+                new GetObjectLockConfigurationRequest { BucketName = bucketName }, cancellationToken);
+            var configuration = response.ObjectLockConfiguration;
+            if (configuration?.ObjectLockEnabled != "Enabled" ||
+                configuration.Rule?.DefaultRetention?.Mode != modeValue ||
+                configuration.Rule.DefaultRetention.Days != retentionDays)
+            {
+                throw new OEliteException(
+                    $"Object Lock enforcement failed for bucket '{bucketName}': backend did not confirm " +
+                    $"the requested {modeValue} retention for {retentionDays} days (fail-closed).");
+            }
+        }
+
+        private static ObjectLockConfiguration BuildObjectLockConfiguration(string modeValue, int retentionDays) =>
+            new ObjectLockConfiguration
+            {
+                ObjectLockEnabled = "Enabled",
+                Rule = new ObjectLockRule
+                {
+                    DefaultRetention = new DefaultRetention
+                    {
+                        Mode = modeValue,
+                        Days = retentionDays
+                    }
+                }
+            };
     }
 }
