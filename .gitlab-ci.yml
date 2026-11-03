@@ -124,9 +124,12 @@ run_unit_tests:
       while IFS= read -r project || [ -n "$project" ]; do
         if [ -n "$project" ]; then
           echo "Running unit tests for $project"
+          # Pin to net10.0 — the CI image carries only the .NET 10 runtime, so
+          # multi-target test projects abort on their net8.0/net9.0 testhosts.
           dotnet test "$project" --configuration Release --no-restore \
+            --framework net10.0 \
             --filter "Category!=Integration" \
-            --logger "junit;LogFilePath=unit-test-results/{assembly}-unit-test-results.xml" \
+            --logger "junit;LogFilePath=$PWD/unit-test-results/{assembly}-unit-test-results.xml" \
             --results-directory ./unit-test-results || exit $?
         fi
       done <<< "$UNIT_TEST_PROJECTS"
