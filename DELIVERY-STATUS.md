@@ -10,7 +10,7 @@
 | obelisk#280 | Open, blocked by chain | Ethan | Credential/auth wiring per AC; UAT validation depends on #296 package bump/deploy. Use approved shared-stack provisioning only. | Serializer issues expected to clear after #296 lands with verified package. |
 | origin-auth#1564 | Closed | — | Closed, do not reopen. New consumer follow-ups for workaround removals will be created when fixes land. | Triage closed; framework issues separated. |
 | origin-auth#1416/#1412 | Closed | — | Closed, not evidence of completion for #9. Reconcile and create new issues if required. | Requires evidence review. |
-| restme#13 | Open, P1 | Isabella | Documentation accuracy audit — authoritative doc sync; includes F3 shadowed-Status technical documentation (see F3 gate decision below). | Assigned isabella.phanes. |
+| restme#13 | Open, medium | Isabella | Documentation accuracy audit — authoritative doc sync; includes F3 shadowed-Status technical documentation (see F3 gate decision below). | Assigned isabella.phanes. |
 | restme#14 | In Progress, P1 | Emma | Umbrella coordination (this file, MR !13). | emma.phanes. |
 | restme#16 | Open, P1 | Ethan | Restore MR + develop CI pipeline evidence for restme (head_pipeline=null on !12–!14; !11 merged without head pipeline). | Blocks verified merge decisions on all open MRs. |
 
