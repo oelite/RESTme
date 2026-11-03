@@ -39,11 +39,8 @@ namespace OElite.Restme.OpenSearch
         {
             Configuration = config ?? throw new ArgumentNullException(nameof(config));
 
-            Console.WriteLine($"OpenSearchProvider constructor called with connectionString: '{config.ConnectionString}'");
-
             // Parse connection string and create client
             var parsedUri = ParseConnectionString(config.ConnectionString ?? "opensearch://localhost:9200");
-            Console.WriteLine($"Parsed URI: {parsedUri}");
 
             var settings = new ConnectionSettings(parsedUri)
                 .ServerCertificateValidationCallback((o, cert, chain, errors) => true) // accept self-signed
@@ -58,46 +55,31 @@ namespace OElite.Restme.OpenSearch
 
             _client = new OpenSearchClient(settings);
             _defaultIndex = "default";
-            Console.WriteLine("OpenSearchProvider initialized successfully");
         }
 
         private static Uri ParseConnectionString(string connectionString)
         {
-            try
+            // Handle different connection string formats
+            string uriString;
+
+            if (connectionString.StartsWith("http://") || connectionString.StartsWith("https://"))
             {
-                // Debug: Log the incoming connection string
-                Console.WriteLine($"OpenSearch ParseConnectionString received: '{connectionString}'");
-
-                // Handle different connection string formats
-                string uriString;
-
-                if (connectionString.StartsWith("http://") || connectionString.StartsWith("https://"))
-                {
-                    // Already a valid HTTP URI
-                    uriString = connectionString;
-                }
-                else if (connectionString.Contains("://"))
-                {
-                    // Replace scheme with http
-                    var parts = connectionString.Split("://", 2);
-                    uriString = "http://" + parts[1];
-                }
-                else
-                {
-                    // Assume it's just host:port
-                    uriString = "http://" + connectionString;
-                }
-
-                Console.WriteLine($"OpenSearch ParseConnectionString processed: '{uriString}'");
-
-                return new Uri(uriString);
+                // Already a valid HTTP URI
+                uriString = connectionString;
             }
-            catch (Exception ex)
+            else if (connectionString.Contains("://"))
             {
-                Console.WriteLine(
-                    $"OpenSearch ParseConnectionString failed for: '{connectionString}'. Error: {ex.Message}");
-                throw;
+                // Replace scheme with http
+                var parts = connectionString.Split("://", 2);
+                uriString = "http://" + parts[1];
             }
+            else
+            {
+                // Assume it's just host:port
+                uriString = "http://" + connectionString;
+            }
+
+            return new Uri(uriString);
         }
 
         public async Task IndexAsync<T>(T document, string indexName = null, string documentId = null,
