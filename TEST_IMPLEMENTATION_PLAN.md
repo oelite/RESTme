@@ -3,7 +3,14 @@
 ## 🎯 Objective
 Achieve production-ready test coverage for MongoDB, ClickHouse, Kafka, and OpenSearch providers through systematic implementation of comprehensive test suites.
 
-## 📊 Current Status Baseline
+## ⚠️ CI Evidence Status (as-of 2026-11-03)
+
+**The status table below is a point-in-time baseline, NOT a current verified result.** Test jobs are currently **commented out in `.gitlab-ci.yml`** (see the commented `dotnet test` blocks); CI therefore provides **no current test evidence** for any provider. Any "Production Ready" claim below has no active CI backing until the test jobs are re-enabled and a pipeline run is recorded here.
+
+- Last plan revision: 2026-11-03 (issue oelite/uranus/restme#13 — labeling + CI-evidence note only; no counts re-verified in this pass)
+- To refresh this baseline: re-enable CI test jobs, run `dotnet test --configuration Release` locally against the shared oelite-stack services, and update the table with the actual output (pass/fail counts per provider).
+
+## 📊 Current Status Baseline (point-in-time; see CI Evidence Status above)
 
 | Provider | Unit Tests | Integration Tests | Pass Rate | Production Ready |
 |----------|------------|-------------------|-----------|------------------|
