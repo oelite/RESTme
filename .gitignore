@@ -255,3 +255,4 @@ errorLog.txt
 *.DS_Store
 /src/OElite.Common/.DS_Store
 *.DS_Store
+.oe-scope
