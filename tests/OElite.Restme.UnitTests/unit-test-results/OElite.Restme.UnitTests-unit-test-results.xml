@@ -1,0 +1,32 @@
+<testsuites>
+  <testsuite name="OElite.Restme.UnitTests.dll" tests="18" skipped="0" failures="0" errors="0" time="0.013779599999999998" timestamp="2026-11-03T14:49:27" hostname="lidas-macbook-pro-m3" id="0" package="OElite.Restme.UnitTests.dll">
+    <properties />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="GenerateRandomId_IsNonEmpty" time="0.0040025" />
+    <testcase classname="OElite.Restme.UnitTests.GuidUtilsTests" name="IsNotNullOrEmpty_NewGuid_ReturnsTrue" time="0.0035634" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="CanNotBeNullOrEmpty_InvalidInput_ThrowsOEliteException(input: null)" time="0.0003052" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="CanNotBeNullOrEmpty_InvalidInput_ThrowsOEliteException(input: &quot;   &quot;)" time="0.0000712" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="CanNotBeNullOrEmpty_InvalidInput_ThrowsOEliteException(input: &quot;&quot;)" time="0.0000074" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="CanNotBeNullOrEmpty_ObjectOverload_ReturnsTrimmedValue" time="0.0003392" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="CanNotBeNullOrEmpty_ValidInput_ReturnsTrimmedValue(input: &quot;hello&quot;, expected: &quot;hello&quot;)" time="0.0000165" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="CanNotBeNullOrEmpty_ValidInput_ReturnsTrimmedValue(input: &quot;  hello  &quot;, expected: &quot;hello&quot;)" time="0.0000526" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="SubString_ShorterThanLimit_ReturnsOriginal" time="0.0000407" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="GetStringValueOrEmpty_String_ReturnsValue" time="0.0000176" />
+    <testcase classname="OElite.Restme.UnitTests.GuidUtilsTests" name="GetGuidOrEmpty_GuidInstance_ReturnsSameGuid" time="0.0016709" />
+    <testcase classname="OElite.Restme.UnitTests.GuidUtilsTests" name="IsNullOrEmpty_EmptyGuid_ReturnsTrue" time="0.0000220" />
+    <testcase classname="OElite.Restme.UnitTests.GuidUtilsTests" name="GetGuidOrEmpty_InvalidString_ReturnsEmpty" time="0.0010018" />
+    <testcase classname="OElite.Restme.UnitTests.GuidUtilsTests" name="GetGuidOrEmpty_ValidString_ReturnsGuid" time="0.0002906" />
+    <testcase classname="OElite.Restme.UnitTests.GuidUtilsTests" name="GetGuidOrEmpty_Null_ReturnsEmpty" time="0.0000313" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="JsonSerialize_RoundTrip_PreservesValues" time="0.0023081" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="GetStringValueOrEmpty_Null_ReturnsEmpty" time="0.0000198" />
+    <testcase classname="OElite.Restme.UnitTests.StringUtilsTests" name="SubString_LongerThanLimit_TruncatesAndAppends" time="0.0000188" />
+    <system-out>
+Test Framework Informational Messages:
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.0)
+[xUnit.net 00:00:00.03]   Discovering: OElite.Restme.UnitTests
+[xUnit.net 00:00:00.05]   Discovered:  OElite.Restme.UnitTests
+[xUnit.net 00:00:00.05]   Starting:    OElite.Restme.UnitTests
+[xUnit.net 00:00:00.09]   Finished:    OElite.Restme.UnitTests
+</system-out>
+    <system-err></system-err>
+  </testsuite>
+</testsuites>

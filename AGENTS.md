@@ -48,8 +48,9 @@ OElite.Restme is the unified data-infrastructure library for the entire OElite P
 # Build
 dotnet restore --configfile NuGet.config && dotnet build --configuration Release --configfile NuGet.config
 
-# Test (currently disabled in CI to reduce build time; test projects exist under tests/)
-dotnet test --configuration Release
+# MR/develop CI runs non-integration unit tests (including OElite.Restme.UnitTests)
+dotnet test tests/OElite.Restme.UnitTests/OElite.Restme.UnitTests.csproj --configuration Release --filter "Category!=Integration"
+# Integration suites run locally against the shared oelite-stack, never per-repo containers.
 
 # Pack
 dotnet pack OElite.Restme/OElite.Restme.csproj --configuration Release --output ./packages
