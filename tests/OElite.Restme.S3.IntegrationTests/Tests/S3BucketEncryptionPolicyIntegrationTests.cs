@@ -1,8 +1,9 @@
 using System;
+using System.Net;
+using System.Reflection;
 using System.Threading.Tasks;
 using Amazon.S3;
 using Amazon.S3.Model;
-using Microsoft.Extensions.Logging.Abstractions;
 using OElite.Providers;
 using OElite.Restme;
 using OElite.Restme.Abstractions;
@@ -11,102 +12,52 @@ using ObjectLockMode = OElite.Restme.Abstractions.ObjectLockMode;
 
 namespace OElite.Restme.S3.IntegrationTests;
 
-/// <summary>
-///     Integration tests for the verifiable bucket-encryption capability contract
-///     (oelite/uranus/restme#9) against the shared-stack MinIO
-///     (coding-standards/infrastructure/oelite-stack — MinIO on localhost:9000).
-///     <para>
-///     Verifies against a REAL backend:
-///     1) GetBucketEncryptionStatusAsync returns explicit Enabled/Disabled/Unavailable
-///        with real backend evidence — never an exception for unsupported backends;
-///     2) EnsureBucketEncryptionAsync applies default encryption and re-verifies
-///        fail-closed when the backend supports SSE;
-///     3) EnsureObjectLockEnabledAsync fails closed with a descriptive exception when
-///        the backend cannot serve Object Lock.
-///     </para>
-///     The shared-stack MinIO has no KES/KMS. Depending on MinIO version the backend
-///     answers 404 ServerSideEncryptionConfigurationNotFound (Disabled) or
-///     501 NotImplemented (Unavailable) — either way verification never claims Enabled
-///     unless the backend's own API confirms it.
-///     <para>
-///     Excluded from CI per the shared-infrastructure testing policy; run locally:
-///     ./oelite-stack.sh up, then MINIO_ROOT_PASSWORD=... dotnet test --filter Category=Integration
-///     </para>
-/// </summary>
 [Trait("Category", "Integration")]
 [Trait("Category", "SkipCI")]
 public sealed class S3BucketEncryptionPolicyIntegrationTests
 {
-    private const string BucketName = "restme-enc-contract-test";
+    private static string AccessKey => Environment.GetEnvironmentVariable("MINIO_ROOT_USER") ?? "oelite";
+    private static string SecretKey => Environment.GetEnvironmentVariable("MINIO_ROOT_PASSWORD")
+        ?? throw new InvalidOperationException("MINIO_ROOT_PASSWORD is required from the shared oelite-stack .env.");
 
-    private static string AccessKey =>
-        Environment.GetEnvironmentVariable("MINIO_ROOT_USER") ?? "oelite";
+    private static string Bucket() => $"restme-enc-test-{Guid.NewGuid():N}";
 
-    private static string SecretKey =>
-        Environment.GetEnvironmentVariable("MINIO_ROOT_PASSWORD")
-        ?? throw new InvalidOperationException(
-            "MINIO_ROOT_PASSWORD is required: source the oelite-stack .env before running integration tests.");
-
-    private static RestConfig BuildRestConfig(string bucketName) =>
-        new RestConfig(RestMode.S3)
-        {
-            ConnectionString =
-                $"endpoint=http://localhost:9000;bucket={bucketName};accesskey={AccessKey};secretkey={SecretKey};forcepathstyle=true;usehttp=true",
-            AuthKey = AccessKey,
-            AuthSecret = SecretKey,
-            InstanceName = bucketName
-        };
-
-    private static S3BucketEncryptionPolicy BuildPolicy() =>
-        new S3BucketEncryptionPolicy(BuildRestConfig(BucketName));
-
-    private static IAmazonS3 BuildClient() => S3BucketEncryptionPolicy.CreateAmazonClient(BuildRestConfig(BucketName));
-
-    private static async Task<bool> BucketExistsAsync(IAmazonS3 client, string bucketName)
+    private static RestConfig Config(string bucket) => new(RestMode.S3)
     {
-        try
-        {
-            await client.GetBucketLocationAsync(new GetBucketLocationRequest { BucketName = bucketName });
-            return true;
-        }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            return false;
-        }
-    }
+        ConnectionString = $"endpoint=http://localhost:9000;bucket={bucket};accesskey={AccessKey};secretkey={SecretKey};forcepathstyle=true;usehttp=true",
+        AuthKey = AccessKey,
+        AuthSecret = SecretKey,
+        InstanceName = bucket
+    };
+
+    private static S3BucketEncryptionPolicy Policy(string bucket) => new(Config(bucket));
+    private static IAmazonS3 Client(string bucket) => S3BucketEncryptionPolicy.CreateAmazonClient(Config(bucket));
 
     [Fact]
     public async Task GetStatus_WhenSharedStackMinioRunning_ReturnsExplicitStatusWithEvidence()
     {
-        var policy = BuildPolicy();
-
-        var result = await policy.GetBucketEncryptionStatusAsync(BucketName);
-
-        // Real backend evidence must always be present — no exception, no faked states.
-        Assert.False(string.IsNullOrWhiteSpace(result.Evidence),
-            "probe must carry real backend evidence, not an empty string");
-        Assert.True(result.ProbedAtUtc <= DateTimeOffset.UtcNow.AddSeconds(5));
-
-        // Shared-stack MinIO has no KMS: the honest result is Disabled or Unavailable —
-        // never Enabled unless the backend's own API confirms default encryption.
-        Assert.True(result.Status is BucketEncryptionStatus.Disabled or BucketEncryptionStatus.Unavailable,
-            $"expected Disabled or Unavailable against shared-stack MinIO, got {result.Status}: {result.Evidence}");
-        Assert.False(result.IsEncryptionVerified,
-            "shared-stack MinIO has no KMS; verification must never claim Enabled");
+        var bucket = Bucket();
+        using var client = Client(bucket);
+        await client.PutBucketAsync(new PutBucketRequest { BucketName = bucket });
+        try
+        {
+            var result = await Policy(bucket).GetBucketEncryptionStatusAsync(bucket);
+            Assert.False(string.IsNullOrWhiteSpace(result.Evidence));
+            Assert.True(result.ProbedAtUtc <= DateTimeOffset.UtcNow.AddSeconds(5));
+            Assert.True(result.Status is BucketEncryptionStatus.Disabled or BucketEncryptionStatus.Unavailable);
+            Assert.False(result.IsEncryptionVerified);
+        }
+        finally
+        {
+            await client.DeleteBucketAsync(new DeleteBucketRequest { BucketName = bucket });
+        }
     }
 
     [Fact]
     public async Task GetStatus_WhenBucketMissing_ReturnsUnverifiedStatusNotException()
     {
-        var policy = BuildPolicy();
-        var missingBucket = $"restme-enc-missing-{Guid.NewGuid():N}";
-
-        var result = await policy.GetBucketEncryptionStatusAsync(missingBucket);
-
-        // No capability method may throw for unsupported/missing backends. Real
-        // shared-stack MinIO answers ServerSideEncryptionConfigurationNotFound for a
-        // missing bucket (Disabled); AWS answers NoSuchBucket (Unavailable). Either
-        // way the result is explicitly unverified with backend evidence.
+        var bucket = Bucket();
+        var result = await Policy(bucket).GetBucketEncryptionStatusAsync(bucket);
         Assert.NotEqual(BucketEncryptionStatus.Enabled, result.Status);
         Assert.False(result.IsEncryptionVerified);
         Assert.False(string.IsNullOrWhiteSpace(result.Evidence));
@@ -115,84 +66,103 @@ public sealed class S3BucketEncryptionPolicyIntegrationTests
     [Fact]
     public async Task EnsureBucketEncryption_WhenBackendCannotServeSse_FailsClosedWithDescriptiveException()
     {
-        var client = BuildClient();
+        var bucket = Bucket();
+        using var client = Client(bucket);
+        await client.PutBucketAsync(new PutBucketRequest { BucketName = bucket });
         try
         {
-            var policy = BuildPolicy();
-
-            // Real shared-stack MinIO (no KES/KMS) answers 501 NotImplemented
-            // ("Server side encryption specified but KMS is not configured") for
-            // PutBucketEncryption — even for SSE-S3. The enforce path must fail
-            // closed with a descriptive exception carrying backend evidence:
-            // never a silent no-op and never a false success.
-            var ex = await Assert.ThrowsAsync<OEliteException>(
-                () => policy.EnsureBucketEncryptionAsync(BucketName,
-                    new BucketEncryptionConfig { Algorithm = BucketEncryptionAlgorithm.SseS3 }));
-
-            Assert.Contains("restme-enc-contract-test", ex.Message);
+            var policy = Policy(bucket);
+            var ex = await Assert.ThrowsAsync<OEliteException>(() => policy.EnsureBucketEncryptionAsync(bucket,
+                new BucketEncryptionConfig { Algorithm = BucketEncryptionAlgorithm.SseS3 }));
+            Assert.Contains(bucket, ex.Message);
             Assert.Contains("NotImplemented", ex.Message, StringComparison.OrdinalIgnoreCase);
-
-            // The status probe after the failed enforce must still be explicitly unverified.
-            var status = await policy.GetBucketEncryptionStatusAsync(BucketName);
+            var status = await policy.GetBucketEncryptionStatusAsync(bucket);
             Assert.False(status.IsEncryptionVerified);
         }
         finally
         {
-            client.Dispose();
+            await client.DeleteBucketAsync(new DeleteBucketRequest { BucketName = bucket });
         }
     }
 
     [Fact]
     public async Task EnsureObjectLock_WhenBackendCannotServeLock_FailsClosedWithDescriptiveException()
     {
-        var client = BuildClient();
+        var bucket = Bucket();
+        using var client = Client(bucket);
+        await client.PutBucketAsync(new PutBucketRequest { BucketName = bucket });
         try
         {
-            var policy = BuildPolicy();
-
-            // The test bucket was created without Object Lock (shared-stack MinIO cannot
-            // enable lock on an existing bucket). Enforce must fail closed — a descriptive
-            // exception, never a silent no-op or a false success.
-            var ex = await Assert.ThrowsAsync<OEliteException>(
-                () => policy.EnsureObjectLockEnabledAsync(BucketName, ObjectLockMode.Governance, 30));
-
+            var ex = await Assert.ThrowsAsync<OEliteException>(() =>
+                Policy(bucket).EnsureObjectLockEnabledAsync(bucket, ObjectLockMode.Governance, 30));
             Assert.Contains("Object Lock", ex.Message);
         }
         finally
         {
-            client.Dispose();
+            await client.DeleteBucketAsync(new DeleteBucketRequest { BucketName = bucket });
         }
     }
 
     [Fact]
     public async Task EnsureObjectLock_WhenBucketMissing_CreatesBucketWithLockAndAppliesRetention()
     {
-        var client = BuildClient();
-        var freshBucket = $"restme-enc-lock-{Guid.NewGuid():N}";
+        var bucket = Bucket();
+        using var client = Client(bucket);
         try
         {
-            var policy = new S3BucketEncryptionPolicy(BuildRestConfig(freshBucket));
-
-            // Missing bucket: the enforce path creates it and enables Object Lock.
-            await policy.EnsureObjectLockEnabledAsync(freshBucket, ObjectLockMode.Compliance, 7);
-
-            var exists = await BucketExistsAsync(client, freshBucket);
-            Assert.True(exists, "bucket must be created by the enforce path when missing");
-
-            // Retention config must be readable back from the backend.
+            await Policy(bucket).EnsureObjectLockEnabledAsync(bucket, ObjectLockMode.Compliance, 7);
+            await client.GetBucketLocationAsync(new GetBucketLocationRequest { BucketName = bucket });
             var lockConfig = await client.GetObjectLockConfigurationAsync(
-                new GetObjectLockConfigurationRequest { BucketName = freshBucket });
+                new GetObjectLockConfigurationRequest { BucketName = bucket });
             Assert.Equal("Enabled", lockConfig.ObjectLockConfiguration?.ObjectLockEnabled);
-            Assert.Equal("COMPLIANCE",
-                lockConfig.ObjectLockConfiguration?.Rule?.DefaultRetention?.Mode);
+            Assert.Equal("COMPLIANCE", lockConfig.ObjectLockConfiguration?.Rule?.DefaultRetention?.Mode);
             Assert.Equal(7, lockConfig.ObjectLockConfiguration?.Rule?.DefaultRetention?.Days);
         }
         finally
         {
-            // Cleanup: remove the created test bucket (force, incl. lock config).
-            try { await client.DeleteBucketAsync(new DeleteBucketRequest { BucketName = freshBucket }); }
-            catch { /* best-effort cleanup */ }
-            client.Dispose();
+            try { await client.DeleteBucketAsync(new DeleteBucketRequest { BucketName = bucket }); }
+            catch (AmazonS3Exception) { /* retained objects can prevent test cleanup */ }
+        }
+    }
+
+    [Fact]
+    public async Task GetStatus_WhenSecondaryProbeDenied_ReturnsUnavailableWithSafeEvidence()
+    {
+        var seam = DispatchProxy.Create<IAmazonS3, S3ErrorProxy>();
+        var result = await new S3BucketEncryptionPolicy(seam).GetBucketEncryptionStatusAsync(Bucket());
+        Assert.Equal(BucketEncryptionStatus.Unavailable, result.Status);
+        Assert.False(result.IsEncryptionVerified);
+        Assert.Contains("AccessDenied", result.Evidence);
+        Assert.DoesNotContain("secret", result.Evidence, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ClassificationIndicatesUnavailable_WhenErrorCodeNull_DoesNotThrow()
+    {
+        var classifier = typeof(S3BucketEncryptionPolicy).GetMethod("ClassificationIndicatesUnavailable",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(classifier);
+        var error = new AmazonS3Exception("unavailable") { StatusCode = HttpStatusCode.BadRequest };
+        Assert.False((bool)classifier.Invoke(null, new object[] { error })!);
+    }
+
+    public class S3ErrorProxy : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == "GetBucketEncryptionAsync")
+                return Task.FromException<GetBucketEncryptionResponse>(new AmazonS3Exception("configuration absent")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "ServerSideEncryptionConfigurationNotFound"
+                });
+            if (targetMethod?.Name == "GetBucketLocationAsync")
+                return Task.FromException<GetBucketLocationResponse>(new AmazonS3Exception("denied")
+                {
+                    StatusCode = HttpStatusCode.Forbidden,
+                    ErrorCode = "AccessDenied"
+                });
+            throw new NotSupportedException(targetMethod?.Name);
         }
     }
 }

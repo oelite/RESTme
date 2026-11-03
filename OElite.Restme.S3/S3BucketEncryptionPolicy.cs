@@ -134,19 +134,29 @@ namespace OElite.Providers
             catch (AmazonS3Exception ex)
             {
                 var status = ClassifyS3Error(ex);
-                if (status == BucketEncryptionStatus.Disabled &&
-                    !await BucketExistsAsync(bucketName, cancellationToken))
+                var evidence = $"S3 API error: HTTP {(int)ex.StatusCode} {ex.StatusCode}, error code {ex.ErrorCode ?? "none"}";
+                if (status == BucketEncryptionStatus.Disabled)
                 {
-                    // MinIO answers ServerSideEncryptionConfigurationNotFound for missing
-                    // buckets too — disambiguate so a missing bucket is Unavailable.
-                    status = BucketEncryptionStatus.Unavailable;
+                    try
+                    {
+                        // MinIO also reports configuration-not-found for missing buckets.
+                        if (!await BucketExistsAsync(bucketName, cancellationToken))
+                            status = BucketEncryptionStatus.Unavailable;
+                    }
+                    catch (Exception probeError) when (probeError is not OperationCanceledException)
+                    {
+                        status = BucketEncryptionStatus.Unavailable;
+                        evidence += probeError is AmazonS3Exception s3Error
+                            ? $"; bucket existence check: HTTP {(int)s3Error.StatusCode} {s3Error.StatusCode}, error code {s3Error.ErrorCode ?? "none"}"
+                            : $"; bucket existence check failed: {probeError.GetType().Name}";
+                    }
                 }
 
                 return new BucketEncryptionStatusResult(
                     status,
                     null,
                     null,
-                    $"S3 API error: HTTP {(int)ex.StatusCode} {ex.StatusCode}, error code {ex.ErrorCode ?? "none"}",
+                    evidence,
                     DateTimeOffset.UtcNow);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
@@ -362,9 +372,9 @@ namespace OElite.Providers
         private static bool ClassificationIndicatesUnavailable(AmazonS3Exception ex) =>
             ex.StatusCode == HttpStatusCode.NotImplemented ||
             ex.StatusCode == HttpStatusCode.MethodNotAllowed ||
-            ex.ErrorCode.Contains("NotImplemented", StringComparison.OrdinalIgnoreCase) ||
-            ex.ErrorCode.Contains("NotSupported", StringComparison.OrdinalIgnoreCase) ||
-            ex.ErrorCode.Contains("MethodNotAllowed", StringComparison.OrdinalIgnoreCase);
+            (ex.ErrorCode ?? string.Empty).Contains("NotImplemented", StringComparison.OrdinalIgnoreCase) ||
+            (ex.ErrorCode ?? string.Empty).Contains("NotSupported", StringComparison.OrdinalIgnoreCase) ||
+            (ex.ErrorCode ?? string.Empty).Contains("MethodNotAllowed", StringComparison.OrdinalIgnoreCase);
 
         private async Task<bool> BucketExistsAsync(string bucketName, CancellationToken cancellationToken)
         {

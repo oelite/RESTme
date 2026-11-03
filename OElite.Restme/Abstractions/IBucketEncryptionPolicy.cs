@@ -81,6 +81,10 @@ namespace OElite.Restme.Abstractions
     /// fail-closed storage without config-flag attestation or ad-hoc bucket mutations.
     /// </summary>
     /// <remarks>
+    /// Construct <c>new S3BucketEncryptionPolicy(RestConfig)</c> from OElite.Restme.S3,
+    /// or inject a preconfigured <c>IAmazonS3</c> client into its alternate constructor.
+    /// This policy is not an <c>IRestmeProvider</c> and is not exposed by
+    /// <c>Rest.GetProvider&lt;IBucketEncryptionPolicy&gt;()</c>.
     /// Read operations (<see cref="GetBucketEncryptionStatusAsync"/>) never throw for
     /// unsupported backends — they return <see cref="BucketEncryptionStatus.Unavailable"/>
     /// with real backend error evidence instead.
