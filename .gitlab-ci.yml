@@ -127,7 +127,7 @@ run_unit_tests:
           dotnet test "$project" --configuration Release --no-restore \
             --filter "Category!=Integration" \
             --logger "junit;LogFilePath=unit-test-results/{assembly}-unit-test-results.xml" \
-            --results-directory ./unit-test-results
+            --results-directory ./unit-test-results || exit $?
         fi
       done <<< "$UNIT_TEST_PROJECTS"
   artifacts:
