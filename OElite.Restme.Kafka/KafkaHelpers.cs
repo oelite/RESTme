@@ -24,6 +24,8 @@ namespace OElite.Restme.Kafka
         private IProducer<string, string>? _producer;
         private IAdminClient? _adminClient;
         private bool _disposed = false;
+        private string? _saslUsername;
+        private string? _saslPassword;
 
         public KafkaConnection(string connectionString, RestConfig? config = null)
         {
@@ -60,6 +62,9 @@ namespace OElite.Restme.Kafka
 
                 if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
                 {
+                    _saslUsername = username;
+                    _saslPassword = password;
+
                     // Configure SASL authentication - use custom mechanism if specified, default to Plain
                     var securityProtocol = config.SecurityProtocol switch
                     {
@@ -96,11 +101,71 @@ namespace OElite.Restme.Kafka
             }
         }
 
+        /// <summary>
+        /// Removes credential material from text emitted by librdkafka before it is written to stderr.
+        /// </summary>
+        private string Redact(string? text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text ?? string.Empty;
+            }
+
+            var sanitized = text;
+            if (!string.IsNullOrEmpty(_saslPassword))
+            {
+                sanitized = sanitized.Replace(_saslPassword, "[redacted]", StringComparison.Ordinal);
+            }
+
+            if (!string.IsNullOrEmpty(_saslUsername))
+            {
+                sanitized = sanitized.Replace(_saslUsername, "[redacted]", StringComparison.Ordinal);
+            }
+
+            return sanitized;
+        }
+
+        private void OnLogMessage(LogMessage logMessage)
+        {
+            // librdkafka's default log callback writes to stderr; route messages through
+            // the redactor so connection failures cannot echo credential material.
+            Console.Error.WriteLine($"[{logMessage.Level}] {Redact(logMessage.Message)}");
+        }
+
+        private void OnError(Error error)
+        {
+            Console.Error.WriteLine(Redact(error.Reason));
+        }
+
+        private IProducer<string, string> BuildProducer(ProducerConfig config)
+        {
+            return new ProducerBuilder<string, string>(config)
+                .SetErrorHandler((_, error) => OnError(error))
+                .SetLogHandler((_, logMessage) => OnLogMessage(logMessage))
+                .Build();
+        }
+
+        private IConsumer<string, string> BuildConsumer(ConsumerConfig config)
+        {
+            return new ConsumerBuilder<string, string>(config)
+                .SetErrorHandler((_, error) => OnError(error))
+                .SetLogHandler((_, logMessage) => OnLogMessage(logMessage))
+                .Build();
+        }
+
+        private IAdminClient BuildAdminClient(AdminClientConfig config)
+        {
+            return new AdminClientBuilder(config)
+                .SetErrorHandler((_, error) => OnError(error))
+                .SetLogHandler((_, logMessage) => OnLogMessage(logMessage))
+                .Build();
+        }
+
         private IProducer<string, string> GetProducer()
         {
             if (_producer == null)
             {
-                _producer = new ProducerBuilder<string, string>(_producerConfig).Build();
+                _producer = BuildProducer(_producerConfig);
             }
             return _producer;
         }
@@ -109,7 +174,7 @@ namespace OElite.Restme.Kafka
         {
             if (_adminClient == null)
             {
-                _adminClient = new AdminClientBuilder(_adminConfig).Build();
+                _adminClient = BuildAdminClient(_adminConfig);
             }
             return _adminClient;
         }
@@ -184,7 +249,7 @@ namespace OElite.Restme.Kafka
                 AutoOffsetReset = AutoOffsetReset.Earliest
             };
 
-            using var consumer = new ConsumerBuilder<string, string>(consumerConfig).Build();
+            using var consumer = BuildConsumer(consumerConfig);
             consumer.Subscribe(topicName);
             Console.WriteLine("Consumer subscribed, starting message loop...");
 
@@ -269,7 +334,7 @@ namespace OElite.Restme.Kafka
             if (string.IsNullOrEmpty(topicName))
                 throw new ArgumentNullException(nameof(topicName));
 
-            using var adminClient = new AdminClientBuilder(_adminConfig).Build();
+            using var adminClient = BuildAdminClient(_adminConfig);
 
             try
             {
@@ -304,7 +369,7 @@ namespace OElite.Restme.Kafka
 
             try
             {
-                using var adminClient = new AdminClientBuilder(_adminConfig).Build();
+                using var adminClient = BuildAdminClient(_adminConfig);
 
                 var configs = new List<ConfigEntry>
                 {
@@ -337,7 +402,7 @@ namespace OElite.Restme.Kafka
 
             try
             {
-                using var adminClient = new AdminClientBuilder(_adminConfig).Build();
+                using var adminClient = BuildAdminClient(_adminConfig);
 
                 var configs = new List<ConfigEntry>
                 {

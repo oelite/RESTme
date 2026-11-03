@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace OElite.Restme.Kafka;
 
@@ -34,6 +35,18 @@ internal static class KafkaConnectionString
         {
             value = value[KafkaScheme.Length..].Trim();
         }
+
+        // Strip any userinfo (user:password@) carried inside inline-credential URIs
+        // so that credentials can never reach BootstrapServers and, consequently,
+        // librdkafka native log output on connection failures.
+        value = string.Join(
+            ",",
+            value.Split(',').Select(endpoint =>
+            {
+                var trimmed = endpoint.Trim();
+                var delimiter = trimmed.LastIndexOf('@');
+                return delimiter > 0 ? trimmed[(delimiter + 1)..].Trim() : trimmed;
+            }));
 
         if (string.IsNullOrWhiteSpace(value))
         {
