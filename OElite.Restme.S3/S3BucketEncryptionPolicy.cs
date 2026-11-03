@@ -266,8 +266,8 @@ namespace OElite.Providers
                 if (!bucketReachable)
                 {
                     // Fresh bucket: create with Object Lock enabled at creation time
-                // (MinIO and AWS both reject enabling Object Lock on existing buckets),
-                // then apply the default retention rule.
+                    // (MinIO and AWS both reject enabling Object Lock on existing buckets),
+                    // then apply the default retention rule.
                     await _s3Client.PutBucketAsync(
                         new PutBucketRequest
                         {
