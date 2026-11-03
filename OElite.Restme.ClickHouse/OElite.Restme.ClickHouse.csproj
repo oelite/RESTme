@@ -20,6 +20,10 @@
 
 
   <ItemGroup>
+    <InternalsVisibleTo Include="OElite.Restme.ClickHouse.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ClickHouse.Client" Version="7.14.0" />
     <ProjectReference Include="..\OElite.Restme\OElite.Restme.csproj" />
   </ItemGroup>
