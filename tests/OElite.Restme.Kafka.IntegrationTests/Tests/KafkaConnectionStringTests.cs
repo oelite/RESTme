@@ -25,11 +25,28 @@ public class KafkaConnectionStringTests
     }
 
     [Theory]
+    [InlineData("kafka://test-user:secret-value@localhost:9092", "localhost:9092")]
+    [InlineData("kafka://test-user@localhost:9092", "localhost:9092")]
+    [InlineData("kafka://test-user:secret-value@host1:9092,host2:9092", "host1:9092,host2:9092")]
+    [InlineData("bootstrap.servers=test-user:secret-value@localhost:9092", "localhost:9092")]
+    [InlineData("test-user:secret-value@localhost:9092", "localhost:9092")]
+    public void Normalize_strips_inline_credentials(string connectionString, string expected)
+    {
+        var bootstrapServers = KafkaConnectionString.Normalize(connectionString);
+
+        bootstrapServers.Should().Be(expected);
+        bootstrapServers.Should().NotContain("test-user");
+        bootstrapServers.Should().NotContain("secret-value");
+        bootstrapServers.Should().NotContain("@");
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("  ")]
     [InlineData("bootstrap.servers=")]
     [InlineData("bootstrap.servers=&sasl.password=secret-value")]
     [InlineData("kafka://")]
+    [InlineData("kafka://user:pass@")]
     public void Normalize_rejects_connection_strings_without_broker_endpoints(string connectionString)
     {
         // Given a connection string without a broker endpoint
