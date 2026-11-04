@@ -162,13 +162,14 @@ pack_packages:
       
       while IFS= read -r project || [ -n "$project" ]; do
         if [ -n "$project" ]; then
-          echo "Packing $project"
+          echo "Building and packing $project"
+          dotnet build $project/$project.csproj --configuration Release --no-incremental --no-restore
           if [ -n "$VERSION_SUFFIX" ]; then
             # Pre-release version
-            dotnet pack $project/$project.csproj --configuration Release --no-incremental --output ./packages --version-suffix $VERSION_SUFFIX
+            dotnet pack $project/$project.csproj --configuration Release --no-build --no-restore --output ./packages --version-suffix $VERSION_SUFFIX
           else
             # Production release - use version from project file
-            dotnet pack $project/$project.csproj --configuration Release --no-incremental --output ./packages
+            dotnet pack $project/$project.csproj --configuration Release --no-build --no-restore --output ./packages
           fi
         fi
       done <<< "$PROJECTS"
