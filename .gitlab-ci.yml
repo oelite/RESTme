@@ -165,10 +165,10 @@ pack_packages:
           echo "Packing $project"
           if [ -n "$VERSION_SUFFIX" ]; then
             # Pre-release version
-            dotnet pack $project/$project.csproj --configuration Release --output ./packages --version-suffix $VERSION_SUFFIX
+            dotnet pack $project/$project.csproj --configuration Release --no-incremental --output ./packages --version-suffix $VERSION_SUFFIX
           else
             # Production release - use version from project file
-            dotnet pack $project/$project.csproj --configuration Release --output ./packages
+            dotnet pack $project/$project.csproj --configuration Release --no-incremental --output ./packages
           fi
         fi
       done <<< "$PROJECTS"
