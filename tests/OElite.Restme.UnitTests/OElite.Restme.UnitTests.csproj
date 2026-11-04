@@ -27,6 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\OElite.Restme\OElite.Restme.csproj" />
     <ProjectReference Include="..\..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
   </ItemGroup>
 

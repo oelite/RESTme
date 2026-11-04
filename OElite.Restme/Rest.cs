@@ -22,6 +22,7 @@ namespace OElite.Restme
         internal object? ObjAsParam;
         internal Dictionary<string, IRestmeProvider> InstantiatedProviders = new();
         public RestConfig Configuration { get; private set; }
+        private readonly Func<string, bool>? _assemblyLoaderOverride;
 
         public string? RequestUrlPath { get; set; }
         public bool Initialized { get; private set; }
@@ -140,9 +141,15 @@ namespace OElite.Restme
 
 
         public Rest(RestConfig? config = null, ILogger? logger = null)
+            : this(config, logger, null)
+        {
+        }
+
+        internal Rest(RestConfig? config, ILogger? logger, Func<string, bool>? assemblyLoaderOverride)
         {
             Configuration = config ?? new RestConfig(RestMode.Memory);
             Logger = logger;
+            _assemblyLoaderOverride = assemblyLoaderOverride;
 
             this.PrepareRestMode();
         }
@@ -234,7 +241,10 @@ namespace OElite.Restme
                 if (!string.IsNullOrEmpty(assemblyName))
                 {
                     Logger?.LogDebug("Attempting to load provider assembly: {AssemblyName}", assemblyName);
-                    var loaded = LoadAssembly(assemblyName);
+                    var loaded = _assemblyLoaderOverride != null
+                        ? _assemblyLoaderOverride(assemblyName)
+                        : LoadAssembly(assemblyName);
+
                     if (loaded)
                     {
                         Logger?.LogDebug("Successfully loaded provider assembly: {AssemblyName}", assemblyName);
@@ -242,10 +252,11 @@ namespace OElite.Restme
                     else
                     {
                         Logger?.LogWarning("Failed to load provider assembly: {AssemblyName}", assemblyName);
-
-                        // Try discovery as a fallback
+                        // Preserve existing registrations (typed + named) — do NOT Clear the
+                        // process-global ServiceLocator registry, since factory static
+                        // constructors only run once per process and Clear() would
+                        // permanently wipe them. Discovery below only ADDS missing ones.
                         Logger?.LogDebug("Attempting provider auto-discovery as fallback");
-                        ServiceLocator.Clear(); // Clear cache to force discovery
                         var factory = ServiceLocator.GetFactory(Configuration.OperationMode switch
                         {
                             RestMode.Redis => "redis",
