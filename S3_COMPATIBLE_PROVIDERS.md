@@ -12,17 +12,38 @@ AccessKeyId=your_access_key;SecretAccessKey=your_secret_key;ServiceUrl=https://y
 
 ### Parameters
 
-| Parameter | Description | Required | Default |
-|-----------|-------------|----------|---------|
-| `AccessKeyId` | Your access key ID | Yes | - |
-| `SecretAccessKey` | Your secret access key | Yes | - |
-| `ServiceUrl` or `Endpoint` | The S3-compatible service endpoint URL | No* | Uses AWS S3 |
-| `BucketName` | Default bucket name for cache operations | No | `restme-cache` |
-| `Region` | AWS region (only used when ServiceUrl is not provided) | No | `us-east-1` |
-| `ForcePathStyle` | Use path-style URLs (required for most S3-compatible services) | No | `false` |
-| `UseHttp` | Use HTTP instead of HTTPS | No | `false` |
+Keys are matched case-insensitively. Aliases are listed alongside canonical names.
+
+| Parameter | Aliases | Description | Required | Default |
+|-----------|---------|-------------|----------|---------|
+| `AccessKeyId` | `AccessKey` | Your access key ID | Yes | - |
+| `SecretAccessKey` | `SecretKey` | Your secret access key | Yes | - |
+| `ServiceUrl` | `Endpoint` | The S3-compatible service endpoint URL | No* | Uses AWS S3 |
+| `BucketName` | `Bucket` | Default bucket name for cache operations. **Note:** silently overridden by the `Rest` instance name (`RestConfig.InstanceName`) when one is set | No | `restme-cache` |
+| `Region` | - | AWS region system name (only used when ServiceUrl is not provided) | No | `us-east-1` |
+| `ForcePathStyle` | - | Use path-style URLs (required for most S3-compatible services) | No | `false` |
+| `UseHttp` | - | Use HTTP instead of HTTPS | No | `false` |
+| `RootPath` | - | Prefix applied to all object keys (via `S3ConnectionStringParser.CombinePath`) | No | - |
 
 *Required for S3-compatible providers, optional for Amazon S3
+
+Both `AccessKeyId` and `SecretAccessKey` are mandatory: parsing throws `ArgumentException` if either is missing.
+
+### URI-Style Connection Strings
+
+As an alternative to key=value format, URI-style connection strings are supported:
+
+```
+s3://host:port/bucket            # HTTP (UseHttp=true)
+s3s://host:port/bucket           # HTTPS (default)
+```
+
+Behavior of the URI form (per `S3ConnectionStringParser.ParseS3Uri`):
+- `s3s://` maps to `https://`, `s3://` maps to `http://` (`UseHttp=true`); a missing port defaults to 443 (HTTPS) or 80 (HTTP)
+- `ForcePathStyle` is **always** set to `true` (required for MinIO and custom endpoints)
+- The first path segment becomes the `BucketName`; any additional path segments become the `RootPath` (e.g. `s3s://localhost:9000/my-bucket/backups` → bucket `my-bucket`, root path `backups`)
+- `Region` defaults to `us-east-1`
+- The URI parser does not extract credentials from URI user information. Supply `AuthKey` and `AuthSecret` separately in `RestConfig` when using URI format. Do not append `AccessKeyId`/`SecretAccessKey` key-value pairs to a URI; those are only parsed in key=value format.
 
 ## Supported Providers
 

@@ -29,6 +29,14 @@ public static class MongoClassMapConfigurator
             conventionPack.Add(new RestmeDbAttributeConvention());
             ConventionRegistry.Register("RestmeDbConvention", conventionPack,
                 t => true);
+
+            // Per-shadowed-type serialization provider (restme#12 note 63578): entities that
+            // declare their own Status property are serialized by ShadowedStatusSerializer<T>,
+            // which suppresses the inherited BaseEntity.Status element per derived type WITHOUT
+            // mutating the shared frozen base class map. Registration order is therefore
+            // irrelevant. Non-shadow types resolve null and use the normal class-map path.
+            BsonSerializer.RegisterSerializationProvider(new RestmeShadowSerializationProvider());
+
             _isConfigured = true;
         }
     }
@@ -46,6 +54,17 @@ public static class MongoClassMapConfigurator
             // First, ensure all base classes are mapped
             EnsureBaseClassesMapped<T>();
 
+            // Shadowed types (declare their own Status) are owned by the serialization provider
+            // (ShadowedStatusSerializer<T>), which composes a PRIVATE class map internally.
+            // No class map is registered in the global BsonClassMap registry for shadowed types —
+            // this is what makes Freeze() duplicate-element errors impossible by construction
+            // and keeps the shared BaseEntity map untouched (restme#12 note 63578).
+            if (RestmeShadowSerializationProviderApplies(typeof(T)))
+            {
+                _registeredTypes.Add(typeof(T));
+                return;
+            }
+
             try
             {
                 BsonClassMap.RegisterClassMap<T>(cm =>
@@ -57,7 +76,8 @@ public static class MongoClassMapConfigurator
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(cm);
 
-                    // Resolve property conflicts (e.g., Status hiding base Status)
+                    // Resolve property conflicts (non-Status shadowed properties only —
+                    // Status shadows never reach this path, see above)
                     MongoPropertyConflictResolver.ResolvePropertyConflicts(cm, typeof(T));
                 });
 
@@ -72,17 +92,16 @@ public static class MongoClassMapConfigurator
     }
 
     /// <summary>
-    /// Ensures all base classes are mapped before mapping the derived class
-    /// This method should only be called from within a lock
+    /// Ensures all base classes are mapped before mapping the derived class.
+    /// Base class maps are ALWAYS registered with their own Status member (previously the
+    /// order-dependent UnmapStatusFrom/SuppressInheritedStatusIfNeeded mutations of the shared
+    /// BaseEntity map are deleted — restme#12 note 63578). This method should only be
+    /// called from within a lock.
     /// </summary>
     private static void EnsureBaseClassesMapped<T>() where T : BaseEntity
     {
-        // Collect all derived types in the chain that shadow BaseEntity.Status with 'new'.
-        // Shadowing types must be detected BEFORE registering BaseEntity so the registration action
-        // can unmap Status after AutoMap() and convention apply, but before the class map freezes.
-        var shadowingTypes = CollectShadowingTypes(typeof(T));
-
-        // First, ensure BaseEntity itself is mapped
+        // First, ensure BaseEntity itself is mapped — always WITH Status; shadow resolution
+        // happens exclusively per-derived-type in ShadowedStatusSerializer<T>.
         if (!_registeredTypes.Contains(typeof(BaseEntity)) && !BsonClassMap.IsClassMapRegistered(typeof(BaseEntity)))
         {
             try
@@ -92,10 +111,6 @@ public static class MongoClassMapConfigurator
                     cm.AutoMap();
                     var convention = new RestmeDbAttributeConvention();
                     convention.Apply(cm);
-                    if (shadowingTypes.Count > 0)
-                    {
-                        UnmapStatusFrom(cm);
-                    }
                 });
                 _registeredTypes.Add(typeof(BaseEntity));
             }
@@ -105,8 +120,6 @@ public static class MongoClassMapConfigurator
                 _registeredTypes.Add(typeof(BaseEntity));
             }
         }
-
-        SuppressInheritedStatusIfNeeded(typeof(T));
 
         var currentType = typeof(T);
         var baseTypes = new List<Type>();
@@ -123,12 +136,20 @@ public static class MongoClassMapConfigurator
             }
         }
 
-        // Register base classes in order (most derived first)
+        // Register base classes in order (most derived first).
+        // Intermediate base classes that themselves shadow Status are owned by the
+        // serialization provider, like leaf shadowed types — skip class-map registration.
         baseTypes.Reverse();
         foreach (var baseType in baseTypes)
         {
             if (!_registeredTypes.Contains(baseType) && !BsonClassMap.IsClassMapRegistered(baseType))
             {
+                if (RestmeShadowSerializationProviderApplies(baseType))
+                {
+                    _registeredTypes.Add(baseType);
+                    continue;
+                }
+
                 try
                 {
                     // Use reflection to call the generic RegisterClassMap method
@@ -136,10 +157,6 @@ public static class MongoClassMapConfigurator
                     var genericMethod = registerMethod.MakeGenericMethod(baseType);
                     var action = new Action<BsonClassMap>(cm =>
                     {
-                        if (shadowingTypes.Contains(baseType))
-                        {
-                            UnmapStatusFrom(cm);
-                        }
                         cm.AutoMap();
                         var convention = new RestmeDbAttributeConvention();
                         convention.Apply(cm);
@@ -154,71 +171,19 @@ public static class MongoClassMapConfigurator
                     _registeredTypes.Add(baseType);
                 }
             }
-
-            SuppressInheritedStatusIfNeeded(baseType);
-        }
-    }
-
-    private static bool HasShadowedStatus(Type type)
-    {
-        // DeclaredOnly avoids AmbiguousMatchException when multiple Status properties exist in the hierarchy.
-        var statusProperty = type.GetProperty("Status", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-        return statusProperty != null;
-    }
-
-    /// <summary>
-    /// Collects all types in the inheritance chain from <paramref name="derivedType"/> up to
-    /// (but not including) BaseEntity that shadow BaseEntity.Status with a 'new' keyword.
-    /// </summary>
-    private static HashSet<Type> CollectShadowingTypes(Type derivedType)
-    {
-        var shadowing = new HashSet<Type>();
-        var current = derivedType;
-        while (current != null && current != typeof(BaseEntity) && typeof(BaseEntity).IsAssignableFrom(current))
-        {
-            if (HasShadowedStatus(current))
-            {
-                shadowing.Add(current);
-            }
-            current = current.BaseType;
-        }
-        return shadowing;
-    }
-
-    /// <summary>
-    /// Removes the Status member from the given class map. Must be called BEFORE AutoMap()
-    /// because AutoMap freezes the map, after which UnmapProperty is a no-op.
-    /// </summary>
-    private static void UnmapStatusFrom(BsonClassMap classMap)
-    {
-        var statusMember = classMap.GetMemberMap("Status");
-        if (statusMember != null)
-        {
-            classMap.UnmapProperty("Status");
         }
     }
 
     /// <summary>
-    /// If the given type shadows BaseEntity.Status with a 'new' keyword, unmaps the inherited
-    /// BaseEntity.Status member from the BaseEntity class map so only the shadow property is serialized.
-    /// This is inferred automatically from the presence of a shadowed Status property — no attribute required.
+    /// True when the type declares its own Status property (shadowing BaseEntity.Status) and
+    /// is therefore owned by <see cref="RestmeShadowSerializationProvider"/> rather than by a
+    /// registered class map.
     /// </summary>
-    private static void SuppressInheritedStatusIfNeeded(Type type)
+    private static bool RestmeShadowSerializationProviderApplies(Type type)
     {
-        if (!BsonClassMap.IsClassMapRegistered(typeof(BaseEntity)))
-            return;
-
-        var baseClassMap = BsonClassMap.LookupClassMap(typeof(BaseEntity));
-        if (baseClassMap == null || baseClassMap.IsFrozen)
-            return;
-
-        // A shadowed property is one declared directly on `type`; an inherited one comes from BaseEntity.
-        // DeclaredOnly avoids AmbiguousMatchException when multiple Status properties exist in the hierarchy.
-        var shadowedStatus = type.GetProperty("Status", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-        if (shadowedStatus == null)
-            return;
-
-        UnmapStatusFrom(baseClassMap);
+        return type != typeof(BaseEntity) &&
+               typeof(BaseEntity).IsAssignableFrom(type) &&
+               type.GetProperty("Status", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly) != null;
     }
 
     /// <summary>
@@ -236,6 +201,14 @@ public static class MongoClassMapConfigurator
 
             // Ensure all base classes are configured first
             MongoPropertyConflictResolver.EnsureBaseClassesConfigured(type, configuredTypes);
+
+            // Shadowed types are owned by the serialization provider — no class-map registration.
+            if (RestmeShadowSerializationProviderApplies(type))
+            {
+                _registeredTypes.Add(type);
+                configuredTypes.Add(type);
+                return;
+            }
 
             // Configure the main type
             if (!BsonClassMap.IsClassMapRegistered(type))

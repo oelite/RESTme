@@ -72,40 +72,12 @@ public static class MongoPropertyConflictResolver
         Type type,
         Type? derivedType = null)
     {
-        // Detect if any type in the inheritance chain shadows BaseEntity.Status with 'new'.
-        // Unmap must happen before AutoMap() freezes the map.
-        if (derivedType != null)
-        {
-            UnmapStatusIfShadowed(classMap, derivedType, type);
-        }
+        // Status shadow resolution is handled exclusively by ShadowedStatusSerializer<T> via
+        // RestmeShadowSerializationProvider (restme#12 note 63578) — the order-dependent
+        // mutation of base class maps (UnmapStatusIfShadowed) was deleted because it could not
+        // act once the base map was frozen.
         classMap.AutoMap();
         ResolvePropertyConflicts(classMap, type);
-    }
-
-    private static void UnmapStatusIfShadowed(BsonClassMap classMap, Type derivedType, Type targetType)
-    {
-        if (!BsonClassMap.IsClassMapRegistered(typeof(BaseEntity)))
-            return;
-
-        var current = derivedType;
-        while (current != null && current != typeof(BaseEntity) && typeof(BaseEntity).IsAssignableFrom(current))
-        {
-            if (current != targetType && current.IsSubclassOf(targetType))
-            {
-                // DeclaredOnly avoids AmbiguousMatchException when multiple Status properties exist.
-                var statusProperty = current.GetProperty("Status", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-                if (statusProperty != null)
-                {
-                    var memberMap = classMap.GetMemberMap("Status");
-                    if (memberMap != null)
-                    {
-                        classMap.UnmapProperty("Status");
-                    }
-                    break;
-                }
-            }
-            current = current.BaseType!;
-        }
     }
 
     /// <summary>
