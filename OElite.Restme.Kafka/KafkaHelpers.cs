@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -208,11 +209,12 @@ namespace OElite.Restme.Kafka
 
             var producer = GetProducer();
             var tasks = new List<Task>();
+            var batchCount = 0;
 
             foreach (var message in messages)
             {
                 var messageValue = JsonSerializer.Serialize(message);
-                Console.WriteLine($"Publishing individual message: {messageValue}");
+                batchCount++;
                 var key = keySelector?.Invoke(message);
 
                 var kafkaMessage = new Message<string, string>
@@ -225,7 +227,7 @@ namespace OElite.Restme.Kafka
             }
 
             await Task.WhenAll(tasks);
-            Console.WriteLine("All messages published successfully");
+            Console.WriteLine($"Published {batchCount} messages to topic: {topicName}");
         }
 
         public async Task SubscribeAsync<T>(string topicName, string consumerGroup, Func<T, Task> messageHandler, CancellationToken cancellationToken = default)
@@ -267,13 +269,13 @@ namespace OElite.Restme.Kafka
 
                         if (consumeResult != null && consumeResult.Message != null)
                         {
-                            Console.WriteLine($"Consumer received message: '{consumeResult.Message.Value}'");
+                            Console.WriteLine($"Consumer received message on topic: {consumeResult.Topic}, partition: {consumeResult.Partition}, offset: {consumeResult.Offset} ({Encoding.UTF8.GetByteCount(consumeResult.Message.Value ?? string.Empty)} bytes)");
                             try
                             {
                                 var message = JsonSerializer.Deserialize<T>(consumeResult.Message.Value);
                                 if (message != null)
                                 {
-                                    Console.WriteLine($"Successfully deserialized message for user: {(message as dynamic)?.UserId}");
+                                    Console.WriteLine($"Successfully deserialized message (topic: {consumeResult.Topic}, partition: {consumeResult.Partition}, offset: {consumeResult.Offset})");
                                     await messageHandler(message);
                                 }
                                 else
@@ -283,8 +285,8 @@ namespace OElite.Restme.Kafka
                             }
                             catch (JsonException ex)
                             {
-                                // Log the problematic message for debugging
-                                Console.WriteLine($"Failed to deserialize message: '{consumeResult.Message.Value}'. Error: {ex.Message}");
+                                // Do not log the raw payload — only the structural failure reason.
+                                Console.WriteLine($"Failed to deserialize message (topic: {consumeResult.Topic}, partition: {consumeResult.Partition}, offset: {consumeResult.Offset}). Error: {ex.Message}");
                                 throw;
                             }
                         }
