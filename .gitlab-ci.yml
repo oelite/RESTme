@@ -95,11 +95,6 @@ build_solution:
           dotnet build $project/$project.csproj --configuration Release --no-restore
         fi
       done <<< "$PROJECTS"
-  artifacts:
-    paths:
-      - "**/bin/"
-      - "**/obj/"
-    expire_in: 1 hour
 
 # Unit tests run on every MR-head and protected-branch pipeline (CI-PIPELINE-EFFICIENCY-STANDARD.md §1/§2.4).
 # Data-layer integration tests are filtered out of CI and run locally against the shared
