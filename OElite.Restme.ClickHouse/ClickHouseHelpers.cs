@@ -19,14 +19,11 @@ namespace OElite.Restme.ClickHouse
             // Parse Restme connection string format: clickhouse://host:port/database
             var parsedConnection = ParseConnectionString(connectionString);
 
-            Console.WriteLine($"[DEBUG] Input connection string: {connectionString}");
-            Console.WriteLine($"[DEBUG] Parsed connection string: {parsedConnection}");
-
             // ClickHouse.Client expects standard ADO.NET format
             _connection = new ClickHouseConnection(parsedConnection);
         }
 
-        private static string ParseConnectionString(string connectionString)
+        internal static string ParseConnectionString(string connectionString)
         {
             // Handle both URI-style (clickhouse://user:pass@host:port/db) and ADO.NET-style (Host=...;Username=...)
             if (connectionString.StartsWith("clickhouse://"))
@@ -123,6 +120,7 @@ namespace OElite.Restme.ClickHouse
                         database = value;
                         break;
                     case "username":
+                    case "user": // Accept 'User=' alias (Origin Auth-style); key case is normalized by ToLowerInvariant above
                         username = value;
                         break;
                     case "password":
