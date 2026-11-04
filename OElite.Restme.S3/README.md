@@ -107,6 +107,29 @@ bool exists = await storageProvider.ExistsAsync("documents/report.json");
 await storageProvider.DeleteAsync("documents/report.json");
 ```
 
+## Bucket Encryption Policy
+
+`IBucketEncryptionPolicy` is a separate S3 capability, not an `IRestmeProvider`.
+It is not available through `Rest.GetProvider<IBucketEncryptionPolicy>()` or the
+`S3ServiceFactory`. Construct `S3BucketEncryptionPolicy` with the same `RestConfig`
+used for storage, or pass an existing `IAmazonS3` client to its alternate constructor
+(and manage that client's lifetime in the caller).
+
+```csharp
+using OElite.Providers;
+using OElite.Restme.Abstractions;
+
+IBucketEncryptionPolicy encryptionPolicy = new S3BucketEncryptionPolicy(config);
+var status = await encryptionPolicy.GetBucketEncryptionStatusAsync(config.InstanceName);
+if (!status.IsEncryptionVerified)
+    throw new InvalidOperationException($"Bucket encryption unverified: {status.Evidence}");
+```
+
+A status probe returns `Enabled`, `Disabled`, or `Unavailable`; inability to
+verify never counts as enabled. Write operations apply the requested setting
+and re-verify or fail closed. The shared MinIO stack has no KES/KMS, so it
+cannot be used to demonstrate a successful encryption-enforcement path.
+
 ## Core Features
 
 ### Object Storage
