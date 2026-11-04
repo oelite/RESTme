@@ -29,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\OElite.Restme\OElite.Restme.csproj" />
     <ProjectReference Include="..\..\OElite.Restme.Utils\OElite.Restme.Utils.csproj" />
+    <ProjectReference Include="..\..\OElite.Restme.MongoDb\OElite.Restme.MongoDb.csproj" />
   </ItemGroup>
 
 </Project>
