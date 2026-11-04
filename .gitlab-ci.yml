@@ -1,5 +1,6 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
+  NUGET_PACKAGES: "$CI_PROJECT_DIR/.nuget/packages"
   # Define projects as multi-line string (easier to manage than space-separated)
   PROJECTS: |
     OElite.Restme
@@ -16,31 +17,29 @@ variables:
     OElite.Restme.RateLimiting
     OElite.Restme.Hosting
 
-# Test projects temporarily removed to reduce CI/CD time and resource usage
-  # INTEGRATION_TEST_PROJECTS: |
-  #   OElite.Restme.MongoDb.IntegrationTests
-  #   OElite.Restme.ClickHouse.IntegrationTests
-  #   OElite.Restme.Kafka.IntegrationTests
-  #   OElite.Restme.OpenSearch.IntegrationTests
-
-  # UNIT_TEST_PROJECTS: |
-  #   OElite.Restme.ClickHouse.UnitTests
-  #   OElite.Restme.Kafka.UnitTests
-  #   OElite.Restme.OpenSearch.UnitTests
+# Test projects: unit tests run in CI; integration tests remain local-only
+# against the shared oelite-stack (no per-repo containers, per standard 16).
+  UNIT_TEST_PROJECTS: |
+    tests/OElite.Restme.UnitTests/OElite.Restme.UnitTests.csproj
+    tests/OElite.Restme.RateLimiting.UnitTests/OElite.Restme.RateLimiting.UnitTests.csproj
+    tests/OElite.Restme.OpenSearch.UnitTests/OElite.Restme.OpenSearch.UnitTests.csproj
 
 stages:
   - version
   - build
-  # - test  # Temporarily disabled to reduce CI/CD time and resource usage
+  - test
   - pack
   - deploy
 
-# Manual trigger support (similar to workflow_dispatch)
+# Per CI-PIPELINE-EFFICIENCY-STANDARD.md §1: MR pipelines (merge_request_event) are
+# the merge gate; pipelines run on protected branches and manual/web/api triggers only.
+# No push pipelines on feature/* or fix/* branches.
 workflow:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "web"
-    - if: $CI_COMMIT_BRANCH == "develop"
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
 
 determine_version:
   stage: version
@@ -76,9 +75,17 @@ determine_version:
 build_solution:
   stage: build
   image: mcr.microsoft.com/dotnet/sdk:10.0
+  interruptible: true
+  timeout: 15m
+  cache:
+    key:
+      files:
+        - NuGet.config
+    paths:
+      - .nuget/packages
   script:
     - dotnet restore --configfile NuGet.config
-    - dotnet build --configuration Release --configfile NuGet.config
+    - dotnet build --configuration Release --configfile NuGet.config --no-restore
     # Ensure all specified projects are built (solution build sometimes skips some)
     - |
       echo "Building specified projects:"
@@ -94,49 +101,62 @@ build_solution:
       - "**/obj/"
     expire_in: 1 hour
 
-# Tests temporarily removed to reduce CI/CD time and resource usage
-# run_tests:
-#   stage: test
-#   image: mcr.microsoft.com/dotnet/sdk:10.0
-#   services:
-#     - docker:dind
-#   variables:
-#     DOCKER_DRIVER: overlay2
-#     DOCKER_TLS_CERTDIR: "/certs"
-#     DOCKER_HOST: tcp://docker:2376
-#     DOCKER_TLS_VERIFY: 1
-#     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
-#   dependencies:
-#     - build_solution
-#   script:
-#     - echo "Running unit tests..."
-#     - dotnet test --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-test-results.xml" --results-directory ./test-results
-#     - |
-#       while IFS= read -r project || [ -n "$project" ]; do
-#         if [ -n "$project" ]; then
-#           echo "Running unit tests for $project"
-#           dotnet test tests/$project/$project.csproj --configuration Release --logger "junit;LogFilePath=../artifacts/{assembly}-unit-test-results.xml" --results-directory ./unit-test-results
-#         fi
-#       done <<< "$UNIT_TEST_PROJECTS"
-#   artifacts:
-#     reports:
-#       junit:
-#         - "**/test-results/*.xml"
-#         - "**/unit-test-results/*.xml"
-#         - "**/integration-test-results/*.xml"
-#     paths:
-#       - "**/test-results/"
-#       - "**/unit-test-results/"
-#       - "**/integration-test-results/"
-#     expire_in: 1 week
+# Unit tests run on every MR-head and protected-branch pipeline (CI-PIPELINE-EFFICIENCY-STANDARD.md §1/§2.4).
+# Data-layer integration tests are filtered out of CI and run locally against the shared
+# oelite-stack — never against per-repo containers (standard 16, Gate E).
+run_unit_tests:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  interruptible: true
+  timeout: 15m
+  cache:
+    key:
+      files:
+        - NuGet.config
+    paths:
+      - .nuget/packages
+    policy: pull
+  dependencies:
+    - build_solution
+  script:
+    - dotnet restore --configfile NuGet.config
+    - |
+      while IFS= read -r project || [ -n "$project" ]; do
+        if [ -n "$project" ]; then
+          echo "Running unit tests for $project"
+          # Pin to net10.0 — the CI image (mcr.microsoft.com/dotnet/sdk:10.0) ships
+          # only the .NET 10 runtime, so multi-targeted test projects abort when
+          # their net8.0/net9.0 testhosts start (Microsoft.NETCore.App 8.0/9.0 not found).
+          # Local developers keep the full net8.0/net9.0/net10.0 matrix via plain `dotnet test`.
+          dotnet test "$project" --configuration Release --no-restore \
+            --framework net10.0 \
+            --filter "Category!=Integration" \
+            --logger "junit;LogFileName={assembly}-test-results.xml" \
+            --results-directory "$PWD/unit-test-results" || exit $?
+        fi
+      done <<< "$UNIT_TEST_PROJECTS"
+  artifacts:
+    reports:
+      junit:
+        - "unit-test-results/*.xml"
+    paths:
+      - "unit-test-results/"
+    expire_in: 1 week
+    when: always
 
 pack_packages:
   stage: pack
   image: mcr.microsoft.com/dotnet/sdk:10.0
+  interruptible: true
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'
   dependencies:
     - build_solution
     - determine_version
-    # - run_tests  # Temporarily removed (tests disabled for faster builds)
+    - run_unit_tests
   script:
     # Restore dependencies first
     - dotnet restore --configfile NuGet.config
@@ -169,6 +189,16 @@ pack_packages:
 deploy_packages:
   stage: deploy
   image: mcr.microsoft.com/dotnet/sdk:10.0
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        DEPLOY_ENV: development
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      variables:
+        DEPLOY_ENV: production
+  environment:
+    name: $DEPLOY_ENV
   dependencies:
     - pack_packages
     - determine_version
@@ -186,7 +216,7 @@ deploy_packages:
         DEPLOY_TARGET="packages.phanes.ltd"
         NUGET_SOURCE="https://packages.phanes.ltd/v3/index.json"
         echo "Deploying to $DEPLOY_TARGET"
-        echo "Source: $NUGET_SOURCE - $PHANES_API_TOKEN"
+        echo "Source: $NUGET_SOURCE"
         echo "Using Phanes NuGet feed authentication"
         dotnet nuget push ./packages/*.nupkg --source $NUGET_SOURCE --api-key "$PHANES_API_TOKEN" --skip-duplicate
       fi
