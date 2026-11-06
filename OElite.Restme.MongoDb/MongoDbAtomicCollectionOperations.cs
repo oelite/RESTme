@@ -41,7 +41,7 @@ internal sealed class MongoDbAtomicCollectionOperations<T> : IMongoDbAtomicColle
         }
         catch (OperationCanceledException)
         {
-            throw;
+            throw new MongoDbWriteException(MongoDbWriteFailure.OutcomeUnknown);
         }
         catch (MongoWriteConcernException)
         {
@@ -62,7 +62,7 @@ internal sealed class MongoDbAtomicCollectionOperations<T> : IMongoDbAtomicColle
         }
         catch (OperationCanceledException)
         {
-            throw;
+            throw new MongoDbWriteException(MongoDbWriteFailure.OutcomeUnknown);
         }
         catch (MongoWriteConcernException)
         {

@@ -405,19 +405,27 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
         T document, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(document);
+        cancellationToken.ThrowIfCancellationRequested();
         if (document.Id.IsNullOrEmpty())
         {
             document.Id = DbObjectId.NewId();
         }
 
-        switch (await _atomicOperations.InsertOneAsync(document, cancellationToken))
+        try
         {
-            case MongoDbAtomicInsertOutcome.Inserted:
-                return new MongoDbInsertResult<T>(MongoDbInsertResultStatus.Inserted, document, null);
-            case MongoDbAtomicInsertOutcome.DuplicateKey:
-                return new MongoDbInsertResult<T>(MongoDbInsertResultStatus.DuplicateKey, null, "Unique key already exists.");
-            default:
-                throw new MongoDbWriteException(MongoDbWriteFailure.OutcomeUnknown);
+            switch (await _atomicOperations.InsertOneAsync(document, cancellationToken))
+            {
+                case MongoDbAtomicInsertOutcome.Inserted:
+                    return new MongoDbInsertResult<T>(MongoDbInsertResultStatus.Inserted, document, null);
+                case MongoDbAtomicInsertOutcome.DuplicateKey:
+                    return new MongoDbInsertResult<T>(MongoDbInsertResultStatus.DuplicateKey, null, "Unique key already exists.");
+                default:
+                    throw new MongoDbWriteException(MongoDbWriteFailure.OutcomeUnknown);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw new MongoDbWriteException(MongoDbWriteFailure.OutcomeUnknown);
         }
     }
 
@@ -426,6 +434,7 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
         var version = MongoDbAtomicWrite.VersionPropertyExpression<T>(request.VersionProperty);
         return await ReplaceOneIfVersionAsync(
             request.Replacement, version, request.ExpectedVersion, request.Condition, cancellationToken);
@@ -440,6 +449,7 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(version);
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var (filter, snapshot) = MongoDbAtomicWrite.PrepareCompareExchange(
@@ -455,7 +465,7 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
         }
         catch (OperationCanceledException)
         {
-            throw;
+            throw new MongoDbWriteException(MongoDbWriteFailure.OutcomeUnknown);
         }
         catch (MongoException)
         {

@@ -130,6 +130,63 @@ public class MongoDbCollectionWriteContractTests
         Assert.False(called);
     }
 
+    [Fact]
+    public async Task InsertOneIfAbsentAsync_CancellationAfterDispatch_SanitizedOutcomeUnknown_NoRetryableResult()
+    {
+        var source = new CancellationTokenSource();
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // The injected provider waits on the token only after confirming dispatch began.
+        var ops = new InjectedAtomicOperations
+        {
+            InsertOneAsyncOverride = async (doc, ct) =>
+            {
+                entered.SetResult(true);
+                await Task.Delay(Timeout.Infinite, ct);
+                return MongoDbAtomicInsertOutcome.Inserted;
+            }
+        };
+        IMongoDbCollection<VersionedEntity> collection = CreateCollection(ops);
+        var write = collection.InsertOneIfAbsentAsync(
+            new VersionedEntity { Id = DbObjectId.NewId() }, cancellationToken: source.Token);
+
+        await entered.Task;
+        source.Cancel();
+        var error = await Assert.ThrowsAsync<MongoDbWriteException>(() => write);
+
+        Assert.Equal(MongoDbWriteFailure.OutcomeUnknown, error.Failure);
+        Assert.Null(error.InnerException);
+        Assert.DoesNotContain("canceled", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ReplaceOneIfVersionAsync_CancellationAfterDispatch_SanitizedOutcomeUnknown_NoConflictResult()
+    {
+        var source = new CancellationTokenSource();
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var ops = new InjectedAtomicOperations
+        {
+            ReplaceOneAsyncOverride = async (filter, repl, ct) =>
+            {
+                entered.SetResult(true);
+                await Task.Delay(Timeout.Infinite, ct);
+                return new ReplaceOneResult.Acknowledged(0, 0, null);
+            }
+        };
+        IMongoDbCollection<VersionedEntity> collection = CreateCollection(ops);
+        var write = collection.ReplaceOneIfVersionAsync(
+            new VersionedEntity { Id = DbObjectId.NewId(), Version = 5 }, x => x.Version, 5, cancellationToken: source.Token);
+
+        await entered.Task;
+        source.Cancel();
+        var error = await Assert.ThrowsAsync<MongoDbWriteException>(() => write);
+
+        Assert.Equal(MongoDbWriteFailure.OutcomeUnknown, error.Failure);
+        Assert.Null(error.InnerException);
+        Assert.DoesNotContain("canceled", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── CAS / version contract ──────────────────────────────────────────────
 
     [Fact]
