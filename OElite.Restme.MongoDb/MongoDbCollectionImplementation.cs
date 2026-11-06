@@ -1,3 +1,4 @@
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using OElite.Common;
@@ -339,10 +340,20 @@ internal class MongoDbCollectionImplementation : IMongoDbCollection
 internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where T : BaseEntity
 {
     private readonly IMongoCollection<T> _collection;
+    private readonly IMongoDbAtomicCollectionOperations<T> _atomicOperations;
 
     public MongoDbCollectionImplementation(IMongoCollection<T> collection)
     {
         _collection = collection;
+        _atomicOperations = new MongoDbAtomicCollectionOperations<T>(collection);
+    }
+
+    internal MongoDbCollectionImplementation(
+        IMongoCollection<T> collection,
+        IMongoDbAtomicCollectionOperations<T> atomicOperations)
+    {
+        _collection = collection;
+        _atomicOperations = atomicOperations;
     }
 
     public async Task<List<T>> FindAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
@@ -389,6 +400,73 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
         }
         await _collection.InsertOneAsync(document, cancellationToken: cancellationToken);
     }
+
+    public async Task<MongoDbInsertResult<T>> InsertOneIfAbsentAsync(
+        T document, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (document.Id.IsNullOrEmpty())
+        {
+            document.Id = DbObjectId.NewId();
+        }
+
+        switch (await _atomicOperations.InsertOneAsync(document, cancellationToken))
+        {
+            case MongoDbAtomicInsertOutcome.Inserted:
+                return new MongoDbInsertResult<T>(MongoDbInsertResultStatus.Inserted, document, null);
+            case MongoDbAtomicInsertOutcome.DuplicateKey:
+                return new MongoDbInsertResult<T>(MongoDbInsertResultStatus.DuplicateKey, null, "Unique key already exists.");
+            default:
+                throw new MongoDbWriteException(MongoDbWriteFailure.OutcomeUnknown);
+        }
+    }
+
+    public async Task<MongoDbCasResult<T>> ReplaceOneIfVersionAsync(
+        MongoDbVersionedWrite<T> request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var version = MongoDbAtomicWrite.VersionPropertyExpression<T>(request.VersionProperty);
+        return await ReplaceOneIfVersionAsync(
+            request.Replacement, version, request.ExpectedVersion, request.Condition, cancellationToken);
+    }
+
+    public async Task<MongoDbCasResult<T>> ReplaceOneIfVersionAsync(
+        T document,
+        System.Linq.Expressions.Expression<Func<T, long>> version,
+        long expectedVersion,
+        System.Linq.Expressions.Expression<Func<T, bool>>? condition = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(version);
+        try
+        {
+            var (filter, snapshot) = MongoDbAtomicWrite.PrepareCompareExchange(
+                document, version, expectedVersion, condition, _atomicOperations.DocumentSerializer);
+            var persisted = BsonSerializer.Deserialize<T>(snapshot);
+            var result = await _atomicOperations.ReplaceOneAsync(filter, persisted, cancellationToken);
+
+            return MongoDbAtomicWrite.MapReplaceResult(result, persisted, expectedVersion);
+        }
+        catch (MongoDbWriteException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (MongoException)
+        {
+            throw new MongoDbWriteException(MongoDbWriteFailure.ProviderFailure);
+        }
+    }
+
+    public Task<TResult> ExecuteInTransactionAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken = default)
+        => throw new MongoDbTransactionException(MongoDbTransactionFailure.Unsupported);
 
     public async Task<long> CountDocumentsAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
     {
