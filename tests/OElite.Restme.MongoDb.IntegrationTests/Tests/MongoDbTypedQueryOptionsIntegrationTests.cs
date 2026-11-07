@@ -330,7 +330,7 @@ public class MongoDbTypedQueryOptionsIntegrationTests : TestBase
             ex.Failure.Should().Be(MongoDbBulkInsertFailure.DuplicateKey);
             ex.InsertedCount.Should().Be(2); // The two "New" items before the duplicate
             var verifyResults = await collection.FindPagedAsync(p => p.IsActive, (MongoDbQueryOptions<TestProduct>?)null);
-            verifyResults.Should().HaveCount(3); // 1 original + 2 newly inserted
+            verifyResults.Documents.Should().HaveCount(3); // 1 original + 2 newly inserted
         }
     }
 
@@ -372,9 +372,9 @@ public class MongoDbTypedQueryOptionsIntegrationTests : TestBase
         products[0].Id.Should().NotBe(products[1].Id);
 
         // Verify persistence
-        var result = await collection.FindPagedAsync(p => true, (MongoDbQueryOptions<TestProduct>?)null);
-        result.Documents.Should().HaveCount(2);
-        result.Documents.All(p => !p.Id.IsNullOrEmpty()).Should().BeTrue();
+        var pagedResult = await collection.FindPagedAsync(p => true, (MongoDbQueryOptions<TestProduct>?)null);
+        pagedResult.Documents.Should().HaveCount(2);
+        pagedResult.Documents.All(p => !p.Id.IsNullOrEmpty()).Should().BeTrue();
     }
 
     [Fact]
@@ -398,8 +398,8 @@ public class MongoDbTypedQueryOptionsIntegrationTests : TestBase
         products[0].Id.Should().Be(id1);
         products[1].Id.Should().Be(id2);
 
-        var result = await collection.FindPagedAsync(p => true, (MongoDbQueryOptions<TestProduct>?)null);
-        result.Documents.Select(p => p.Id).Should().Contain(new[] { id1, id2 });
+        var pagedResult = await collection.FindPagedAsync(p => true, (MongoDbQueryOptions<TestProduct>?)null);
+        pagedResult.Documents.Select(p => p.Id).Should().Contain(new[] { id1, id2 });
     }
 
     [Fact]
