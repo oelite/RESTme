@@ -362,6 +362,124 @@ internal class MongoDbCollectionImplementation<T> : IMongoDbCollection<T> where 
         return await cursor.ToListAsync(cancellationToken);
     }
 
+    public async Task<MongoDbPagedResult<T>> FindPagedAsync(
+        System.Linq.Expressions.Expression<Func<T, bool>> filter,
+        MongoDbQueryOptions<T>? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        options ??= new MongoDbQueryOptions<T>();
+        ValidateQueryOptions(options);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var totalCount = await _collection.CountDocumentsAsync(filter, cancellationToken: cancellationToken);
+        var find = _collection.Find(filter);
+        if (options.SortExpression is not null)
+        {
+            find = options.Ascending
+                ? find.SortBy(options.SortExpression)
+                : find.SortByDescending(options.SortExpression);
+        }
+
+        if (options.Skip > 0)
+        {
+            find = find.Skip(options.Skip);
+        }
+
+        if (options.Limit > 0)
+        {
+            find = find.Limit(options.Limit);
+        }
+
+        var documents = await find.ToListAsync(cancellationToken);
+        var pageSize = options.Limit;
+        var pageIndex = pageSize > 0 ? options.Skip / pageSize : 0;
+        return new MongoDbPagedResult<T>
+        {
+            Documents = documents,
+            TotalCount = totalCount,
+            Skip = options.Skip,
+            PageIndex = pageIndex,
+            PageSize = pageSize
+        };
+    }
+
+    private static void ValidateQueryOptions(MongoDbQueryOptions<T> options)
+    {
+        if (options.Skip < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), "Skip must be nonnegative.");
+        }
+
+        if (options.Limit < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), "Limit must be nonnegative.");
+        }
+    }
+
+    public async Task<MongoDbBulkInsertResult<T>> InsertManyAsync(
+        IEnumerable<T> documents,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(documents);
+        var batch = documents.ToList();
+        if (batch.Any(document => document is null))
+        {
+            throw new ArgumentException("Bulk insert documents cannot contain null entries.", nameof(documents));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (batch.Count == 0)
+        {
+            return new MongoDbBulkInsertResult<T>(0, 0, new List<T>());
+        }
+
+        foreach (var document in batch)
+        {
+            if (document.Id.IsNullOrEmpty())
+            {
+                document.Id = DbObjectId.NewId();
+            }
+        }
+
+        try
+        {
+            await _collection.InsertManyAsync(
+                batch,
+                new InsertManyOptions { IsOrdered = true },
+                cancellationToken);
+            return new MongoDbBulkInsertResult<T>(batch.Count, 0, new List<T>());
+        }
+        catch (MongoBulkWriteException<T> exception)
+        {
+            var insertedCount = checked((int)exception.Result.InsertedCount);
+            var duplicateIndexes = exception.WriteErrors
+                .Where(error => error.Category == ServerErrorCategory.DuplicateKey)
+                .Select(error => error.Index)
+                .Where(index => index >= insertedCount && index < batch.Count)
+                .Distinct()
+                .ToArray();
+            var failure = duplicateIndexes.Length > 0
+                ? MongoDbBulkInsertFailure.DuplicateKey
+                : exception.Result.IsAcknowledged
+                    ? MongoDbBulkInsertFailure.ProviderFailure
+                    : MongoDbBulkInsertFailure.OutcomeUnknown;
+            throw new MongoDbBulkInsertException(failure, insertedCount);
+        }
+        catch (OperationCanceledException)
+        {
+            throw new MongoDbBulkInsertException(MongoDbBulkInsertFailure.OutcomeUnknown, 0);
+        }
+        catch (MongoWriteConcernException)
+        {
+            throw new MongoDbBulkInsertException(MongoDbBulkInsertFailure.OutcomeUnknown, 0);
+        }
+        catch (MongoException)
+        {
+            throw new MongoDbBulkInsertException(MongoDbBulkInsertFailure.ProviderFailure, 0);
+        }
+    }
+
     public async Task<T?> FindOneAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
     {
         return await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
