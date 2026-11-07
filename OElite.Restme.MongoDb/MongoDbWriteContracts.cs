@@ -69,6 +69,32 @@ public enum MongoDbWriteFailure
     OutcomeUnknown
 }
 
+/// <summary>Failure classification for an ordered bulk insert.</summary>
+public enum MongoDbBulkInsertFailure
+{
+    DuplicateKey,
+    ProviderFailure,
+    OutcomeUnknown
+}
+
+/// <summary>
+/// Sanitized failure from an ordered bulk insert. InsertedCount is the count confirmed by the
+/// provider as successful before the failure; for OutcomeUnknown it is not a complete count.
+/// Reconcile before retrying when OutcomeUnknown is reported.
+/// </summary>
+public sealed class MongoDbBulkInsertException : Exception
+{
+    public MongoDbBulkInsertFailure Failure { get; }
+    public int InsertedCount { get; }
+
+    public MongoDbBulkInsertException(MongoDbBulkInsertFailure failure, int insertedCount)
+        : base($"Bulk insert failed: {failure}.")
+    {
+        Failure = failure;
+        InsertedCount = insertedCount;
+    }
+}
+
 /// <summary>
 /// Failure from a new atomic write API. OutcomeUnknown means the outcome is not asserted;
 /// reconcile before retrying. Driver messages, collection details, and credentials are never retained.

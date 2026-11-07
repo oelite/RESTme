@@ -165,6 +165,23 @@ public interface IMongoDbCollection<T> where T : BaseEntity
     Task<List<T>> FindAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Find typed documents matching the filter, with optional server-side ordering and paging.
+    /// TotalCount represents all matching documents before paging.
+    /// </summary>
+    Task<MongoDbPagedResult<T>> FindPagedAsync(
+        System.Linq.Expressions.Expression<Func<T, bool>> filter,
+        MongoDbQueryOptions<T>? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Inserts documents using ordered bulk semantics. A duplicate or provider failure may leave an
+    /// acknowledged prefix inserted; this operation is not transactional. Such failures throw a
+    /// sanitized MongoDbBulkInsertException carrying the confirmed inserted count. Cancellation and
+    /// write-concern failures are outcome-unknown and require reconciliation before retry.
+    /// </summary>
+    Task<MongoDbBulkInsertResult<T>> InsertManyAsync(IEnumerable<T> documents, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Find first document using lambda expression filter
     /// </summary>
     Task<T?> FindOneAsync(System.Linq.Expressions.Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
